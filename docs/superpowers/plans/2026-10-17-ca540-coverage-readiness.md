@@ -391,3 +391,9 @@ Formatting passed for all 49 affected TypeScript/JSON files; the staged whitespa
 ### Contribution handoff
 
 [PR #3](https://github.com/bigshort2022/opentax/pull/3) contains the separately committed arithmetic correction (`95516843`) and bounded implementation (`fb8ef56f`). Complete-return scenarios remain future work. GitHub CI status must be distinguished from the observed local results above; neither constitutes official FTB validation or filing authorization.
+
+### Checkout runtime maintenance
+
+Updated all four `actions/checkout` references across the test, Pages and release workflows from `v4` to `v5`, without changing triggers or permissions. The [official v5 release](https://github.com/actions/checkout/releases/tag/v5.0.0) moves checkout to Node.js 24 and requires runner 2.327.1 or newer; the observed hosted runner is 2.337.0.
+
+All three workflow files pass YAML syntax validation. [CI run 39010255698](https://github.com/bigshort2022/opentax/actions/runs/39010255698) passed both verification jobs on checkout-update commit `0f070b8d`, executed `checkout@v5`, and no longer emitted the previous Node.js 20 deprecation warning. Pages deployment and release workflows were not manually dispatched. This maintenance does not broaden tax or filing scope.
