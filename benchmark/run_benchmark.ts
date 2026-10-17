@@ -13,7 +13,7 @@ import {
   createdReturnSchema,
   discoverBenchmarkCases,
 } from "./harness.ts";
-import { runCa540Benchmark } from "./ca540_2025.ts";
+import { runCaBenchmark } from "./ca540.ts";
 
 const SCRIPT_DIR = dirname(fromFileUrl(import.meta.url));
 const TAX_DIR = join(SCRIPT_DIR, "..");
@@ -33,7 +33,20 @@ if (import.meta.main && formFlag === "ca540") {
   if (yearFlag !== "2025") {
     throw new Error(`Unsupported California benchmark year: ${yearFlag}`);
   }
-  Deno.exit(await runCa540Benchmark() ? 0 : 1);
+  const report = await runCaBenchmark(
+    join(SCRIPT_DIR, "cases", "ca540", yearFlag),
+  );
+  console.log(
+    jsonFlag ? JSON.stringify(report) : [
+      ...report.results.map((result) =>
+        `${result.ok ? "PASS" : "FAIL"} ${result.name}${
+          result.errors.length ? ": " + result.errors.join("; ") : ""
+        }`
+      ),
+      `${report.pass} passed, ${report.fail} failed; CA workpaper evidence only, exact dollars; no filing authorization`,
+    ].join("\n"),
+  );
+  Deno.exit(report.total > 0 && report.fail === 0 ? 0 : 1);
 }
 
 const CASES_DIR = join(SCRIPT_DIR, "cases", formFlag, yearFlag);
@@ -335,7 +348,15 @@ async function runCase(name: string): Promise<CaseResult> {
   const correct = JSON.parse(await Deno.readTextFile(correctFile));
   benchmarkExpectedSchema.parse(correct);
   const rid = createdReturnSchema.parse(JSON.parse(
-    await tax("return", "create", "--year", String(caseData.year), "--json"),
+    await tax(
+      "return",
+      "create",
+      "--form",
+      formFlag,
+      "--year",
+      String(caseData.year),
+      "--json",
+    ),
   )).returnId;
   for (const f of caseData.forms) {
     await tax(

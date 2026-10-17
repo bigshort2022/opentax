@@ -185,7 +185,7 @@ const COMMANDS: readonly CommandDef[] = [
     cmd: "return",
     sub: "export",
     description:
-      "Export a return as MeF XML, filled IRS PDF, or Form 4972 paper packet",
+      "Export MeF XML, filled federal PDF, CA workpaper, or Form 4972 paper packet",
     usage:
       "opentax return export --returnId <id> --type mef|pdf|form4972-paper [--force] [--draft] [--output <path>]",
     options: [
@@ -197,7 +197,8 @@ const COMMANDS: readonly CommandDef[] = [
       },
       {
         flag: "--force",
-        description: "Bypass reject-severity validation gate",
+        description:
+          "Bypass federal reject-severity business rules (not CA workpaper restrictions)",
         required: false,
       },
       {
@@ -374,7 +375,8 @@ const COMMANDS: readonly CommandDef[] = [
   {
     cmd: "return",
     sub: "validate",
-    description: "Validate a return against MeF business rules",
+    description:
+      "Report federal rule validation or California workpaper readiness diagnostics",
     usage: "opentax return validate --returnId <id> [--format text|json]",
     options: [
       { flag: "--returnId", description: "Return identifier", required: true },

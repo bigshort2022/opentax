@@ -26,6 +26,7 @@ import type {
   DiagnosticsReport,
   ErrorCategory,
 } from "../../core/validation/types.ts";
+import type { StateDiagnosticsReport } from "../../core/validation/state-report.ts";
 import { FIELD_REGISTRY } from "../../forms/f1040/validation/field-registry.ts";
 import { ALL_RULES } from "../../forms/f1040/validation/rules/index.ts";
 import { normalizeAllPending } from "../../forms/f1040/2025/return-processing/pending.ts";
@@ -46,7 +47,7 @@ export type ValidateReturnArgs = {
 };
 
 export type ValidateReturnResult = {
-  readonly report: DiagnosticsReport;
+  readonly report: DiagnosticsReport | StateDiagnosticsReport;
   readonly formatted: string;
 };
 
@@ -62,37 +63,7 @@ export async function validateReturnCommand(
   const def = getCatalogEntry(meta.formType ?? "f1040", meta.year);
   if (isStateFormDefinition(def)) {
     const entriesForInput = inputs[def.inputKey] ?? [];
-    const blockers = entriesForInput.length === 1
-      ? def.calculate({ ...entriesForInput[0].fields }).blockers
-      : ["California Form 540 requires exactly one validated input object."];
-    const entries: DiagnosticEntry[] = [
-      ...blockers.map((message, index) => ({
-        ruleNumber: `CA540_REVIEW_${index + 1}`,
-        severity: "reject" as const,
-        category: "unsupported" as const,
-        message,
-        formRef: "Form 540",
-      })),
-      {
-        ruleNumber: "CA540_SCOPE_NOT_FILING_READY",
-        severity: "reject",
-        category: "unsupported",
-        message:
-          "This calculation worksheet is not a filing-readiness validation.",
-        formRef: "Form 540",
-      },
-    ];
-    const report: DiagnosticsReport = {
-      entries,
-      summary: {
-        total: entries.length,
-        passed: 0,
-        rejected: entries.length,
-        alerts: 0,
-        skipped: 0,
-      },
-      canFile: false,
-    };
+    const { report } = def.assess(entriesForInput.map((entry) => entry.fields));
     const format = args.format ?? "json";
     return {
       report,

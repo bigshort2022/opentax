@@ -38,5 +38,21 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
 
+  ca540-workpaper:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Provision PDF text utilities for worksheet checks
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
+      - name: California arithmetic, readiness and workpaper tests
+        run: deno task test:ca540
+      - name: Canonical California evidence benchmark (not filing certification)
+        run: deno task bench --form ca540 --year 2025 --json
+
 # Private IRS schemas, reviewed attachment bytes and ATS acceptance require
 # the separately recorded full/evidence gates; this job does not claim them.
+# California checks are local workpaper evidence only, not private FTB schemas,
+# PATS certification, provider approval or transmission acceptance.

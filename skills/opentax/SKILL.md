@@ -13,6 +13,8 @@ Ask which tax year(s) and jurisdiction(s) the user needs, whether each return is
 
 The supported full-return preparation scope is federal Form 1040 for TY2025. A separate California Form 540 TY2025 workpaper supports selected calculations for full-year residents only; it is not a complete return, filing-readiness review, or e-fileable return. Do not claim support for federal TY2022–TY2024, California TY2022–TY2024, 540NR, 540 2EZ, or amended returns. For CA workpaper requests, explain the limitations in `docs/ca540-ty2025.md` before gathering any values.
 
+For a CA workpaper, inspect `return validate` coverage, stable finding codes, and each gate outcome; exit zero only means the inspection ran. Do not treat supplied totals, zero amounts, affirmative review flags, unavailable official checks, or unverified external checks as a complete-return pass. `canFile` remains false and force/draft cannot enable CA MeF export.
+
 If the requested scope is supported and `opentax` is not installed, ask permission before running the installer. Never install or update automatically. Verify the selected executable with `opentax version`.
 
 ## Privacy and routing

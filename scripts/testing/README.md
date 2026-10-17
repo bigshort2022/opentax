@@ -13,11 +13,10 @@ in [AGENTS.md](../../AGENTS.md); the rule each check owns is in the table in
 | `deno task check:oracle [--base origin/main]` | expected values changed only with a citation             | a changed scored value, a removed case, or a new case without a source, that has no matching entry in `benchmark/cases/<form>/<year>/ledger.json`                                                                           |
 | `deno task bench --form f1040 --year 2025`    | the engine matches IRS ground truth                      | a supported line outside the $5 legacy tolerance, an unmapped oracle, a diagnostic, a skipped case                                                                                                                          |
 | `deno task test:unit`                         | the module graph resolves and the typed tests pass       | a graph error, a missing or duplicate test module, a failing test, a runtime change during the run                                                                                                                          |
+| `deno task test:ca540` | selected CA calculations, coverage, assessment, CLI/worksheet and evidence contracts execute | a selected behavioral contract fails; this does not run official FTB schemas/PATS |
+| `deno task bench --form ca540 --year 2025 --json` | canonical CA line/workpaper expectations match exactly, including intentional non-readiness | a numeric/typed expectation differs, inventory is empty/malformed, required evidence is absent, or workflow fails |
 
-Every check prints each problem with its fix, takes `--json`, and exits 1 on any
-problem. `.github/workflows/test.yml` runs the first three and `test:unit` on
-every pull request. `bench` runs locally until the baselined cases below are
-fixed, then joins them.
+The first three checks print problems with fixes and support JSON reports. `.github/workflows/test.yml` runs those checks and `test:unit`, plus an explicit CA test/benchmark job with the required PDF utilities. The federal benchmark remains local while its baselined invalid cases remain unresolved; a CA pass is not a clean federal benchmark or filing certification.
 
 ## Ratchets
 
@@ -30,6 +29,8 @@ fails until it is removed, so a baseline only shrinks.
 | `scripts/testing/structure-baseline.json`   | path, node type        | nodes outside the tree, registry and reach problems |
 | `benchmark/cases/baseline.json`             | `<form>/<year>/<case>` | cases whose inputs no longer fit their node schema  |
 | `benchmark/cases/<form>/<year>/ledger.json` | case, line             | every expected-value change, with its publication   |
+
+California ledgers use typed assertion paths and official/project-policy authority for numeric and nonnumeric outcomes, inputs/sources, and manifest changes. Their contributor provenance does not imply user or tax-professional numerical approval. Federal numeric ledger semantics are unchanged.
 
 The ledger is history, not debt: it is append-only and never expires. An entry
 that cites the engine, its output or a reference calculator does not count.
@@ -51,6 +52,8 @@ checking the graph of every TypeScript module. `test:harness` selects the
 verification contracts and benchmark harness. `test:preflight` checks discovery
 and graph resolution without executing tests. Reports explicitly list excluded
 modules; a selected run does not prove complete filing coverage.
+
+`deno task test:ca540` is a separate explicit selection of `forms/ca540/2025`, `cli/commands/ca540.test.ts`, and `benchmark/ca540.test.ts`. It is required because the ordinary unit mode excludes CA product/command modules; graph discovery alone is not execution evidence. CA canonical cases distinguish line-31 checks from workpapers and reject complete-return cases until that product scope exists.
 
 `deno task test` runs the complete discovered suite serially, requires xmllint,
 Poppler and the retained TY2025 Return1040 schema, and rejects unavailable

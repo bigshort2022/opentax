@@ -1,0 +1,38 @@
+{
+  "product": "ca540",
+  "year": 2025,
+  "cases": [
+    {
+      "id": "single-tax-table-68494",
+      "kind": "line31",
+      "requirements": [
+        "ca540.line31.ordinary_tax"
+      ]
+    },
+    {
+      "id": "single-rate-schedule-150000",
+      "kind": "line31",
+      "requirements": [
+        "ca540.line31.ordinary_tax"
+      ]
+    },
+    {
+      "id": "workpaper-baseline",
+      "kind": "workpaper",
+      "requirements": [
+        "ca540.line18.standard_deduction",
+        "ca540.line31.ordinary_tax",
+        "ca540.line32.exemption_credits",
+        "ca540.line14.schedule_ca_subtractions"
+      ]
+    },
+    {
+      "id": "mixed-exemption-regression",
+      "kind": "workpaper",
+      "requirements": [
+        "ca540.line32.exemption_credits",
+        "ca540.line31.ordinary_tax"
+      ]
+    }
+  ]
+}

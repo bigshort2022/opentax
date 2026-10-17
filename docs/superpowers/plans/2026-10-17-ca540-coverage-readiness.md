@@ -165,7 +165,7 @@ No overall "percent filing-ready" score. Report exact capability and assessment 
 
 **Files:** modify `forms/ca540/2025/credits.ts`, `credits.test.ts`; add the regression evidence to the CA scenario ledger established by Task 6.
 
-- [ ] Add this consumer-visible regression to `credits.test.ts` before changing arithmetic:
+- [x] Add this consumer-visible regression to `credits.test.ts` before changing arithmetic:
 
 ```ts
 Deno.test("Form 540 floors exemption credit groups separately", () => {
@@ -177,8 +177,8 @@ Deno.test("Form 540 floors exemption credit groups separately", () => {
 });
 ```
 
-- [ ] Run `deno test forms/ca540/2025/credits.test.ts --filter 'floors exemption'`; expected current result: actual 268 versus expected 295.
-- [ ] Replace the combined reduction with the worksheet's two separately floored groups:
+- [x] Run the pre-fix credit regression; observed actual 268 versus expected 295.
+- [x] Replace the combined reduction with the worksheet's two separately floored groups:
 
 ```ts
 const personalCount = input.personalExemptions + input.blindExemptions +
@@ -194,28 +194,28 @@ return Math.max(0, personalCredit - reduction * personalCount) +
 ```
 
 Remove obsolete combined-credit variables/branches, retaining input validation. Add phaseout cases immediately before/at/after exhaustion of each group and married-separate divisor boundaries. No new expected value may come from the implementation.
-- [ ] Run the focused credit and calculation modules after the change, then the agreed final suite once the contribution is integrated. Record the source-derived correction honestly; do not alter published expected amounts to fit the engine.
-- [ ] Commit separately as `fix(ca540): floor exemption credit groups independently`.
+- [x] Run focused credit/calculation and integrated contribution checks; preserve source-backed expected amounts.
+- [x] Commit separately as `fix(ca540): floor exemption credit groups independently` (`95516843`).
 
 ### Task 2 — Add the finite coverage inventory
 
 **Create:** `forms/ca540/2025/coverage.ts`, `coverage.test.ts`.
 **Modify:** `docs/ca540-ty2025.md` and the CA scenario evidence inventory in Task 6.
 
-- [ ] Transcribe all Form 540 line/field groups and relevant schedule requirements against the primary sources in section 8, retaining unsupported and unknown entries.
-- [ ] Implement the finite capability/applicability schemas and named predicate dispatch; no dynamic code evaluation from inventory text. A predicate may return unknown when required facts are absent.
-- [ ] Test duplicate requirement IDs, unknown predicate IDs, missing sources, an implemented claim without evidence, and a required schedule missing from the computed result. These must reject or block; none may silently disappear.
-- [ ] Test that `usesItemizedDeductions: true` identifies unsupported itemization, while absence of a new applicability fact yields unknown rather than not-applicable. A supplied zero credit cannot prove that a supporting schedule is unnecessary.
-- [ ] Test a small source-traceable initial inventory projection: ordinary standard deduction is computed, Schedule CA inputs are supplied, itemized deduction is unsupported, and official schema is unavailable.
-- [ ] Reconcile README/consumer scope with the inventory without claiming full-return support; commit `feat(ca540): describe explicit calculation coverage`.
+- [x] Transcribe the six-sided Form 540 field/line groups and accepted schedules, retaining unsupported and unknown entries.
+- [x] Implement finite capability/applicability schemas and named predicates; absent facts remain unknown.
+- [x] Test duplicate IDs, unknown predicates, missing sources/evidence, and missing required schedules.
+- [x] Test explicit false versus absent applicability; zero aggregates do not discharge supporting schedules.
+- [x] Test supplied Schedule CA totals, computed ordinary deduction, unsupported itemization, and unavailable schema.
+- [x] Reconcile consumer scope with the inventory; include this work in the bounded contribution commit.
 
 ### Task 3 — Implement the fail-closed readiness reducer
 
 **Create:** `core/validation/readiness.ts`, `readiness.test.ts`.
 
-- [ ] Implement the exact enums/contracts in section 3.1 and the fixed gate-set reducer. All callers receive the same mandatory gate set; no user-supplied allowlist may bypass it.
-- [ ] Keep the reducer pure, linear in gate count, with no I/O, rules evaluation, source parsing, or state mutation.
-- [ ] Add table-driven tests covering every gate removed in turn, every non-pass status in turn, duplicate IDs, unknown serialized IDs, empty results, and all mandatory passes. Example invariant test:
+- [x] Implement the exact gate enums and fixed mandatory gate-set reducer with no caller bypass list.
+- [x] Keep the reducer pure and linear, without I/O, tax-rule evaluation, or state mutation.
+- [x] Test each missing/nonpassing gate, duplicate/unknown IDs, empty results, coherent serialization, and all mandatory passes. Example invariant:
 
 ```ts
 const passedGates = Object.values(GateId).map((id) => ({
@@ -232,34 +232,34 @@ for (const missing of Object.values(GateId)) {
 ```
 
 Put the example inside a Deno test with imports of `assertEquals` and the defined readiness symbols. Add deterministic generated combinations to prove adding an unavailable required gate cannot improve readiness. A justified non-applicable requirement can satisfy its inventory obligation, but a mandatory validation gate cannot itself be marked not-applicable to evade checks.
-- [ ] Run `deno test core/validation/readiness.test.ts`; commit `feat(validation): add explicit local-readiness gates`.
+- [x] Run readiness regressions and include the reducer in the bounded contribution commit.
 
 ### Task 4 — Centralize state assessment and stable diagnostics
 
 **Create:** `forms/ca540/2025/assessment.ts`, `assessment.test.ts`.
 **Modify:** `core/types/form-definition.ts`, `forms/ca540/2025/calculation.ts`, `calculation.test.ts`, `index.ts`, `cli/commands/validate.ts`, `return.ts`, `export.ts`, and all CA fixtures/test consumers of `StateFormCalculation`.
 
-- [ ] Before an exported-symbol change, inspect references with the language server; use the investigation map as a starting point, not an excuse to miss consumers.
-- [ ] Move review and unsupported-case findings to a single typed source with the stable codes in section 3.2. Do not retain positional aliases or string-to-code text matching.
-- [ ] Implement `assess` on the state product definition and migrate all state consumers. Existing pure arithmetic remains separately testable. Validate entry cardinality, use Zod safe parsing for expected input issues, and never compute on invalid input.
-- [ ] Populate the honest gate table. Attach the coverage inventory and separately unverified external limitations. Aggregate summary counts must reconcile to the recorded evaluations/findings; failures are not counted as passes or hidden in skipped.
-- [ ] Add tests for zero/two CA entries; malformed stored field types; missing required fields; valid zero monetary input; each false review answer; part-year/nonresident; itemized/dependent unsupported cases; reordered and additional findings preserving semantic IDs; and all review flags true still blocked by scope/MeF/coverage.
-- [ ] Confirm get/validate/PDF use one assessment contract. A validation command returns structured findings on expected input errors; get/PDF must refuse unavailable calculations rather than fabricate totals. Do not catch unrelated filesystem/programming errors and convert them to success.
-- [ ] Preserve CLI validation exit semantics: a successfully produced blocked report remains a successful inspection command. Operational failure is nonzero. Scenario assertions/CI must inspect typed readiness and fail on an unexpected result; exit zero is not filing readiness.
-- [ ] Keep CA MeF refusal independent of `force` and `draft`. Do not route CA XML through federal builder/type assertions.
-- [ ] Commit `feat(ca540): centralize scoped readiness assessment` after consumer migration and focused verification.
+- [x] Attempt LSP references; no TypeScript server was available. Complete the scoped reference migration with search and module-graph/type verification.
+- [x] Replace positional/string blockers with one typed stable diagnostic source.
+- [x] Cut over all state consumers to `assess`, validate cardinality/schema, and withhold calculation on invalid input.
+- [x] Populate separate gate, coverage, external-check, and reconciled summary outcomes.
+- [x] Cover zero/duplicate/malformed inputs, zeros, every false review answer, residency exclusions, unsupported deductions, stable IDs, and the permanent workpaper restriction.
+- [x] Share assessment across get/validate/PDF; expected errors stay structured, unexpected operational errors propagate, and unsafe arithmetic fails closed.
+- [x] Preserve inspection-command exit semantics; CI compares typed results instead of treating exit zero as readiness.
+- [x] Keep MeF refusal under every force/draft combination without invoking the federal serializer.
+- [x] Include the assessment cutover in the bounded contribution commit.
 
 ### Task 5 — Make CLI and worksheet diagnostics truthful
 
 **Modify:** `core/validation/report.ts`, `cli/commands/ca540.test.ts`, `validate.test.ts`, `return.test.ts`, `export.test.ts`, `forms/ca540/2025/worksheet.ts`, `worksheet.test.ts`.
 
-- [ ] Format CA reports with jurisdiction/year/product scope, arithmetic status, gate outcomes, requirement gaps, and external-check limitations. Use "local checks" and "workpaper only", not unqualified "READY TO FILE". Keep the federal format/contract unchanged here and document why.
-- [ ] Show all missing applicability facts and unsupported requirements with stable codes and safe next actions. Do not imply that setting all review booleans true supplies the missing supporting schedules.
-- [ ] Use separate categories for not-run and unavailable instead of labeling both "stub". Include both schema and rules statuses even when no calculation can run.
-- [ ] Paginate the worksheet for worst-case diagnostics. Existing `worksheet.ts` uses a single page with a fixed downward cursor; an expanded report must not lose blockers off the bottom. Preserve not-official/not-e-fileable warnings and primary-source references on readable output.
-- [ ] Extend the CLI test to compare gate/code semantics between JSON and text, preserve the public `canFile` false value, and reject CA MeF with both override flags. Use extraction and rendered visual inspection for multi-page PDF; do not pin complete wording/source text in permanent tests.
-- [ ] Ensure sentinel synthetic sensitive values never appear in errors, stdout diagnostics, or PDF review-blocker text; intended tax line values in a locally requested private workpaper remain permitted. Keep artifacts outside the checkout and remove temporary workspaces afterward.
-- [ ] Commit `feat(cli): expose California coverage and readiness limits`.
+- [x] Expose scoped CA gate outcomes, coverage gaps, and external limitations without upgrading federal claims.
+- [x] Keep missing facts and unsupported requirements actionable through safe field references and stable codes.
+- [x] Distinguish not-run and unavailable outcomes; schema/rule gates remain visible even without calculations.
+- [x] Wrap and paginate worksheet output, retaining warnings and sources on readable pages.
+- [x] Verify JSON/text gate identities, override refusal, extracted PDF content, and rendered first/final pages.
+- [x] Exclude synthetic sensitive sentinels from diagnostic messages; remove the completed private smoke workspace.
+- [x] Include CLI and worksheet updates in the bounded contribution commit.
 
 ### Task 6 — Put California evidence under real harness enforcement
 
@@ -267,25 +267,25 @@ Put the example inside a Deno test with imports of `assertEquals` and the define
 **Create:** `benchmark/ca540.ts`, `benchmark/ca540.test.ts` for the typed canonical adapter and its behavior tests.
 **New canonical case location:** `benchmark/cases/ca540/2025/<case>/input.json`, `correct.json`, `sources.json`, and `benchmark/cases/ca540/2025/ledger.json`. Keep the capability inventory in the product; a product-level `scenarios.json` lists case IDs and exercised requirement IDs without duplicating capability declarations.
 
-- [ ] Move the two existing line-31 oracles to the canonical CA case contract without relabeling them full-return scenarios. Preserve exact FTB citations and provenance.
-- [ ] Add a typed CA benchmark adapter rather than passing CA through federal FormDefinition casts, federal line names, or federal required-output assumptions. Keep IRS publication expectations for federal fixtures while allowing the explicit FTB source contract for CA.
-- [ ] Resolve CA through `productCatalog`, not the federal-only `catalog`; update product path recognition and every canonical runner's explicit `--form ca540` creation/output contract. Export shared CA adapter contracts so check:cases, oracle, and execution validate the same inputs. Preserve default federal creation/routing.
-- [ ] Add an explicit product/case kind (`line31`, `workpaper`, `complete_return`) with different required output contracts. Do not let a single-line case satisfy full-return coverage.
-- [ ] Cover exact expected lines, exact blocker/code sets when relevant, required/absent schedules, capability profile, readiness status, and expected schema/rules state. Never accept a missing expected line via a zero/default fallback or skip a case whose inputs no longer fit the product schema.
-- [ ] Use exact whole-dollar comparisons for CA; the shared federal runner currently allows a legacy $5 tolerance. Do not inherit that tolerance or silently change federal behavior. CA `--json` must return machine-readable per-case outcomes and correct totals, not the old standalone text output.
-- [ ] Extend CA oracle change control to numeric values, readiness/gate states, diagnostic dispositions, required-document sets, source references, and coverage/scenario deletions. Keep federal numeric-ledger semantics unchanged. CA ledger entries name a typed assertion path, before/after values, official source or project policy authority, reviewer, and date. Do not falsely cite an FTB document as the authority for OpenTax's own workpaper policy. A missing ledger, empty suite, duplicate case ID, or deleted expected outcome cannot silently pass.
-- [ ] Add isolated harness tests that alter a temporary CA expected result without a matching ledger, add an invalid CA field, remove an expected schedule, and remove all CA cases. Each must fail the owning check. No test modifies the repository's actual fixtures or `origin/main`.
-- [ ] Remove the obsolete standalone CA fixture store/runner after migrating all commands; retain one canonical case source and one adapter per product. Do not keep two divergent CA oracle collections.
-- [ ] Add workpaper baseline and the mixed-exemption regression evidence; no complete-return fixture is declared passing before the companion plan implements its requirements.
-- [ ] Commit `test(ca540): enforce source-backed scenario evidence`.
+- [x] Preserve the two line-31 oracles in canonical cases without inventing complete-return facts.
+- [x] Add a typed CA adapter without coercing it to federal definition/output contracts.
+- [x] Route canonical discovery and runners through the proper product, retaining federal defaults.
+- [x] Distinguish line31/workpaper contracts and explicitly reject complete-return cases.
+- [x] Assert exact numeric, diagnostic, coverage, document, readiness, and official-check states.
+- [x] Keep exact CA dollar comparisons, unchanged federal tolerance, and machine-readable CA benchmark output.
+- [x] Protect numeric and typed assertions, sources, coverage and scenario changes with authority-specific provenance; do not claim user numerical approval.
+- [x] Exercise isolated invalid-field, source, schedule, coverage, deletion, authority and migration regressions.
+- [x] Remove obsolete standalone fixtures/runner after every caller is migrated.
+- [x] Add only baseline and mixed-exemption workpapers; no passing complete-return fixture.
+- [x] Include canonical evidence enforcement in the bounded contribution commit.
 
 ### Task 7 — Verification and contribution handoff
 
 **Modify:** `docs/ca540-ty2025.md`, `README.md`, `skills/opentax/SKILL.md`, `skills/tax-preparer/SKILL.md`, `skills/tax-reviewer/SKILL.md`, `deno.json`, `.github/workflows/test.yml`, `benchmark/README.md`, `scripts/testing/README.md`.
 
-- [ ] Keep every named user surface consistent: workpaper scope, stable diagnostics, schema/rule unavailability, no transmission, no earlier-year support. Document the JSON contract change and preserve only intentional public fields, not positional diagnostic shims.
-- [ ] Add `test:ca540` as an explicit Deno test task selecting `forms/ca540/2025`, `cli/commands/ca540.test.ts`, and `benchmark/ca540.test.ts`, with read/write and subprocess permissions for Deno and pdftotext as exercised by the selected tests. Run that task plus the canonical CA benchmark in CI. Do not claim the existing unit selection executes CA. Provision the existing required PDF utilities in the CA CI job explicitly; do not introduce runtime dependencies or auto-install locally.
-- [ ] Run one integration verification set after changes are assembled:
+- [x] Update README, consumer guidance and three skills with the unchanged scope, new JSON contract, and unavailable gates.
+- [x] Add explicit `test:ca540` and CA CI execution with PDF tools. CI results are separate from local proof and official FTB validation.
+- [x] Run integrated verification, correct discovered failures, and rerun the owning checks:
 
 ```sh
 deno task check:structure
@@ -298,9 +298,9 @@ deno task bench --form ca540 --year 2025
 
 Focused bug/contract tests run before and after their relevant changes. Format only affected TypeScript, and run `git diff --check`. Do not weaken test discovery, baseline failures, or claims to make a check green.
 
-- [ ] Existing federal benchmark invocation is known to fail on 28 invalid fixtures. Record it as a baseline limitation; do not rerun merely to reconfirm, fix those fixtures opportunistically, or claim a clean federal benchmark. If a planned shared-harness change introduces a new failure beyond that baseline, stop and fix the regression.
-- [ ] Exercise the real CLI in a fresh private synthetic workspace: create/add/get/validate text and JSON/export worksheet/attempt MeF with no flags, force, and draft. Verify explicit limitations, no leaked values in error messages, no fabricated XML, and readable multi-page blockers. Observe actual output; tests alone are not sufficient evidence.
-- [ ] Benchmark the assessment path separately from process startup, PDF rendering, and any future schema compilation. Record cold/warm wall time, peak memory if measurable, input/schedule counts, engine revision and platform. Use independent synthetic returns for throughput; never race writes to one return. No latency target is claimed as achieved by this plan.
+- [x] Preserve and document the 28 invalid federal fixture baseline without rerunning its benchmark or changing it opportunistically.
+- [x] Exercise the real synthetic CLI through calculations, text/JSON diagnostics, PDF rendering, and four MeF refusal combinations.
+- [x] Measure local assessment separately from PDF/startup/external checks; record limited observations below without an SLA claim.
 - [ ] Open a bounded PR from latest main under `codex/`, preserving unrelated work. State which gates remain unavailable. No automatic merge, release, provider enrollment, external test submission, or production filing authorization.
 
 ## 5. Permanent regression acceptance matrix
@@ -345,4 +345,43 @@ Official FTB schema/rule artifacts and their distribution permissions remain una
 
 ## 9. Plan evidence status
 
-The investigation read the implementation and official HTML instructions and reproduced the mixed-exemption discrepancy in a throwaway Deno invocation. The current workpaper restriction, MeF refusal, and shared skipped-rule behavior were exercised during the preceding review. No implementation code, tax fixture, schema, runtime dependency, or production return was changed in preparing this plan. Proposed paths and APIs above are future implementation contracts, not assertions that those files/functions already exist.
+At plan-authoring time, the investigation read the implementation and official FTB instructions and reproduced the mixed-exemption discrepancy in a throwaway Deno invocation. No implementation or production return was changed while preparing the plan. The following execution record distinguishes subsequent implementation evidence from those original requirements.
+
+## 10. Implementation evidence
+
+- Corrected the mixed-group line 32 discrepancy, with a failing-before result of 268 versus 295 and passing-after regression/boundary checks. The separate arithmetic commit is `95516843`.
+- Added a source-backed inventory of 179 requirement rows, including all 65 entries from the accepted TY2025 individual forms table. Capability and applicability remain distinct; absence and aggregate zeros do not establish non-applicability.
+- Replaced state `calculate` orchestration/string blockers with one typed assessment, stable finding codes, seven mandatory readiness gates, and separately unverified external checks. Federal readiness/override semantics are intentionally unchanged.
+- Actual CLI smoke in fresh private synthetic workspaces exercised create/add/get, JSON and text validation, PDF export, and four MeF flag combinations (none, force, draft, both). The valid workpaper produced taxable income 68494, line 31 tax 2864, and overpayment 1289, while remaining blocked. Each MeF attempt returned exit 1 with no XML.
+- An independent review found a schema-valid exemption-count overflow that could have produced unsafe calculated output. A failing-before regression and narrowed range handling now produce `CA540_CALCULATION_RANGE`, a failed Calculation gate, no calculated values, and no echoed raw amount. Actual CLI get/PDF refuse the unsafe calculation; an existing destination file remains unchanged.
+- PDF text extraction verifies every finding and coverage ID. The actual 12-page workpaper's first/final pages were rendered and visually inspected: text is legible, wrapped within margins, and every page retains unofficial/non-e-fileable warnings.
+- A selected federal compatibility run exposed a QBI assertion difference (actual 206926; expected 206926.37). The identical failure was reproduced in the unchanged baseline checkout. The unrelated assertion and federal calculation were not changed; this contribution does not claim the full federal suite is clean.
+- Official FTB schemas, local rules, PATS, provider import compatibility, and transmission/acceptance remain unavailable or unverified. No complete-return scenario has been added.
+
+### Local performance observation
+
+Measured on darwin/aarch64, Deno 2.6.3, with one synthetic workpaper input and 179 coverage rows, at `95516843` plus the pending bounded contribution. These are in-process measurements, not service throughput or latency guarantees; they exclude CLI startup, XSD, and external checks.
+
+| Measurement | Observed value |
+| --- | --- |
+| First in-process assessment | 0.524 ms |
+| Warm assessment median, 200 sequential samples | 0.032 ms |
+| Warm assessment p95 | 0.067 ms |
+| PDF rendering | 53.350 ms |
+| PDF bytes | 25349 |
+| Process RSS at end (not peak/incremental memory) | 120455168 bytes |
+
+Source/reference change-control review is separate from tax-professional or user numerical approval; contributor-authored ledgers must not claim that the user supplied synthetic oracle values.
+
+### Final local verification
+
+| Check | Observed result |
+| --- | --- |
+| `test:unit` | 172 tests, 0 failures/errors |
+| `test:ca540` | 46 tests, 0 failures |
+| CA canonical benchmark | 4 passed, 0 failed/skipped; two line-31 cases and two workpapers |
+| `check:structure` | 228 node files, 20 existing baseline exceptions, 0 problems |
+| `check:cases` | 109 valid, 28 existing known-invalid, 0 problems |
+| `check:oracle` | 137 cases, 819 numeric/typed migration changes, 0 problems |
+
+Independent state/runtime and canonical-evidence reviews closed all reported correctness findings. The oracle migration was additionally type-corrected and its working-tree-deletion handling repaired without weakening expected values: absent files become removals requiring evidence, and base Git readers complete before current-file errors can propagate. All 11 dedicated oracle regressions pass.

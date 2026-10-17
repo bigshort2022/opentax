@@ -52,7 +52,7 @@ Deno.test("Form 540 computes CA AGI, standard deduction, tax, credits, and balan
   assertEquals(result.lines.line95_payments_after_use_tax_and_penalty, 4_000);
   assertEquals(result.lines.line97_overpaid_tax, 1_289);
   assertEquals(result.lines.line100_tax_due, 0);
-  assertEquals(result.blockers, []);
+  assertEquals(result.findings, []);
 });
 
 Deno.test("Form 540 taxable income does not become negative", () => {
@@ -67,42 +67,4 @@ Deno.test("Form 540 taxable income does not become negative", () => {
   const result = calculateForm540(input);
   assertEquals(result.lines.line19_taxable_income, 0);
   assertEquals(result.lines.line31_tax, 0);
-});
-
-Deno.test("Form 540 returns blockers for unconfirmed filing assumptions", () => {
-  const input = form540InputSchema.parse({
-    ...simpleInput,
-    residency: "part_year_ca",
-    taxpayerCanBeClaimedAsDependent: true,
-    review: {
-      ...simpleInput.review,
-      standardDeductionEligibility: false,
-      paymentsUseTaxAndPenaltyReviewed: false,
-    },
-  });
-  const result = calculateForm540(input);
-  assertEquals(
-    result.blockers.includes(
-      "Form 540 only supports full-year California residents.",
-    ),
-    true,
-  );
-  assertEquals(
-    result.blockers.includes(
-      "The dependent standard-deduction worksheet is not supported.",
-    ),
-    true,
-  );
-  assertEquals(
-    result.blockers.includes(
-      "The standard-deduction assumption has not been reviewed.",
-    ),
-    true,
-  );
-  assertEquals(
-    result.blockers.includes(
-      "Payments, use tax, and the health-coverage penalty have not been reviewed.",
-    ),
-    true,
-  );
 });

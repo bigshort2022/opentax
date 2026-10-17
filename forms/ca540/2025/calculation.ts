@@ -1,11 +1,8 @@
+import type { StateCalculation } from "../../../core/validation/state-report.ts";
 import { calculateExemptionCredit } from "./credits.ts";
+import { reviewFindings } from "./diagnostics.ts";
 import type { Form540Input } from "./input.ts";
 import { calculateOrdinaryTax } from "./tax.ts";
-
-export interface Form540Calculation {
-  readonly lines: Readonly<Record<string, number>>;
-  readonly blockers: readonly string[];
-}
 
 function wholeDollarAmount(value: number, description: string): number {
   if (!Number.isSafeInteger(value)) {
@@ -30,47 +27,7 @@ function standardDeduction(
   }
 }
 
-function reviewBlockers(input: Form540Input): string[] {
-  const blockers: string[] = [];
-  if (input.residency !== "full_year_ca") {
-    blockers.push("Form 540 only supports full-year California residents.");
-  }
-  if (!input.review.fullYearCaliforniaResidence) {
-    blockers.push("Full-year California residence has not been reviewed.");
-  }
-  if (!input.review.filingStatusEligibility) {
-    blockers.push(
-      "California filing-status eligibility has not been reviewed.",
-    );
-  }
-  if (!input.review.federalAndCaliforniaIncomeReconciled) {
-    blockers.push(
-      "Federal income and Schedule CA adjustments have not been reconciled.",
-    );
-  }
-  if (input.usesItemizedDeductions) {
-    blockers.push("California itemized deductions are not supported.");
-  }
-  if (input.taxpayerCanBeClaimedAsDependent) {
-    blockers.push(
-      "The dependent standard-deduction worksheet is not supported.",
-    );
-  }
-  if (!input.review.standardDeductionEligibility) {
-    blockers.push("The standard-deduction assumption has not been reviewed.");
-  }
-  if (!input.review.creditsAndTaxesReviewed) {
-    blockers.push("Additional credits and taxes have not been reviewed.");
-  }
-  if (!input.review.paymentsUseTaxAndPenaltyReviewed) {
-    blockers.push(
-      "Payments, use tax, and the health-coverage penalty have not been reviewed.",
-    );
-  }
-  return blockers;
-}
-
-export function calculateForm540(input: Form540Input): Form540Calculation {
+export function calculateForm540(input: Form540Input): StateCalculation {
   const line15 = wholeDollarAmount(
     input.federalAgi - input.scheduleCaSubtractions,
     "Form 540 line 15",
@@ -136,6 +93,6 @@ export function calculateForm540(input: Form540Input): Form540Calculation {
       line97_overpaid_tax: Math.max(line95 - line64, 0),
       line100_tax_due: Math.max(line64 - line95, 0),
     },
-    blockers: reviewBlockers(input),
+    findings: reviewFindings(input),
   };
 }

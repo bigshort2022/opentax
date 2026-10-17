@@ -1,0 +1,3976 @@
+{
+  "kind": "workpaper",
+  "product": { "formType": "ca540", "taxYear": 2025 },
+  "lines": {
+    "line19_taxable_income": 321497,
+    "line31_tax": 26338,
+    "line32_exemption_credits": 295,
+    "line64_total_tax": 26043,
+    "line97_overpaid_tax": 0,
+    "line100_tax_due": 22043
+  },
+  "validationScope": "ca540-workpaper",
+  "profile": "workpaper",
+  "diagnosticCodes": [
+    "CA540_SCOPE_NOT_FILING_READY",
+    "CA540_REQUIRED_DOCUMENTS_UNKNOWN",
+    "CA540_MEF_SCHEMA_UNAVAILABLE",
+    "CA540_LOCAL_RULES_UNAVAILABLE"
+  ],
+  "canFile": false,
+  "diagnostics": {
+    "CA540_SCOPE_NOT_FILING_READY": {
+      "severity": "reject",
+      "category": "unsupported",
+      "formRef": "Form 540"
+    },
+    "CA540_REQUIRED_DOCUMENTS_UNKNOWN": {
+      "severity": "reject",
+      "category": "missing_document",
+      "formRef": "Form 540"
+    },
+    "CA540_MEF_SCHEMA_UNAVAILABLE": {
+      "severity": "reject",
+      "category": "unsupported",
+      "formRef": "Form 540"
+    },
+    "CA540_LOCAL_RULES_UNAVAILABLE": {
+      "severity": "reject",
+      "category": "unsupported",
+      "formRef": "Form 540"
+    }
+  },
+  "readiness": {
+    "status": "blocked",
+    "canFile": false,
+    "missingGateIds": []
+  },
+  "gates": {
+    "scope": "unsupported",
+    "inputs": "passed",
+    "calculation": "passed",
+    "review": "passed",
+    "required_documents": "not_run",
+    "mef_schema": "unavailable",
+    "local_rules": "unavailable"
+  },
+  "documents": {
+    "requirementsKnown": false,
+    "required": [],
+    "produced": []
+  },
+  "externalChecks": {
+    "ftb_records": "unverified",
+    "provider_approval": "unverified",
+    "transmission_acceptance": "unverified"
+  },
+  "coverage": {
+    "ca540.return_period": {
+      "id": "ca540.return_period",
+      "formRef": "Form 540",
+      "locator": "Side 1; Amended-return checkbox; fiscal-year month and year",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 1; Amended-return checkbox; fiscal-year month and year"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.identity.taxpayer": {
+      "id": "ca540.identity.taxpayer",
+      "formRef": "Form 540",
+      "locator": "Side 1; Taxpayer first name, initial, last name, suffix, SSN or ITIN",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 1; Taxpayer first name, initial, last name, suffix, SSN or ITIN"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.identity.spouse": {
+      "id": "ca540.identity.spouse",
+      "formRef": "Form 540",
+      "locator": "Side 1; Spouse/RDP first name, initial, last name, suffix, SSN or ITIN",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 1; Spouse/RDP first name, initial, last name, suffix, SSN or ITIN"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.identity.address": {
+      "id": "ca540.identity.address",
+      "formRef": "Form 540",
+      "locator": "Side 1; Additional information; street or PO box; apartment/suite; private mailbox; city, state, ZIP; foreign country, province/state/county and postal code",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 1; Additional information; street or PO box; apartment/suite; private mailbox; city, state, ZIP; foreign country, province/state/county and postal code"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.identity.pba": {
+      "id": "ca540.identity.pba",
+      "formRef": "Form 540",
+      "locator": "Side 1; Principal business activity code",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 1; Principal business activity code"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.identity.birth_dates": {
+      "id": "ca540.identity.birth_dates",
+      "formRef": "Form 540",
+      "locator": "Side 1; Taxpayer and spouse/RDP dates of birth",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 1; Taxpayer and spouse/RDP dates of birth"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.identity.prior_names": {
+      "id": "ca540.identity.prior_names",
+      "formRef": "Form 540",
+      "locator": "Side 1; Taxpayer and spouse/RDP prior last names",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 1; Taxpayer and spouse/RDP prior last names"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.identity.principal_residence": {
+      "id": "ca540.identity.principal_residence",
+      "formRef": "Form 540",
+      "locator": "Side 1; County; same-address checkbox; principal/physical street, apartment, city, state and ZIP",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 1; County; same-address checkbox; principal/physical street, apartment, city, state and ZIP"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.filing_status": {
+      "id": "ca540.filing_status",
+      "formRef": "Form 540",
+      "locator": "Side 1; Lines 1–5; filing-status choice",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 1; Lines 1–5; filing-status choice"
+      },
+      "capability": "supplied_input",
+      "implementationRef": "forms/ca540/2025/input.ts#form540InputSchema",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.filing_status_details": {
+      "id": "ca540.filing_status_details",
+      "formRef": "Form 540",
+      "locator": "Side 1; Federal-status-difference checkbox; separate spouse name; surviving-spouse year of death; filing-status eligibility",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 1; Federal-status-difference checkbox; separate spouse name; surviving-spouse year of death; filing-status eligibility"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line6.dependent_flag": {
+      "id": "ca540.line6.dependent_flag",
+      "formRef": "Form 540",
+      "locator": "Side 1; Line 6: taxpayer or spouse/RDP can be claimed as dependent checkbox",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 1; Line 6: taxpayer or spouse/RDP can be claimed as dependent checkbox"
+      },
+      "capability": "supplied_input",
+      "implementationRef": "forms/ca540/2025/input.ts#form540InputSchema",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line7.personal_count": {
+      "id": "ca540.line7.personal_count",
+      "formRef": "Form 540",
+      "locator": "Side 1; Line 7: personal exemption count",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 1; Line 7: personal exemption count"
+      },
+      "capability": "supplied_input",
+      "implementationRef": "forms/ca540/2025/input.ts#form540InputSchema",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line7.personal_amount": {
+      "id": "ca540.line7.personal_amount",
+      "formRef": "Form 540",
+      "locator": "Side 1; Line 7: personal exemption dollar amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 1; Line 7: personal exemption dollar amount"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line8.blind_count": {
+      "id": "ca540.line8.blind_count",
+      "formRef": "Form 540",
+      "locator": "Side 1; Line 8: blind exemption count",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 1; Line 8: blind exemption count"
+      },
+      "capability": "supplied_input",
+      "implementationRef": "forms/ca540/2025/input.ts#form540InputSchema",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line8.blind_amount": {
+      "id": "ca540.line8.blind_amount",
+      "formRef": "Form 540",
+      "locator": "Side 1; Line 8: blind exemption dollar amount and doctor statement eligibility",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 1; Line 8: blind exemption dollar amount and doctor statement eligibility"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line9.senior_count": {
+      "id": "ca540.line9.senior_count",
+      "formRef": "Form 540",
+      "locator": "Side 1; Line 9: senior exemption count",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 1; Line 9: senior exemption count"
+      },
+      "capability": "supplied_input",
+      "implementationRef": "forms/ca540/2025/input.ts#form540InputSchema",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line9.senior_amount": {
+      "id": "ca540.line9.senior_amount",
+      "formRef": "Form 540",
+      "locator": "Side 1; Line 9: senior exemption dollar amount and age eligibility",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 1; Line 9: senior exemption dollar amount and age eligibility"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.identity.repeated_headers": {
+      "id": "ca540.identity.repeated_headers",
+      "formRef": "Form 540",
+      "locator": "Side 2; Taxpayer name and SSN/ITIN repeated on Sides 2–6",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Taxpayer name and SSN/ITIN repeated on Sides 2–6"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line10.dependent_details": {
+      "id": "ca540.line10.dependent_details",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 10: three dependent name, SSN/ITIN and relationship groups; additional-dependent statement",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 10: three dependent name, SSN/ITIN and relationship groups; additional-dependent statement"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line10.dependent_count": {
+      "id": "ca540.line10.dependent_count",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 10: dependent exemption count",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 10: dependent exemption count"
+      },
+      "capability": "supplied_input",
+      "implementationRef": "forms/ca540/2025/input.ts#form540InputSchema",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line10.dependent_amount": {
+      "id": "ca540.line10.dependent_amount",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 10: dependent exemption dollar amount and eligibility",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 10: dependent exemption dollar amount and eligibility"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line11.exemption_amount": {
+      "id": "ca540.line11.exemption_amount",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 11: total unphased exemption amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 11: total unphased exemption amount"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line12.state_wages": {
+      "id": "ca540.line12.state_wages",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 12: all-states W-2 box 16 state wages",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 12: all-states W-2 box 16 state wages"
+      },
+      "capability": "supplied_input",
+      "implementationRef": "forms/ca540/2025/input.ts#form540InputSchema",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line13.federal_agi": {
+      "id": "ca540.line13.federal_agi",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 13: federal adjusted gross income",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 13: federal adjusted gross income"
+      },
+      "capability": "supplied_input",
+      "implementationRef": "forms/ca540/2025/input.ts#form540InputSchema",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line14.schedule_ca_subtractions": {
+      "id": "ca540.line14.schedule_ca_subtractions",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 14: Schedule CA Part I line 27 column B aggregate",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 14: Schedule CA Part I line 27 column B aggregate"
+      },
+      "capability": "supplied_input",
+      "implementationRef": "forms/ca540/2025/input.ts#form540InputSchema",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line15.subtotal": {
+      "id": "ca540.line15.subtotal",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 15: federal AGI less aggregate subtractions",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 15: federal AGI less aggregate subtractions"
+      },
+      "capability": "computed",
+      "implementationRef": "forms/ca540/2025/calculation.ts#calculateForm540",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line16.schedule_ca_additions": {
+      "id": "ca540.line16.schedule_ca_additions",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 16: Schedule CA Part I line 27 column C aggregate",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 16: Schedule CA Part I line 27 column C aggregate"
+      },
+      "capability": "supplied_input",
+      "implementationRef": "forms/ca540/2025/input.ts#form540InputSchema",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line17.ca_agi": {
+      "id": "ca540.line17.ca_agi",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 17: California adjusted gross income",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 17: California adjusted gross income"
+      },
+      "capability": "computed",
+      "implementationRef": "forms/ca540/2025/calculation.ts#calculateForm540",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line18.standard_deduction": {
+      "id": "ca540.line18.standard_deduction",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 18: ordinary standard deduction chart",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 18: ordinary standard deduction chart"
+      },
+      "capability": "computed",
+      "implementationRef": "forms/ca540/2025/calculation.ts#calculateForm540",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "ordinary_standard_deduction",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "usesItemizedDeductions,taxpayerCanBeClaimedAsDependent",
+          "decision": "ordinary_standard_deduction_selected"
+        }
+      ]
+    },
+    "ca540.line18.itemized_deduction": {
+      "id": "ca540.line18.itemized_deduction",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 18: California itemized deductions; Schedule CA Part II",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 18: California itemized deductions; Schedule CA Part II"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "itemizes_deductions",
+      "applicability": "not_applicable",
+      "evidence": [
+        {
+          "fact": "usesItemizedDeductions",
+          "decision": "explicit_false"
+        }
+      ]
+    },
+    "ca540.line18.dependent_standard_deduction": {
+      "id": "ca540.line18.dependent_standard_deduction",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 18: California Standard Deduction Worksheet for Dependents",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 18: California Standard Deduction Worksheet for Dependents"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "claimed_as_dependent",
+      "applicability": "not_applicable",
+      "evidence": [
+        {
+          "fact": "taxpayerCanBeClaimedAsDependent",
+          "decision": "explicit_false"
+        }
+      ]
+    },
+    "ca540.line18.separate_eligibility": {
+      "id": "ca540.line18.separate_eligibility",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 18: married/RDP separate coordinated deduction election",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 18: married/RDP separate coordinated deduction election"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line19.taxable_income": {
+      "id": "ca540.line19.taxable_income",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 19: taxable income under ordinary deduction assumption",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 19: taxable income under ordinary deduction assumption"
+      },
+      "capability": "computed",
+      "implementationRef": "forms/ca540/2025/calculation.ts#calculateForm540",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "ordinary_standard_deduction",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "usesItemizedDeductions,taxpayerCanBeClaimedAsDependent",
+          "decision": "ordinary_standard_deduction_selected"
+        }
+      ]
+    },
+    "ca540.line19.ccf": {
+      "id": "ca540.line19.ccf",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 19: Capital Construction Fund deduction notation and amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 19: Capital Construction Fund deduction notation and amount"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line31.ordinary_tax": {
+      "id": "ca540.line31.ordinary_tax",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 31: ordinary Tax Table or Tax Rate Schedule amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 31: ordinary Tax Table or Tax Rate Schedule amount"
+      },
+      "capability": "computed",
+      "implementationRef": "forms/ca540/2025/tax.ts#calculateOrdinaryTax",
+      "scenarioEvidenceIds": [
+        "single-tax-table-68494",
+        "single-rate-schedule-150000",
+        "workpaper-baseline"
+      ],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line31.tax_methods": {
+      "id": "ca540.line31.tax_methods",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 31: Tax Table, Tax Rate Schedule, FTB 3800 and FTB 3803 method checkboxes and alternate tax computation",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 31: Tax Table, Tax Rate Schedule, FTB 3800 and FTB 3803 method checkboxes and alternate tax computation"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line32.exemption_credits": {
+      "id": "ca540.line32.exemption_credits",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 32: exemption credits and AGI Limitation Worksheet",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 32: exemption credits and AGI Limitation Worksheet"
+      },
+      "capability": "computed",
+      "implementationRef": "forms/ca540/2025/credits.ts#calculateExemptionCredit",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline",
+        "mixed-exemption-regression"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line33.tax_after_exemption_credits": {
+      "id": "ca540.line33.tax_after_exemption_credits",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 33: tax less exemption credits, floored at zero",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 33: tax less exemption credits, floored at zero"
+      },
+      "capability": "computed",
+      "implementationRef": "forms/ca540/2025/calculation.ts#calculateForm540",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line34.special_tax": {
+      "id": "ca540.line34.special_tax",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 34: supplied special tax amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 34: supplied special tax amount"
+      },
+      "capability": "supplied_input",
+      "implementationRef": "forms/ca540/2025/input.ts#form540InputSchema",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line34.methods": {
+      "id": "ca540.line34.methods",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 34: Schedule G-1 and FTB 5870A checkboxes and supporting calculations",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 34: Schedule G-1 and FTB 5870A checkboxes and supporting calculations"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line35.tax_before_other_credits": {
+      "id": "ca540.line35.tax_before_other_credits",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 35: tax before other credits",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 35: tax before other credits"
+      },
+      "capability": "computed",
+      "implementationRef": "forms/ca540/2025/calculation.ts#calculateForm540",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line40.child_dependent_care_credit": {
+      "id": "ca540.line40.child_dependent_care_credit",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 40: supplied child and dependent care credit amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 40: supplied child and dependent care credit amount"
+      },
+      "capability": "supplied_input",
+      "implementationRef": "forms/ca540/2025/input.ts#form540InputSchema",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line43.special_credit": {
+      "id": "ca540.line43.special_credit",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 43: credit name, code and amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 43: credit name, code and amount"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line44.special_credit": {
+      "id": "ca540.line44.special_credit",
+      "formRef": "Form 540",
+      "locator": "Side 2; Line 44: credit name, code and amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 2; Line 44: credit name, code and amount"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line45.special_credits": {
+      "id": "ca540.line45.special_credits",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 45: supplied special-credit aggregate",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 45: supplied special-credit aggregate"
+      },
+      "capability": "supplied_input",
+      "implementationRef": "forms/ca540/2025/input.ts#form540InputSchema",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line46.renter_credit": {
+      "id": "ca540.line46.renter_credit",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 46: supplied nonrefundable renter credit amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 46: supplied nonrefundable renter credit amount"
+      },
+      "capability": "supplied_input",
+      "implementationRef": "forms/ca540/2025/input.ts#form540InputSchema",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line46.renter_eligibility": {
+      "id": "ca540.line46.renter_eligibility",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 46: Nonrefundable Renter's Credit Qualification Record",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 46: Nonrefundable Renter's Credit Qualification Record"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line47.nonrefundable_credits": {
+      "id": "ca540.line47.nonrefundable_credits",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 47: sum of supplied credit aggregates (no independent line 43/44 input)",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 47: sum of supplied credit aggregates (no independent line 43/44 input)"
+      },
+      "capability": "computed",
+      "implementationRef": "forms/ca540/2025/calculation.ts#calculateForm540",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line48.tax_after_credits": {
+      "id": "ca540.line48.tax_after_credits",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 48: tax less supplied nonrefundable credits, floored at zero",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 48: tax less supplied nonrefundable credits, floored at zero"
+      },
+      "capability": "computed",
+      "implementationRef": "forms/ca540/2025/calculation.ts#calculateForm540",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line61.amt": {
+      "id": "ca540.line61.amt",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 61: supplied alternative minimum tax amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 61: supplied alternative minimum tax amount"
+      },
+      "capability": "supplied_input",
+      "implementationRef": "forms/ca540/2025/input.ts#form540InputSchema",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line62.behavioral_health_tax": {
+      "id": "ca540.line62.behavioral_health_tax",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 62: supplied behavioral health services tax amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 62: supplied behavioral health services tax amount"
+      },
+      "capability": "supplied_input",
+      "implementationRef": "forms/ca540/2025/input.ts#form540InputSchema",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line62.behavioral_health_worksheet": {
+      "id": "ca540.line62.behavioral_health_worksheet",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 62: behavioral health services tax worksheet calculation",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 62: behavioral health services tax worksheet calculation"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line63.other_taxes": {
+      "id": "ca540.line63.other_taxes",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 63: supplied other taxes and recapture aggregate",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 63: supplied other taxes and recapture aggregate"
+      },
+      "capability": "supplied_input",
+      "implementationRef": "forms/ca540/2025/input.ts#form540InputSchema",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line63.notations": {
+      "id": "ca540.line63.notations",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 63: additional-tax source, recapture and interest notations and supporting calculations",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 63: additional-tax source, recapture and interest notations and supporting calculations"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line64.total_tax": {
+      "id": "ca540.line64.total_tax",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 64: aggregate total tax",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 64: aggregate total tax"
+      },
+      "capability": "computed",
+      "implementationRef": "forms/ca540/2025/calculation.ts#calculateForm540",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line71.withholding": {
+      "id": "ca540.line71.withholding",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 71: California withholding from W-2, W-2G and 1099 source ledger",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 71: California withholding from W-2, W-2G and 1099 source ledger"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line72.estimated_payments": {
+      "id": "ca540.line72.estimated_payments",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 72: estimates, prior-year applied overpayment, extension and other payments; allocation statements",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 72: estimates, prior-year applied overpayment, extension and other payments; allocation statements"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line73.withholding": {
+      "id": "ca540.line73.withholding",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 73: Forms 592-B and 593 withholding",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 73: Forms 592-B and 593 withholding"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line74.refundable_film_credit": {
+      "id": "ca540.line74.refundable_film_credit",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 74: refundable Program 4.0 film credit",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 74: refundable Program 4.0 film credit"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line75.eitc": {
+      "id": "ca540.line75.eitc",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 75: earned income tax credit",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 75: earned income tax credit"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line76.yctc": {
+      "id": "ca540.line76.yctc",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 76: young child tax credit",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 76: young child tax credit"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line77.fytc": {
+      "id": "ca540.line77.fytc",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 77: foster youth tax credit",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 77: foster youth tax credit"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line78.payments": {
+      "id": "ca540.line78.payments",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 78: total payments and claim-of-right credit notation",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 78: total payments and claim-of-right credit notation"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line91.use_tax": {
+      "id": "ca540.line91.use_tax",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 91: use tax amount; no-use-tax and directly-paid-to-CDTFA checkboxes",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 91: use tax amount; no-use-tax and directly-paid-to-CDTFA checkboxes"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line92.isr": {
+      "id": "ca540.line92.isr",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 92: household full-year health coverage checkbox and individual shared responsibility penalty",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 92: household full-year health coverage checkbox and individual shared responsibility penalty"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line93.payments_balance": {
+      "id": "ca540.line93.payments_balance",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 93: payments balance after use tax",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 93: payments balance after use tax"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line94.use_tax_balance": {
+      "id": "ca540.line94.use_tax_balance",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 94: excess use tax balance",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 94: excess use tax balance"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line95.payments_after_penalty": {
+      "id": "ca540.line95.payments_after_penalty",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 95: supplied payments after use tax and ISR penalty",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 95: supplied payments after use tax and ISR penalty"
+      },
+      "capability": "supplied_input",
+      "implementationRef": "forms/ca540/2025/input.ts#form540InputSchema",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line96.isr_balance": {
+      "id": "ca540.line96.isr_balance",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 96: excess ISR penalty balance",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 96: excess ISR penalty balance"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line97.overpaid_tax": {
+      "id": "ca540.line97.overpaid_tax",
+      "formRef": "Form 540",
+      "locator": "Side 3; Line 97: provisional overpayment from supplied line 95, before refund allocation",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 3; Line 97: provisional overpayment from supplied line 95, before refund allocation"
+      },
+      "capability": "computed",
+      "implementationRef": "forms/ca540/2025/calculation.ts#calculateForm540",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line98.estimated_tax_election": {
+      "id": "ca540.line98.estimated_tax_election",
+      "formRef": "Form 540",
+      "locator": "Side 4; Line 98: overpayment applied to 2026 estimated tax",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 4; Line 98: overpayment applied to 2026 estimated tax"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line99.available_overpayment": {
+      "id": "ca540.line99.available_overpayment",
+      "formRef": "Form 540",
+      "locator": "Side 4; Line 99: overpayment available this year",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 4; Line 99: overpayment available this year"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line100.tax_due": {
+      "id": "ca540.line100.tax_due",
+      "formRef": "Form 540",
+      "locator": "Side 4; Line 100: provisional tax due from supplied line 95, not final amount due",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 4; Line 100: provisional tax due from supplied line 95, not final amount due"
+      },
+      "capability": "computed",
+      "implementationRef": "forms/ca540/2025/calculation.ts#calculateForm540",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line110.contributions": {
+      "id": "ca540.line110.contributions",
+      "formRef": "Form 540",
+      "locator": "Side 4; Line 110: total voluntary contributions",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 4; Line 110: total voluntary contributions"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line111.amount_owed": {
+      "id": "ca540.line111.amount_owed",
+      "formRef": "Form 540",
+      "locator": "Side 5; Line 111: amount owed including use tax, ISR balance and contributions",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 5; Line 111: amount owed including use tax, ISR balance and contributions"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line112.interest_penalties": {
+      "id": "ca540.line112.interest_penalties",
+      "formRef": "Form 540",
+      "locator": "Side 5; Line 112: interest and late filing/payment penalties",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 5; Line 112: interest and late filing/payment penalties"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line113.estimated_penalty": {
+      "id": "ca540.line113.estimated_penalty",
+      "formRef": "Form 540",
+      "locator": "Side 5; Line 113: estimated-tax penalty and FTB 5805/5805F attachment checkboxes",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 5; Line 113: estimated-tax penalty and FTB 5805/5805F attachment checkboxes"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line114.total_due": {
+      "id": "ca540.line114.total_due",
+      "formRef": "Form 540",
+      "locator": "Side 5; Line 114: final total amount due",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 5; Line 114: final total amount due"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line115.refund": {
+      "id": "ca540.line115.refund",
+      "formRef": "Form 540",
+      "locator": "Side 5; Line 115: final refund or no amount due",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 5; Line 115: final refund or no amount due"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.line116.direct_deposit": {
+      "id": "ca540.line116.direct_deposit",
+      "formRef": "Form 540",
+      "locator": "Side 5; Line 116: verified routing/account numbers, checking/savings choice and deposit amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 5; Line 116: verified routing/account numbers, checking/savings choice and deposit amount"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.line117.direct_deposit": {
+      "id": "ca540.line117.direct_deposit",
+      "formRef": "Form 540",
+      "locator": "Side 5; Line 117: second routing/account numbers, checking/savings choice and deposit amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 5; Line 117: second routing/account numbers, checking/savings choice and deposit amount"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.consent.voter_information": {
+      "id": "ca540.consent.voter_information",
+      "formRef": "Form 540",
+      "locator": "Side 5; Voter registration information checkbox",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 5; Voter registration information checkbox"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.consent.health_information": {
+      "id": "ca540.consent.health_information",
+      "formRef": "Form 540",
+      "locator": "Side 5; Covered California information-sharing authorization yes/no",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 5; Covered California information-sharing authorization yes/no"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.consent.organ_donor": {
+      "id": "ca540.consent.organ_donor",
+      "formRef": "Form 540",
+      "locator": "Side 5; Organ donor election; primary taxpayer and spouse/RDP consent checkboxes",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 5; Organ donor election; primary taxpayer and spouse/RDP consent checkboxes"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.attachments": {
+      "id": "ca540.attachments",
+      "formRef": "Form 540",
+      "locator": "Side 6; Complete federal return copy, supporting schedules, statements and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 6; Complete federal return copy, supporting schedules, statements and attachments"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.signatures": {
+      "id": "ca540.signatures",
+      "formRef": "Form 540",
+      "locator": "Side 6; Perjury declaration; taxpayer signature and date; spouse/RDP signature",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 6; Perjury declaration; taxpayer signature and date; spouse/RDP signature"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.contact": {
+      "id": "ca540.contact",
+      "formRef": "Form 540",
+      "locator": "Side 6; One email address and preferred phone number",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 6; One email address and preferred phone number"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.paid_preparer": {
+      "id": "ca540.paid_preparer",
+      "formRef": "Form 540",
+      "locator": "Side 6; Paid preparer name, phone, signature, firm name/address, PTIN and FEIN",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 6; Paid preparer name, phone, signature, firm name/address, PTIN and FEIN"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.third_party_designee": {
+      "id": "ca540.third_party_designee",
+      "formRef": "Form 540",
+      "locator": "Side 6; Third-party discussion authorization yes/no; designee name and phone",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 6; Third-party discussion authorization yes/no; designee name and phone"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.contribution.400": {
+      "id": "ca540.contribution.400",
+      "formRef": "Form 540",
+      "locator": "Side 4; Voluntary contribution code 400: election and amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 4; Voluntary contribution code 400: election and amount"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.contribution.401": {
+      "id": "ca540.contribution.401",
+      "formRef": "Form 540",
+      "locator": "Side 4; Voluntary contribution code 401: election and amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 4; Voluntary contribution code 401: election and amount"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.contribution.403": {
+      "id": "ca540.contribution.403",
+      "formRef": "Form 540",
+      "locator": "Side 4; Voluntary contribution code 403: election and amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 4; Voluntary contribution code 403: election and amount"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.contribution.405": {
+      "id": "ca540.contribution.405",
+      "formRef": "Form 540",
+      "locator": "Side 4; Voluntary contribution code 405: election and amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 4; Voluntary contribution code 405: election and amount"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.contribution.406": {
+      "id": "ca540.contribution.406",
+      "formRef": "Form 540",
+      "locator": "Side 4; Voluntary contribution code 406: election and amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 4; Voluntary contribution code 406: election and amount"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.contribution.407": {
+      "id": "ca540.contribution.407",
+      "formRef": "Form 540",
+      "locator": "Side 4; Voluntary contribution code 407: election and amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 4; Voluntary contribution code 407: election and amount"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.contribution.408": {
+      "id": "ca540.contribution.408",
+      "formRef": "Form 540",
+      "locator": "Side 4; Voluntary contribution code 408: election and amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 4; Voluntary contribution code 408: election and amount"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.contribution.413": {
+      "id": "ca540.contribution.413",
+      "formRef": "Form 540",
+      "locator": "Side 4; Voluntary contribution code 413: election and amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 4; Voluntary contribution code 413: election and amount"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.contribution.422": {
+      "id": "ca540.contribution.422",
+      "formRef": "Form 540",
+      "locator": "Side 4; Voluntary contribution code 422: election and amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 4; Voluntary contribution code 422: election and amount"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.contribution.423": {
+      "id": "ca540.contribution.423",
+      "formRef": "Form 540",
+      "locator": "Side 4; Voluntary contribution code 423: election and amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 4; Voluntary contribution code 423: election and amount"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.contribution.424": {
+      "id": "ca540.contribution.424",
+      "formRef": "Form 540",
+      "locator": "Side 4; Voluntary contribution code 424: election and amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 4; Voluntary contribution code 424: election and amount"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.contribution.431": {
+      "id": "ca540.contribution.431",
+      "formRef": "Form 540",
+      "locator": "Side 4; Voluntary contribution code 431: election and amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 4; Voluntary contribution code 431: election and amount"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.contribution.438": {
+      "id": "ca540.contribution.438",
+      "formRef": "Form 540",
+      "locator": "Side 4; Voluntary contribution code 438: election and amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 4; Voluntary contribution code 438: election and amount"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.contribution.439": {
+      "id": "ca540.contribution.439",
+      "formRef": "Form 540",
+      "locator": "Side 4; Voluntary contribution code 439: election and amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 4; Voluntary contribution code 439: election and amount"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.contribution.445": {
+      "id": "ca540.contribution.445",
+      "formRef": "Form 540",
+      "locator": "Side 4; Voluntary contribution code 445: election and amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 4; Voluntary contribution code 445: election and amount"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.contribution.447": {
+      "id": "ca540.contribution.447",
+      "formRef": "Form 540",
+      "locator": "Side 4; Voluntary contribution code 447: election and amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 4; Voluntary contribution code 447: election and amount"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.contribution.448": {
+      "id": "ca540.contribution.448",
+      "formRef": "Form 540",
+      "locator": "Side 4; Voluntary contribution code 448: election and amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 4; Voluntary contribution code 448: election and amount"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.contribution.449": {
+      "id": "ca540.contribution.449",
+      "formRef": "Form 540",
+      "locator": "Side 4; Voluntary contribution code 449: election and amount",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540.pdf",
+        "locator": "Side 4; Voluntary contribution code 449: election and amount"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form540": {
+      "id": "accepted.form540",
+      "formRef": "Form 540",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 540 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "always_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "accepted.form540_2ez": {
+      "id": "accepted.form540_2ez",
+      "formRef": "Form 540 2EZ",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 540 2EZ row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "outside_original_resident_scope",
+      "acceptedForm": {
+        "classification": "outside_scope",
+        "maxPerReturn": "1"
+      },
+      "applicability": "not_applicable",
+      "evidence": [
+        {
+          "fact": "product.original_resident_form540",
+          "decision": "outside_original_resident_scope"
+        }
+      ]
+    },
+    "accepted.form540nr": {
+      "id": "accepted.form540nr",
+      "formRef": "Form 540NR",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 540NR row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "outside_original_resident_scope",
+      "acceptedForm": {
+        "classification": "outside_scope",
+        "maxPerReturn": "1"
+      },
+      "applicability": "not_applicable",
+      "evidence": [
+        {
+          "fact": "product.original_resident_form540",
+          "decision": "outside_original_resident_scope"
+        }
+      ]
+    },
+    "accepted.form592_b": {
+      "id": "accepted.form592_b",
+      "formRef": "Form 592-B",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 592-B row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "Unbounded"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form593": {
+      "id": "accepted.form593",
+      "formRef": "Form 593",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 593 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "Unbounded"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3461": {
+      "id": "accepted.form3461",
+      "formRef": "Form 3461",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3461 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3503": {
+      "id": "accepted.form3503",
+      "formRef": "Form 3503",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3503 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "Unbounded"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3504": {
+      "id": "accepted.form3504",
+      "formRef": "Form 3504",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3504 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "2"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3506": {
+      "id": "accepted.form3506",
+      "formRef": "Form 3506",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3506 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3507": {
+      "id": "accepted.form3507",
+      "formRef": "Form 3507",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3507 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3510": {
+      "id": "accepted.form3510",
+      "formRef": "Form 3510",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3510 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3514": {
+      "id": "accepted.form3514",
+      "formRef": "Form 3514",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3514 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3521": {
+      "id": "accepted.form3521",
+      "formRef": "Form 3521",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3521 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3523": {
+      "id": "accepted.form3523",
+      "formRef": "Form 3523",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3523 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3526": {
+      "id": "accepted.form3526",
+      "formRef": "Form 3526",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3526 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3531": {
+      "id": "accepted.form3531",
+      "formRef": "Form 3531",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3531 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "Unbounded"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3532": {
+      "id": "accepted.form3532",
+      "formRef": "Form 3532",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3532 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "head_of_household",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "not_applicable",
+      "evidence": [
+        {
+          "fact": "filingStatus",
+          "decision": "other_filing_status_selected"
+        }
+      ]
+    },
+    "accepted.form3540": {
+      "id": "accepted.form3540",
+      "formRef": "Form 3540",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3540 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3541": {
+      "id": "accepted.form3541",
+      "formRef": "Form 3541",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3541 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "Unbounded"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3547": {
+      "id": "accepted.form3547",
+      "formRef": "Form 3547",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3547 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3548": {
+      "id": "accepted.form3548",
+      "formRef": "Form 3548",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3548 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "Unbounded"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3554": {
+      "id": "accepted.form3554",
+      "formRef": "Form 3554",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3554 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "Unbounded"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3568": {
+      "id": "accepted.form3568",
+      "formRef": "Form 3568",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3568 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "Unbounded"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3592": {
+      "id": "accepted.form3592",
+      "formRef": "Form 3592",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3592 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "Unbounded"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3596": {
+      "id": "accepted.form3596",
+      "formRef": "Form 3596",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3596 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3800": {
+      "id": "accepted.form3800",
+      "formRef": "Form 3800",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3800 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3801": {
+      "id": "accepted.form3801",
+      "formRef": "Form 3801",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3801 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3801_cr": {
+      "id": "accepted.form3801_cr",
+      "formRef": "Form 3801-CR",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3801-CR row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3803": {
+      "id": "accepted.form3803",
+      "formRef": "Form 3803",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3803 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "10"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3804_cr": {
+      "id": "accepted.form3804_cr",
+      "formRef": "Form 3804-CR",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3804-CR row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "2"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3805e": {
+      "id": "accepted.form3805e",
+      "formRef": "Form 3805E",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3805E row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "25"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3805p": {
+      "id": "accepted.form3805p",
+      "formRef": "Form 3805P",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3805P row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1 per taxpayer"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3805v": {
+      "id": "accepted.form3805v",
+      "formRef": "Form 3805V",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3805V row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3805z": {
+      "id": "accepted.form3805z",
+      "formRef": "Form 3805Z",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3805Z row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "Unbounded"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3807": {
+      "id": "accepted.form3807",
+      "formRef": "Form 3807",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3807 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "Unbounded"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3808": {
+      "id": "accepted.form3808",
+      "formRef": "Form 3808",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3808 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "Unbounded"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3809": {
+      "id": "accepted.form3809",
+      "formRef": "Form 3809",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3809 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "Unbounded"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3814": {
+      "id": "accepted.form3814",
+      "formRef": "Form 3814",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3814 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3820": {
+      "id": "accepted.form3820",
+      "formRef": "Form 3820",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3820 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "Unbounded"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3821": {
+      "id": "accepted.form3821",
+      "formRef": "Form 3821",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3821 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "Unbounded"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3831": {
+      "id": "accepted.form3831",
+      "formRef": "Form 3831",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3831 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "Unbounded"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3835": {
+      "id": "accepted.form3835",
+      "formRef": "Form 3835",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3835 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "Unbounded"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3840": {
+      "id": "accepted.form3840",
+      "formRef": "Form 3840",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3840 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "Unbounded"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3853": {
+      "id": "accepted.form3853",
+      "formRef": "Form 3853",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3853 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3870": {
+      "id": "accepted.form3870",
+      "formRef": "Form 3870",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3870 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3872": {
+      "id": "accepted.form3872",
+      "formRef": "Form 3872",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3872 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "Unbounded"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3885a": {
+      "id": "accepted.form3885a",
+      "formRef": "Form 3885A",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3885A row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "Unbounded"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form3913": {
+      "id": "accepted.form3913",
+      "formRef": "Form 3913",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 3913 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "Unbounded"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form4197": {
+      "id": "accepted.form4197",
+      "formRef": "Form 4197",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 4197 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "Unbounded"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form5805": {
+      "id": "accepted.form5805",
+      "formRef": "Form 5805",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 5805 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form5805f": {
+      "id": "accepted.form5805f",
+      "formRef": "Form 5805F",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 5805F row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form5870a": {
+      "id": "accepted.form5870a",
+      "formRef": "Form 5870A",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form 5870A row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1 per taxpayer"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.form_w2": {
+      "id": "accepted.form_w2",
+      "formRef": "Form W-2",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Form W-2 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "50"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.schedule_ca_540": {
+      "id": "accepted.schedule_ca_540",
+      "formRef": "Schedule CA (540)",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Schedule CA (540) row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.schedule_ca_540nr": {
+      "id": "accepted.schedule_ca_540nr",
+      "formRef": "Schedule CA (540NR)",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Schedule CA (540NR) row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "outside_original_resident_scope",
+      "acceptedForm": {
+        "classification": "outside_scope",
+        "maxPerReturn": "1"
+      },
+      "applicability": "not_applicable",
+      "evidence": [
+        {
+          "fact": "product.original_resident_form540",
+          "decision": "outside_original_resident_scope"
+        }
+      ]
+    },
+    "accepted.schedule_d_540": {
+      "id": "accepted.schedule_d_540",
+      "formRef": "Schedule D (540)",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Schedule D (540) row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.schedule_d_540nr": {
+      "id": "accepted.schedule_d_540nr",
+      "formRef": "Schedule D (540NR)",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Schedule D (540NR) row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "outside_original_resident_scope",
+      "acceptedForm": {
+        "classification": "outside_scope",
+        "maxPerReturn": "1"
+      },
+      "applicability": "not_applicable",
+      "evidence": [
+        {
+          "fact": "product.original_resident_form540",
+          "decision": "outside_original_resident_scope"
+        }
+      ]
+    },
+    "accepted.schedule_d1": {
+      "id": "accepted.schedule_d1",
+      "formRef": "Schedule D-1",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Schedule D-1 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.schedule_g1": {
+      "id": "accepted.schedule_g1",
+      "formRef": "Schedule G-1",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Schedule G-1 row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1 per taxpayer"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.schedule_p_540": {
+      "id": "accepted.schedule_p_540",
+      "formRef": "Schedule P (540)",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Schedule P (540) row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.schedule_p_540nr": {
+      "id": "accepted.schedule_p_540nr",
+      "formRef": "Schedule P (540NR)",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Schedule P (540NR) row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "outside_original_resident_scope",
+      "acceptedForm": {
+        "classification": "outside_scope",
+        "maxPerReturn": "1"
+      },
+      "applicability": "not_applicable",
+      "evidence": [
+        {
+          "fact": "product.original_resident_form540",
+          "decision": "outside_original_resident_scope"
+        }
+      ]
+    },
+    "accepted.schedule_r": {
+      "id": "accepted.schedule_r",
+      "formRef": "Schedule R",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Schedule R row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "unknown",
+        "maxPerReturn": "1 per taxpayer"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.schedule_s": {
+      "id": "accepted.schedule_s",
+      "formRef": "Schedule S",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Schedule S row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "Unbounded"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.schedule_rdp": {
+      "id": "accepted.schedule_rdp",
+      "formRef": "Schedule RDP",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Schedule RDP row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "acceptedForm": {
+        "classification": "resident_relevant",
+        "maxPerReturn": "1"
+      },
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "accepted.schedule_x": {
+      "id": "accepted.schedule_x",
+      "formRef": "Schedule X",
+      "locator": "TY2025 accepted individual forms table; complete form, multiplicity and attachments",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-efile-forms.html",
+        "locator": "Tax year 2025 table; Schedule X row"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "outside_original_resident_scope",
+      "acceptedForm": {
+        "classification": "outside_scope",
+        "maxPerReturn": "1"
+      },
+      "applicability": "not_applicable",
+      "evidence": [
+        {
+          "fact": "product.original_resident_form540",
+          "decision": "outside_original_resident_scope"
+        }
+      ]
+    },
+    "ca540.residency": {
+      "id": "ca540.residency",
+      "formRef": "Form 540",
+      "locator": "Supplied residency classification, not independently verified resident eligibility",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540-instructions.html",
+        "locator": "Filing Status; nonresident spouse and Form 540NR requirements"
+      },
+      "capability": "supplied_input",
+      "implementationRef": "forms/ca540/2025/input.ts#form540InputSchema",
+      "scenarioEvidenceIds": [
+        "workpaper-baseline"
+      ],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.source_reconciliation": {
+      "id": "ca540.source_reconciliation",
+      "formRef": "Form 540 / Schedule CA (540)",
+      "locator": "Federal return, W-2, California nonconformity, RDP and community-property source reconciliation",
+      "source": {
+        "url": "https://www.ftb.ca.gov/forms/2025/2025-540-ca-instructions.html",
+        "locator": "Purpose; Specific Line Instructions; Part I and Part II"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.mef_schema": {
+      "id": "ca540.mef_schema",
+      "formRef": "FTB individual e-file schema",
+      "locator": "TY2025 official schema access and local validation",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-ftb-xml-schemas.html",
+        "locator": "Overview; FTA State Exchange System authorized-user access; Tax Year 2025 table"
+      },
+      "capability": "unavailable",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.xml_mapping": {
+      "id": "ca540.xml_mapping",
+      "formRef": "FTB individual e-file schema",
+      "locator": "Official Form 540 XML mapping (not implemented or substituted with IRS XML)",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-ftb-xml-schemas.html",
+        "locator": "Overview; authorized-user schema access"
+      },
+      "capability": "unavailable",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.local_rules": {
+      "id": "ca540.local_rules",
+      "formRef": "FTB individual e-file business rules",
+      "locator": "TY2025 authorized business-rule artifacts and local execution",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/individual-ftb-xml-schemas.html",
+        "locator": "Overview; Schemas and Business Rules; Tax Year 2025 table"
+      },
+      "capability": "unavailable",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "always_required",
+      "applicability": "required",
+      "evidence": [
+        {
+          "fact": "form540.original_resident_requirement",
+          "decision": "intrinsic_requirement"
+        }
+      ]
+    },
+    "ca540.efile_authorization": {
+      "id": "ca540.efile_authorization",
+      "formRef": "FTB 8453 / FTB 8879",
+      "locator": "Applicable original-return signature authorization, dates and retention",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/enroll-in-efile-program.html",
+        "locator": "How to e-file; Individual e-file only; applicable signature authorization forms"
+      },
+      "capability": "unsupported",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    },
+    "ca540.external_ftb_records": {
+      "id": "ca540.external_ftb_records",
+      "formRef": "FTB individual e-file",
+      "locator": "Prior-year AGI, prior filing/account history and duplicate-return checks against FTB records",
+      "source": {
+        "url": "https://www.ftb.ca.gov/tax-pros/efile/enroll-in-efile-program.html",
+        "locator": "Common errors with Individual e-file; prior-year AGI, previously used SSN and prior-year return records"
+      },
+      "capability": "unavailable",
+      "implementationRef": null,
+      "scenarioEvidenceIds": [],
+      "predicateId": "source_facts_required",
+      "applicability": "unknown",
+      "evidence": [
+        {
+          "fact": "source_reconciled_applicability_facts",
+          "decision": "source_reconciliation_not_represented"
+        }
+      ]
+    }
+  }
+}

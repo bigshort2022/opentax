@@ -167,12 +167,16 @@ export async function getReturnCommand(
   const def = getCatalogEntry(meta.formType ?? "f1040", meta.year);
   if (isStateFormDefinition(def)) {
     const entries = inputs[def.inputKey] ?? [];
-    if (entries.length !== 1) {
+    const { calculation, report } = def.assess(
+      entries.map((entry) => entry.fields),
+    );
+    if (!calculation) {
       throw new Error(
-        `California Form 540 requires exactly one ${def.inputKey} input`,
+        `California workpaper calculation is unavailable; run validate for input diagnostics (${
+          report.entries[0].ruleNumber
+        }).`,
       );
     }
-    const calculation = def.calculate({ ...entries[0].fields });
     return {
       returnId: meta.returnId,
       year: meta.year,
@@ -190,7 +194,7 @@ export async function getReturnCommand(
       },
       forms: ["f540"],
       lines: { ...calculation.lines },
-      warnings: calculation.blockers,
+      warnings: calculation.findings.map((finding) => finding.message),
       carryforwards: {},
     };
   }

@@ -1,5 +1,5 @@
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
-import type { StateFormCalculation } from "../../../core/types/form-definition.ts";
+import { PDFDocument, type PDFFont, rgb, StandardFonts } from "pdf-lib";
+import type { StateAssessment } from "../../../core/validation/state-report.ts";
 
 function formatDollars(amount: number): string {
   const formatted = new Intl.NumberFormat("en-US", {
@@ -9,7 +9,7 @@ function formatDollars(amount: number): string {
   return amount < 0 ? `($${formatted})` : `$${formatted}`;
 }
 const LINE_LABELS: Readonly<Record<string, string>> = {
-  line12_state_wages: "Line 12 — California wages",
+  line12_state_wages: "Line 12 — State wages (all states)",
   line13_federal_agi: "Line 13 — Federal AGI",
   line14_ca_subtractions: "Line 14 — Schedule CA subtractions",
   line15_subtotal: "Line 15 — AGI after subtractions",
@@ -39,58 +39,127 @@ const LINE_LABELS: Readonly<Record<string, string>> = {
   line100_tax_due: "Line 100 — Tax due",
 };
 
-function worksheetRows(calculation: StateFormCalculation): string[] {
-  const lineRows = Object.entries(calculation.lines).map(([line, amount]) =>
-    `${LINE_LABELS[line] ?? line}: ${formatDollars(amount)}`
-  );
-  const blockers = calculation.blockers.length > 0
-    ? calculation.blockers.map((blocker) => `BLOCKER: ${blocker}`)
-    : ["No blockers recorded by this limited arithmetic tool."];
+function worksheetRows(assessment: StateAssessment): string[] {
+  const { calculation, report } = assessment;
+  if (!calculation) {
+    throw new Error("California workpaper calculation is unavailable.");
+  }
   return [
-    "California Form 540 TY2025 preparation worksheet",
-    "Not an official Form 540. Not e-fileable. Not a filing-readiness determination.",
-    "Manual review and transfer to the official FTB forms are required.",
-    "This workpaper does not verify filing status, residency, supporting forms, or legal eligibility.",
+    "This workpaper does not verify complete return facts, supporting forms, or legal eligibility.",
     "",
-    "Form 540 line calculations",
-    ...lineRows,
+    "Form 540 line calculations:",
+    ...Object.entries(calculation.lines).map(([line, amount]) =>
+      `${LINE_LABELS[line] ?? line}: ${formatDollars(amount)}`
+    ),
     "",
-    "Review blockers",
-    ...blockers,
+    `Local readiness: ${report.readiness.status}; canFile: ${report.canFile}`,
+    "Local gates (not counts of official tax rules):",
+    ...report.gates.map((gate) => `${gate.id}: ${gate.status}`),
+    "",
+    "Readiness findings:",
+    ...report.entries.map((finding) =>
+      `[${finding.ruleNumber}] ${finding.message}`
+    ),
+    "",
+    "Coverage (capability / applicability):",
+    ...report.coverage.flatMap((item) => [
+      `${item.id}: ${item.capability} / ${item.applicability}`,
+      `${item.formRef} — ${item.locator}`,
+      ...item.evidence.map((evidence) =>
+        `${evidence.fact}: ${evidence.decision}`
+      ),
+    ]),
+    "",
+    "External checks:",
+    ...report.externalChecks.map((check) =>
+      `${check.id}: ${check.status}. ${check.message}`
+    ),
     "",
     "Primary sources:",
-    "https://www.ftb.ca.gov/forms/2025/2025-540-instructions.html",
-    "https://www.ftb.ca.gov/forms/2025/2025-540-ca-instructions.html",
-    "https://www.ftb.ca.gov/forms/2025/2025-540-taxtable.pdf",
-    "https://www.ftb.ca.gov/forms/2025/2025-540-tax-rate-schedules.pdf",
+    ...new Set(report.coverage.map((item) => item.source.url)),
   ];
 }
 
+function wrapRow(
+  text: string,
+  font: PDFFont,
+  size: number,
+  width: number,
+): string[] {
+  const lines: string[] = [];
+  let line = "";
+  for (const word of text.split(/\s+/)) {
+    const candidate = line ? `${line} ${word}` : word;
+    if (font.widthOfTextAtSize(candidate, size) <= width) {
+      line = candidate;
+      continue;
+    }
+    if (line) lines.push(line);
+    line = "";
+    for (const character of word) {
+      if (font.widthOfTextAtSize(line + character, size) > width) {
+        lines.push(line);
+        line = character;
+      } else line += character;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
 export async function buildWorksheetPdf(
-  calculation: StateFormCalculation,
+  assessment: StateAssessment,
 ): Promise<Uint8Array> {
+  const rows = worksheetRows(assessment);
   const document = await PDFDocument.create();
   const font = await document.embedFont(StandardFonts.Helvetica);
   const bold = await document.embedFont(StandardFonts.HelveticaBold);
-  const rows = worksheetRows(calculation);
-  const page = document.addPage([612, 792]);
-  let y = 750;
+  let page = document.addPage([612, 792]);
+  let y = 696;
+  const drawHeader = () => {
+    page.drawText("California Form 540 TY2025 preparation worksheet", {
+      x: 42,
+      y: 750,
+      font: bold,
+      size: 14,
+    });
+    page.drawText("Not an official Form 540. Not e-fileable.", {
+      x: 42,
+      y: 730,
+      font: bold,
+      size: 9,
+    });
+    page.drawText(
+      "Not a filing-readiness determination. No submission or payment authorization.",
+      {
+        x: 42,
+        y: 715,
+        font,
+        size: 9,
+      },
+    );
+  };
+  drawHeader();
   for (const row of rows) {
     if (!row) {
-      y -= 9;
+      y -= 8;
       continue;
     }
-    const isTitle = row === rows[0];
-    page.drawText(row, {
-      x: 42,
-      y,
-      size: isTitle ? 15 : row.startsWith("Primary sources") ? 8 : 9,
-      font: isTitle ? bold : font,
-      color: isTitle ? rgb(0, 0, 0) : rgb(0.12, 0.12, 0.12),
-      maxWidth: 528,
-      lineHeight: 12,
-    });
-    y -= isTitle ? 22 : 15;
+    for (const line of wrapRow(row, font, 9, 528)) {
+      if (y < 48) {
+        page = document.addPage([612, 792]);
+        y = 696;
+        drawHeader();
+      }
+      page.drawText(line, {
+        x: 42,
+        y,
+        font,
+        size: 9,
+        color: rgb(0.12, 0.12, 0.12),
+      });
+      y -= 13;
+    }
   }
   return await document.save();
 }

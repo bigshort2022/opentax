@@ -1,7 +1,12 @@
 import { basename, dirname, join, relative } from "@std/path";
 import { z } from "zod";
-import { catalog } from "../catalog.ts";
+import { productCatalog } from "../catalog.ts";
+import {
+  isStateFormDefinition,
+  type ProductDefinition,
+} from "../core/types/form-definition.ts";
 import type { FormDefinition } from "../core/types/form-definition.ts";
+import { inspectCaInventory, loadCaCase } from "./ca540.ts";
 import {
   getUserInputSchema,
   rejectUnknownFields,
@@ -90,7 +95,7 @@ export function caseProduct(
 ): { form: string; year: number } | undefined {
   const year = basename(dirname(directory));
   const form = basename(dirname(dirname(directory)));
-  if (!/^f\w+$/.test(form) || !/^\d{4}$/.test(year)) return undefined;
+  if (!/^(?:f\w+|ca540)$/.test(form) || !/^\d{4}$/.test(year)) return undefined;
   return { form, year: Number(year) };
 }
 
@@ -173,8 +178,22 @@ async function parseFile<T>(
 /** One case: files parse, the product exists, inputs fit their schemas, the source is a publication. */
 export async function validateCase(
   directory: string,
-  products: Readonly<Record<string, FormDefinition>>,
+  products: Readonly<Record<string, ProductDefinition>>,
 ): Promise<void> {
+  const pathProduct = caseProduct(directory);
+  if (pathProduct?.form === "ca540") {
+    const definition = products[`ca540:${pathProduct.year}`];
+    if (!definition || !isStateFormDefinition(definition)) {
+      throw new Error(
+        `${directory}: unsupported benchmark product ca540:${pathProduct.year}`,
+      );
+    }
+    const { input } = await loadCaCase(directory);
+    if (input.year !== pathProduct.year) {
+      throw new Error(`${directory}: CA product/year mismatch`);
+    }
+    return;
+  }
   const { parsed: input } = await parseFile(
     directory,
     "input.json",
@@ -196,6 +215,11 @@ export async function validateCase(
   if (!definition) {
     throw new Error(`${directory}: unsupported benchmark product ${key}`);
   }
+  if (isStateFormDefinition(definition)) {
+    throw new Error(
+      `${directory}: state product requires its typed benchmark adapter`,
+    );
+  }
   validateCaseInputs(input, definition, directory);
   validateCaseSource(expected, directory);
 }
@@ -212,12 +236,21 @@ export type CaseInspection = {
 /** Cases are leaves; an incomplete leaf must never disappear from the report. */
 export async function inspectBenchmarkCases(
   root: string,
-  products: Readonly<Record<string, FormDefinition>> = catalog,
+  products: Readonly<Record<string, ProductDefinition>> = productCatalog,
 ): Promise<CaseInspection> {
   const found: string[] = [];
   const problems: CaseProblem[] = [];
   async function visit(directory: string): Promise<void> {
     const entries = [];
+    if (
+      basename(directory) === "2025" && basename(dirname(directory)) === "ca540"
+    ) {
+      try {
+        await inspectCaInventory(directory);
+      } catch (error) {
+        problems.push({ directory, message: describe(error) });
+      }
+    }
     for await (const entry of Deno.readDir(directory)) entries.push(entry);
     entries.sort((a, b) => a.name.localeCompare(b.name));
     if (
@@ -245,7 +278,7 @@ export async function inspectBenchmarkCases(
 
 export async function discoverBenchmarkCases(
   root: string,
-  products: Readonly<Record<string, FormDefinition>> = catalog,
+  products: Readonly<Record<string, ProductDefinition>> = productCatalog,
 ): Promise<string[]> {
   const { found, problems } = await inspectBenchmarkCases(root, products);
   if (problems.length > 0) {

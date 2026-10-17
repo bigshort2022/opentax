@@ -19,6 +19,8 @@ The supported full-return review scope is federal Form 1040 TY2025. A separate C
 
 For unsupported or unverified full-return review scope, do not request source documents for an OpenTax recalculation and do not create a return. For a CA workpaper request, use only independently reviewed California adjustments and supporting amounts for the specified selected-line calculation; do not call it a review or verification of the complete state return. A previously filed return needing correction requires verified amendment support; otherwise leave it unchanged and stop.
 
+For CA workpapers, review the structured coverage/applicability and per-gate outcomes rather than the command exit code or absence of arithmetic errors. Unknown required schedules, unsupported features, unavailable official validators, and unverified external checks remain limitations. Stable findings identify specific gaps; neither supplied zero totals nor affirmative review flags prove complete-return correctness. Do not characterize the workpaper's `canFile: false` as an FTB rejection, or bypass it with force/draft.
+
 ## Phase 1: Collect sources (verified scope only)
 
 Continue to full document collection only after the scope gate verifies the exact year and jurisdiction. For unsupported or unverified scope, do not request uploads or source values for an OpenTax recalculation. Stop and report the coverage blocker. If the user independently provides a non-sensitive summary and asks for manual issue-spotting, limit the response to questions/blockers, label it incomplete, and do not claim a verified recalculation.
