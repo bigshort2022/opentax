@@ -15,6 +15,10 @@ Expand the product to complete TY2025 California Form 540 preparation for full-y
 - Explicitly exclude Form 540NR, Form 540 2EZ, amended returns, TY2024 and earlier, actual transmission, payment, ACK/reject processing, and filing authorization. These require separate scope and certification decisions.
 - Include the Form 540 inputs and workflows necessary to prepare a complete supported return. Unsupported taxpayer situations must be identified explicitly and fail readiness rather than default to zero or pass via review booleans.
 
+### Delivery order
+
+First deliver explicit product coverage and trustworthy CA readiness diagnostics while retaining the workpaper and MeF locks. Next deliver complete tax scenarios with independently sourced expected results, then official FTB XML/rule integration once authorized artifacts are available. This sequence does not reduce the full-return destination or allow a narrow scenario to establish universal resident-return support. The bounded implementation plan is `../plans/2026-10-17-ca540-coverage-readiness.md`.
+
 ## Readiness contract
 
 The current `canFile: false` is deliberate workpaper policy, not evidence that a synthetic input failed a MeF schema. Replace that unconditional result only after complete coverage and the validation gates below exist.
@@ -29,6 +33,8 @@ Expose independent, typed results for at least:
 
 `canFile` is true only when the return is within the supported scope, required facts and schedules are present and reviewed, calculations and applicable business rules pass, and the generated FTB XML validates against the pinned official schema. It means the return passes this tool's local filing-readiness checks; it does not mean OpenTax can transmit it, an approved provider will accept/import it, or FTB has accepted it. Schema validity alone never makes `canFile` true. Product/provider approval and transmission/acceptance status remain separate and are not inferred.
 
+Each required gate reports `passed`, `failed`, `unsupported`, `not_run`, or `unavailable`; requirement applicability separately reports required, not applicable with evidence, or unknown. Unknown applicability and skipped/unimplemented required checks cannot count as passes. External FTB-record checks are reported separately as unverified, not misrepresented as locally passed. An incomplete check inventory is itself a readiness blocker. Phase one deliberately cannot produce a filing-ready California return.
+
 ## MeF authority and external dependencies
 
 Use the FTB California individual schema and business rules, not the IRS Form 1040 schema, for the state return. FTB's public schema page says those artifacts are distributed to authorized users through the FTA State Exchange System after a California Letter of Intent for each supported tax year. The FTB page lists TY2025 Form Type `540/NR/2EZ`, version `2025v4.3`, available in SES on 2026-06-08, with PATS and production dates starting 2026-06-22. Target that latest listed version unless FTB confirms a superseding release. Do not invent or substitute schemas/rules if access is unavailable.
@@ -41,7 +47,7 @@ FTB's developer participation page says California e-file software developers mu
 
 - Keep California tax calculation, state return data, and FTB serialization distinct from the federal Form 1040 engine and IRS MeF schema.
 - Preserve year-versioned, strict input schemas and typed line/schedule results; use explicit source-document facts and traceable calculations rather than user-entered totals wherever the return model supports it.
-- Derive `canFile` from the typed result gates; do not hardcode false or allow `--force` to bypass tax, schema, or business-rule rejects.
+- Derive future CA readiness from complete typed gate results; in the first diagnostic milestone retain the workpaper scope restriction and MeF export refusal. Do not permit `--force` to bypass California readiness gates. Do not silently reinterpret the existing federal `canFile` contract: report its current limitations and review any federal migration as a separate change.
 - Generate the XML candidate only from validated return state. Preserve exact validator rule identifiers/messages and map them to actionable diagnostics without leaking private taxpayer content into logs or committed fixtures.
 - Keep existing workpaper output available only as a clearly labeled incomplete result until the full-return gates are proven. Remove or migrate obsolete paper-only MeF refusal when the replacement path is complete; do not add a shim that implies filing support early.
 
@@ -50,8 +56,8 @@ FTB's developer participation page says California e-file software developers mu
 1. **Requirements coverage:** Maintain a traceability matrix from each Form 540 line, relevant 2025 Schedule CA and supporting schedule field, eligibility rule, and XML element/business rule to an FTB source and implementation/test.
 2. **Tax correctness:** Use synthetic cases with expected line values independently derived from FTB 2025 forms, instructions, publications, tax tables, and applicable law. Cover filing status, boundaries, phaseouts, carryovers, rounding, credits, payments, and error paths; never derive oracle values from OpenTax output.
 3. **Schema:** Run the exact FTB TY2025 v4.3 XSD locally against generated XML, with tests for required/missing/invalid elements, types, ordering, namespaces, and attachments.
-4. **Business rules:** Run the exact FTB TY2025 v4.3 rules locally and preserve exact rule identifiers and severities; include positive cases and intentional rule failures.
-5. **End-to-end:** Exercise a fully supported synthetic return through fact ingestion, calculations, complete Form 540/schedules, XML generation, XSD validation, and business-rule evaluation. Assert readiness true only for a valid fixture and assert specific blockers for incomplete, unsupported, or rejected fixtures.
+4. **Business rules:** Inventory the official FTB TY2025 v4.3 rules and preserve exact rule identifiers and severities. Implement and test every applicable locally evaluable rule; distinguish justified non-applicability, unsupported/unimplemented rules, and checks requiring FTB records. Do not assume the distributed rules package is an executable validator or that external-only checks can run locally.
+5. **End-to-end:** Exercise supported synthetic scenarios from fact ingestion through complete Form 540/schedules and, once available, XML/schema/local-rule validation. Phase-one scenarios assert specific blockers and `canFile: false`; a later readiness-positive fixture requires complete applicable scope and official artifact gates. A missing expected schedule must be detected even if the XML emitter omitted it.
 6. **Official test evidence:** If FTB authorizes a PATS/test path for this handoff-only project, run only approved synthetic test scenarios and record the versioned result. Do not use live taxpayer data or a production transmission. If access is unavailable or PATS is not applicable absent provider enrollment, document the exact unverified gate and do not claim official approval/acceptance.
 7. **Privacy and operations:** Fixtures contain no taxpayer data, live returns, private identifiers, or raw CLI logs. No automatic transmission, payment, credentials, or filing authorization.
 
