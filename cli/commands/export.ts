@@ -1,6 +1,10 @@
 import { join } from "@std/path";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
-import { catalog } from "../../catalog.ts";
+import { productCatalog } from "../../catalog.ts";
+import {
+  isStateFormDefinition,
+  type ProductDefinition,
+} from "../../core/types/form-definition.ts";
 import { buildEngineInputs, loadReturn } from "../store/store.ts";
 import { singletonPublicInputKeys } from "../store/public-input-keys.ts";
 import { extractFilerIdentity } from "../../forms/f1040/mef/filer.ts";
@@ -11,15 +15,16 @@ import { FIELD_REGISTRY } from "../../forms/f1040/validation/field-registry.ts";
 import { ALL_RULES } from "../../forms/f1040/validation/rules/index.ts";
 import type { DiagnosticEntry } from "../../core/validation/types.ts";
 import type { ExecutorDiagnosticEntry } from "../../core/runtime/executor.ts";
+import type { StateFormCalculation } from "../../core/types/form-definition.ts";
 import { loadForm8839Attachments } from "./form8839-attachments.ts";
 import { normalizeAllPending } from "../../forms/f1040/2025/return-processing/pending.ts";
 import { buildForm4972PaperPdfBytes } from "../../forms/f1040/2025/pdf/builder.ts";
 import { reconcileForm4972Collection } from "../../forms/f1040/2025/domains/taxes/retirement/form4972/form4972_collection_reconciliation.ts";
 import { sha256Hex } from "../../forms/f1040/2025/return-processing/prepared-source.ts";
 
-function getCatalogEntry(formType: string, year: number) {
+function getCatalogEntry(formType: string, year: number): ProductDefinition {
   const key = `${formType}:${year}`;
-  const def = catalog[key];
+  const def = productCatalog[key];
   if (!def) throw new Error(`Unsupported form: ${key}`);
   return def;
 }
@@ -67,9 +72,10 @@ export class ExportExecutionError extends Error {
 
 type PipelineResult = {
   readonly pending: Readonly<Record<string, Record<string, unknown>>>;
-  readonly def: ReturnType<typeof getCatalogEntry>;
+  readonly def: ProductDefinition;
   readonly filer: ReturnType<typeof extractFilerIdentity>;
   readonly executorDiagnostics: readonly ExecutorDiagnosticEntry[];
+  readonly stateCalculation?: StateFormCalculation;
 };
 
 const ALWAYS_APPLICABLE_RULE_PREFIXES = [
@@ -215,6 +221,22 @@ export async function runReturnPipeline(
   const returnPath = join(args.baseDir, args.returnId);
   const { meta, inputs } = await loadReturn(returnPath);
   const def = getCatalogEntry(meta.formType ?? "f1040", meta.year);
+  if (isStateFormDefinition(def)) {
+    const entries = inputs[def.inputKey] ?? [];
+    if (entries.length !== 1) {
+      throw new Error(
+        `California Form 540 requires exactly one ${def.inputKey} input`,
+      );
+    }
+    const calculation = def.calculate({ ...entries[0].fields });
+    return {
+      pending: {},
+      def,
+      filer: undefined,
+      executorDiagnostics: [],
+      stateCalculation: calculation,
+    };
+  }
   const engineInputs = buildEngineInputs(inputs, singletonPublicInputKeys(def));
   const result = def.executeReturn(engineInputs);
 
@@ -274,6 +296,9 @@ export async function exportMefCommand(
   const { pending, def, filer, executorDiagnostics } = await runReturnPipeline(
     args,
   );
+  if (isStateFormDefinition(def)) {
+    throw new Error("MeF export is not available for California Form 540");
+  }
   const attachments = await loadForm8839Attachments(
     join(args.baseDir, args.returnId),
     pending,
@@ -297,9 +322,19 @@ export type ExportPdfArgs = ExportReturnArgs & {
 export async function exportPdfCommand(
   args: ExportPdfArgs,
 ): Promise<string> {
-  const { pending, def, filer } = await runReturnPipeline(
+  const { pending, def, filer, stateCalculation } = await runReturnPipeline(
     args,
   );
+  if (isStateFormDefinition(def)) {
+    if (!stateCalculation) {
+      throw new Error("California Form 540 calculation is unavailable");
+    }
+    const pdfBytes = await def.buildWorksheetPdf(stateCalculation);
+    const outPath = args.outputPath ??
+      join(args.baseDir, args.returnId, "export.pdf");
+    await Deno.writeFile(outPath, pdfBytes);
+    return outPath;
+  }
   const attachments = await loadForm8839Attachments(
     join(args.baseDir, args.returnId),
     pending,
@@ -334,6 +369,9 @@ export async function exportForm4972PaperCommand(
     );
   }
   const { pending, def, filer } = await runReturnPipeline(args);
+  if (isStateFormDefinition(def)) {
+    throw new Error("Form 4972 paper-only export requires a TY2025 Form 1040");
+  }
   if (def.formType !== "f1040" || def.taxYear !== 2025) {
     throw new Error("Form 4972 paper-only export requires a TY2025 Form 1040");
   }

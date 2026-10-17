@@ -4,13 +4,13 @@
   <img src="icon.svg" width="128" height="128" alt="Filed Open Tax Engine">
 </p>
 
-**[opentax.filed.com](https://opentax.filed.com)** - Fully open-source federal tax calculation engine. Single binary. Runs on macOS, Linux, and Windows.
+**[opentax.filed.com](https://opentax.filed.com)** - Open-source tax calculation engine. Federal Form 1040 TY2025 and a limited California Form 540 TY2025 workpaper. Single binary. Runs on macOS, Linux, and Windows.
 
-> **Note:** This engine calculates taxes accurately for use by AI agents and developers. For filing your taxes, visit [irs.gov](https://irs.gov).
+> **Note:** This engine provides calculations for AI agents and developers; it does not determine filing readiness. Use official IRS and FTB forms/instructions and approved filing channels to file.
 
-Built and maintained by AI agents using official IRS publications as the sole source of truth.
+Built and maintained by AI agents using official IRS and California FTB publications for the supported calculations.
 
-> Covers Form 1040 (TY2025) today. Additional forms and state returns coming.
+> Federal Form 1040 (TY2025); limited California Form 540 calculation workpaper (TY2025 full-year residents only). The California worksheet is not filing-ready or e-fileable. See [California Form 540 scope and limitations](docs/ca540-ty2025.md).
 
 ---
 

@@ -7,7 +7,11 @@
 
 import { join } from "@std/path";
 import type { ExecutorDiagnosticEntry } from "../../core/runtime/executor.ts";
-import { catalog } from "../../catalog.ts";
+import { productCatalog } from "../../catalog.ts";
+import {
+  isStateFormDefinition,
+  type ProductDefinition,
+} from "../../core/types/form-definition.ts";
 import { buildEngineInputs, loadReturn } from "../store/store.ts";
 import { singletonPublicInputKeys } from "../store/public-input-keys.ts";
 import { extractFilerIdentity } from "../../forms/f1040/mef/filer.ts";
@@ -28,9 +32,9 @@ import { normalizeAllPending } from "../../forms/f1040/2025/return-processing/pe
 import { returnHeaderNameLine1 } from "../../forms/f1040/mef/header.ts";
 import { emittedValidationScope, isTransmissionOnlyRule } from "./export.ts";
 
-function getCatalogEntry(formType: string, year: number) {
+function getCatalogEntry(formType: string, year: number): ProductDefinition {
   const key = `${formType}:${year}`;
-  const def = catalog[key];
+  const def = productCatalog[key];
   if (!def) throw new Error(`Unsupported form: ${key}`);
   return def;
 }
@@ -56,6 +60,47 @@ export async function validateReturnCommand(
   const returnPath = join(args.baseDir, args.returnId);
   const { meta, inputs } = await loadReturn(returnPath);
   const def = getCatalogEntry(meta.formType ?? "f1040", meta.year);
+  if (isStateFormDefinition(def)) {
+    const entriesForInput = inputs[def.inputKey] ?? [];
+    const blockers = entriesForInput.length === 1
+      ? def.calculate({ ...entriesForInput[0].fields }).blockers
+      : ["California Form 540 requires exactly one validated input object."];
+    const entries: DiagnosticEntry[] = [
+      ...blockers.map((message, index) => ({
+        ruleNumber: `CA540_REVIEW_${index + 1}`,
+        severity: "reject" as const,
+        category: "unsupported" as const,
+        message,
+        formRef: "Form 540",
+      })),
+      {
+        ruleNumber: "CA540_SCOPE_NOT_FILING_READY",
+        severity: "reject",
+        category: "unsupported",
+        message:
+          "This calculation worksheet is not a filing-readiness validation.",
+        formRef: "Form 540",
+      },
+    ];
+    const report: DiagnosticsReport = {
+      entries,
+      summary: {
+        total: entries.length,
+        passed: 0,
+        rejected: entries.length,
+        alerts: 0,
+        skipped: 0,
+      },
+      canFile: false,
+    };
+    const format = args.format ?? "json";
+    return {
+      report,
+      formatted: format === "text"
+        ? formatDiagnosticsText(report, args.returnId, meta.year)
+        : formatDiagnosticsJson(report),
+    };
+  }
   const engineInputs = buildEngineInputs(inputs, singletonPublicInputKeys(def));
   const result = def.executeReturn(engineInputs);
   const pending = normalizeAllPending(result.pending);

@@ -15,9 +15,9 @@ Track four separate statuses: source documents available; calculation completed 
 
 First ask the tax year, jurisdiction(s), whether each return was filed, and whether the user moved or had income in another state. Keep every year and jurisdiction separate.
 
-The current published engine scope is federal Form 1040 TY2025; the README says state returns are coming. Do not represent OpenTax as supporting federal TY2022–TY2024 or California TY2022–TY2025. Check current README/release notes and the exact installed executable for any later verified support.
+The supported full-return review scope is federal Form 1040 TY2025. A separate California Form 540 TY2025 workpaper supports selected arithmetic for full-year residents; it is not a complete California return review, filing-readiness determination, or e-fileable return. Do not claim review support for federal TY2022–TY2024, California TY2022–TY2024, Form 540NR, Form 540 2EZ, or amended returns. See `docs/ca540-ty2025.md` for the workpaper boundary.
 
-If any requested year/jurisdiction is unsupported or unverified, do not ask for source documents for an OpenTax recalculation and do not create a return. Explain the coverage blocker. A previously filed return needing correction requires verified amendment support; otherwise leave it unchanged and stop. A manual review may still identify questions from user-provided summaries, but must be labeled incomplete and must not claim a verified recalculation.
+For unsupported or unverified full-return review scope, do not request source documents for an OpenTax recalculation and do not create a return. For a CA workpaper request, use only independently reviewed California adjustments and supporting amounts for the specified selected-line calculation; do not call it a review or verification of the complete state return. A previously filed return needing correction requires verified amendment support; otherwise leave it unchanged and stop.
 
 ## Phase 1: Collect sources (verified scope only)
 
