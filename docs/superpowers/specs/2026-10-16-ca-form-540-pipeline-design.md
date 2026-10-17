@@ -37,6 +37,15 @@ Add a staged California resident Form 540 TY2025 capability that computes a retu
 - This repository's commercial notice reserves IRS MeF developer/transmitter application rights to Filed Inc. and authorized partners. Do not change or imply broader authorization; route any IRS-side filing/transmitter work through authorized parties.
 - California tax calculation sources include the official TY2025 Form 540 booklet/instructions, Schedule CA and instructions, tax table/rate schedules, and any other FTB publications applicable to each supported rule.
 
+## Tax-authority currency and verification
+
+- Re-verify the official FTB TY2025 form/instruction index, publication revisions, conformity guidance, schema version, and business-rule package at implementation start and before each release. A stable URL alone is not evidence that the version is current or applicable.
+- For every implemented calculation or filing rule, retain an authority record with the source title, tax year, issuing agency, canonical URL, publication/revision date, retrieval date, page/line or rule identifier, and SHA-256 of the retained source bytes. Keep restricted SES files outside committed source; record their exact version and hashes in the permitted local provenance record.
+- Treat FTB form instructions as implementation guidance, not conclusive law: FTB itself says its instructions summarize tax law and are not authoritative law. Resolve material ambiguity or conflict using the applicable California Revenue and Taxation Code, regulations, conformity statutes/notices, and official FTB publications; document the resolution before coding.
+- Bind every benchmark expectation to a published worked example or other explicit official value and cite the exact page/line in its case metadata and ledger. A model-produced value, calculator output, or unverified third-party answer is not an oracle.
+- When FTB updates an instruction, schema, or business-rule package, compare the new official revision against the pinned source record. Update implementation, tests, benchmark ledger, and schema provenance together where the change affects TY2025 behavior; otherwise record why the update is non-applicable.
+- Acceptance requires a reviewer to verify source provenance and rule-to-test coverage, not merely that XML validates against an XSD. XSD validity does not establish correct tax treatment or FTB acceptance.
+
 ## Validation and evidence
 
 - Unit tests cover schema-inferred input shapes, boundaries, computation invariants, rounding, residency/filing eligibility, and CA-specific transitions.
