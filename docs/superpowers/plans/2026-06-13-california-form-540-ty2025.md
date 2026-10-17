@@ -115,7 +115,7 @@ FTB itself says the instructions summarize tax law and are not authoritative law
 - [x] `deno task bench --form ca540 --year 2025` — 2 FTB line 31 cases pass. `deno task bench --form f1040 --year 2025` exits with 28 known-invalid fixtures despite the case checker baseline; do not claim the federal benchmark passes.
 - [x] Run actual CLI create/add/get/validate/PDF/MeF smoke using a synthetic return under a fresh `/tmp` workspace; PDF written, validation remains `canFile: false`, MeF rejected.
 - [x] `deno fmt --check` for changed TypeScript and `git diff --check` pass; wrapper-repo Ruff is not applicable because it was not changed.
-- [x] Confirmed PR #1 remains open in `bigshort2022/opentax`; this implementation is in separate PR [#2](https://github.com/bigshort2022/opentax/pull/2) based on the latest `origin/main`.
+- [x] Merged PR #1 first, updated PR #2 from the new `main`, and reconciled all three skill scope gates with the limited CA workpaper boundary.
 
 ## Acceptance gates
 
@@ -125,4 +125,4 @@ FTB itself says the instructions summarize tax law and are not authoritative law
 4. The catalog/CLI create, add, get, validate, and PDF export path works end to end for `ca540:2025`; MeF export is rejected without fabricated XML.
 5. Worksheet says not official / not e-fileable / not a filing-readiness determination; it carries source links and unresolved blockers.
 6. The federal `catalog` and execution branch remain unchanged. The federal benchmark command still exits on 28 invalid cases; this feature does not claim a clean federal benchmark run.
-7. TY2022–2024 remains unclaimed. PR #1 stays unchanged; citations and verification evidence are in follow-up PR #2 and this plan.
+7. TY2022–2024 remains unclaimed. PR #1 is merged; PR #2 contains the workpaper, updated skill scope, citations, and verification evidence.
