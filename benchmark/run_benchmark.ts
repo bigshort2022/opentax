@@ -13,6 +13,7 @@ import {
   createdReturnSchema,
   discoverBenchmarkCases,
 } from "./harness.ts";
+import { runCa540Benchmark } from "./ca540_2025.ts";
 
 const SCRIPT_DIR = dirname(fromFileUrl(import.meta.url));
 const TAX_DIR = join(SCRIPT_DIR, "..");
@@ -28,6 +29,12 @@ function getFlag(flag: string, defaultVal: string): string {
 const formFlag = getFlag("--form", "f1040");
 const yearFlag = getFlag("--year", "2025");
 const jsonFlag = args.includes("--json");
+if (import.meta.main && formFlag === "ca540") {
+  if (yearFlag !== "2025") {
+    throw new Error(`Unsupported California benchmark year: ${yearFlag}`);
+  }
+  Deno.exit(await runCa540Benchmark() ? 0 : 1);
+}
 
 const CASES_DIR = join(SCRIPT_DIR, "cases", formFlag, yearFlag);
 
