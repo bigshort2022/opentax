@@ -15,7 +15,7 @@ import { FIELD_REGISTRY } from "../../forms/f1040/validation/field-registry.ts";
 import { ALL_RULES } from "../../forms/f1040/validation/rules/index.ts";
 import type { DiagnosticEntry } from "../../core/validation/types.ts";
 import type { ExecutorDiagnosticEntry } from "../../core/runtime/executor.ts";
-import type { StateFormCalculation } from "../../core/types/form-definition.ts";
+import type { StateAssessment } from "../../core/validation/state-report.ts";
 import { loadForm8839Attachments } from "./form8839-attachments.ts";
 import { normalizeAllPending } from "../../forms/f1040/2025/return-processing/pending.ts";
 import { buildForm4972PaperPdfBytes } from "../../forms/f1040/2025/pdf/builder.ts";
@@ -75,7 +75,7 @@ type PipelineResult = {
   readonly def: ProductDefinition;
   readonly filer: ReturnType<typeof extractFilerIdentity>;
   readonly executorDiagnostics: readonly ExecutorDiagnosticEntry[];
-  readonly stateCalculation?: StateFormCalculation;
+  readonly stateAssessment?: StateAssessment;
 };
 
 const ALWAYS_APPLICABLE_RULE_PREFIXES = [
@@ -223,18 +223,13 @@ export async function runReturnPipeline(
   const def = getCatalogEntry(meta.formType ?? "f1040", meta.year);
   if (isStateFormDefinition(def)) {
     const entries = inputs[def.inputKey] ?? [];
-    if (entries.length !== 1) {
-      throw new Error(
-        `California Form 540 requires exactly one ${def.inputKey} input`,
-      );
-    }
-    const calculation = def.calculate({ ...entries[0].fields });
+    const assessment = def.assess(entries.map((entry) => entry.fields));
     return {
       pending: {},
       def,
       filer: undefined,
       executorDiagnostics: [],
-      stateCalculation: calculation,
+      stateAssessment: assessment,
     };
   }
   const engineInputs = buildEngineInputs(inputs, singletonPublicInputKeys(def));
@@ -322,14 +317,16 @@ export type ExportPdfArgs = ExportReturnArgs & {
 export async function exportPdfCommand(
   args: ExportPdfArgs,
 ): Promise<string> {
-  const { pending, def, filer, stateCalculation } = await runReturnPipeline(
+  const { pending, def, filer, stateAssessment } = await runReturnPipeline(
     args,
   );
   if (isStateFormDefinition(def)) {
-    if (!stateCalculation) {
-      throw new Error("California Form 540 calculation is unavailable");
+    if (!stateAssessment?.calculation) {
+      throw new Error(
+        "California workpaper calculation is unavailable; run validate for input diagnostics.",
+      );
     }
-    const pdfBytes = await def.buildWorksheetPdf(stateCalculation);
+    const pdfBytes = await def.buildWorksheetPdf(stateAssessment);
     const outPath = args.outputPath ??
       join(args.baseDir, args.returnId, "export.pdf");
     await Deno.writeFile(outPath, pdfBytes);

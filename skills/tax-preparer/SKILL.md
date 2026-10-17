@@ -25,6 +25,8 @@ opentax version
 
 The remainder of this skill's full preparation workflow applies to the federal TY2025 return only. For a California workpaper request, proceed only if the user specifically wants selected-line arithmetic and supplies independently reviewed California adjustments and supporting line amounts. Do not characterize it as preparing or reviewing their complete state return. MeF export is unavailable.
 
+For the CA path, use `opentax return validate --returnId <id> --format json` and inspect `coverage`, `gates`, `readiness`, and stable diagnostic codes. Distinguish computed arithmetic from supplied aggregates and unknown schedule applicability. An inspection exit zero does not establish readiness; the workpaper scope remains unsupported and official schema/rule gates unavailable. Do not set missing facts or review flags merely to remove findings. Force/draft never authorize CA MeF export.
+
 ```bash
 opentax return create --year 2025
 # → { "returnId": "abc-123" }

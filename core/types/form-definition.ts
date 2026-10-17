@@ -4,10 +4,7 @@ import type { FilerIdentity } from "../../forms/f1040/mef/header.ts";
 import type { ExecuteResult } from "../runtime/executor.ts";
 import type { MefBundle } from "../../forms/f1040/2025/mef/builder.ts";
 import type { MefPdfAttachment } from "../../forms/f1040/2025/mef/form-descriptor.ts";
-export interface StateFormCalculation {
-  readonly lines: Readonly<Record<string, number>>;
-  readonly blockers: readonly string[];
-}
+import type { StateAssessment } from "../validation/state-report.ts";
 
 export interface PreparedFormReturn {
   readonly bundle: MefBundle;
@@ -63,11 +60,9 @@ export interface StateFormDefinition {
   readonly taxYear: number;
   readonly inputKey: string;
   readonly inputSchema: ZodTypeAny;
-  readonly calculate: (
-    input: Record<string, unknown>,
-  ) => StateFormCalculation;
+  readonly assess: (entries: readonly unknown[]) => StateAssessment;
   readonly buildWorksheetPdf: (
-    calculation: StateFormCalculation,
+    assessment: StateAssessment,
   ) => Promise<Uint8Array>;
 }
 

@@ -7,14 +7,13 @@
 import { basename, dirname, fromFileUrl, join } from "@std/path";
 
 import {
-  benchmarkExitCode,
-  benchmarkExpectedSchema,
   benchmarkInputSchema,
   benchmarkReturnSchema,
   benchmarkTax,
   createdReturnSchema,
-  discoverBenchmarkCases,
 } from "./harness.ts";
+import { caseProduct } from "./harness.ts";
+import { inspectCaInventory, runCaCase } from "./ca540.ts";
 
 const SCRIPT_DIR = dirname(fromFileUrl(import.meta.url));
 const TAX_DIR = join(SCRIPT_DIR, "..");
@@ -25,6 +24,18 @@ if (!caseDir) {
     "Usage: deno run --allow-read --allow-write --allow-run run_case.ts <case_dir>",
   );
   Deno.exit(1);
+}
+const product = caseProduct(caseDir);
+if (!product) throw new Error("Case must live at <form>/<year>/<case>");
+if (product.form === "ca540") {
+  await inspectCaInventory(dirname(caseDir));
+  const result = await runCaCase(caseDir);
+  await Deno.writeTextFile(
+    join(caseDir, "output.json"),
+    JSON.stringify(result, null, 2),
+  );
+  console.log(JSON.stringify(result));
+  Deno.exit(result.ok ? 0 : 1);
 }
 
 async function tax(...args: string[]): Promise<string> {
@@ -40,7 +51,15 @@ console.log(`Running: ${basename(caseDir)}`);
 console.log(`  Scenario: ${caseData.scenario ?? ""}`);
 
 const rid = createdReturnSchema.parse(JSON.parse(
-  await tax("return", "create", "--year", String(caseData.year), "--json"),
+  await tax(
+    "return",
+    "create",
+    "--form",
+    product.form,
+    "--year",
+    String(caseData.year),
+    "--json",
+  ),
 )).returnId;
 console.log(`  Created return: ${rid}`);
 

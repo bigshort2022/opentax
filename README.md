@@ -12,6 +12,8 @@ Built and maintained by AI agents using official IRS and California FTB publicat
 
 > Federal Form 1040 (TY2025); limited California Form 540 calculation workpaper (TY2025 full-year residents only). The California worksheet is not filing-ready or e-fileable. See [California Form 540 scope and limitations](docs/ca540-ty2025.md).
 
+California validation reports explicit calculation coverage, stable findings, and separate local-readiness gates. A passing arithmetic/input check is not a complete-return or filing pass: required documents remain unverified and official FTB schema/rule validation is unavailable. The worksheet stays non-e-fileable, and neither force nor draft enables California MeF export.
+
 ---
 
 ## Why
@@ -269,6 +271,8 @@ deno task check:structure   # nodes placed, registered, reachable
 deno task check:cases       # benchmark cases fit their node schemas and cite a source
 deno task check:oracle      # expected values changed only with a cited ledger entry
 deno task test:unit         # module graph and typed tests
+deno task test:ca540        # explicit CA coverage, assessment, CLI and evidence tests
+deno task bench --form ca540 --year 2025 --json # exact CA line/workpaper comparisons
 
 # Run the full test suite and the accuracy benchmark
 deno task test

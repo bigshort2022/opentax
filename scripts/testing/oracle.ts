@@ -6,9 +6,20 @@ import {
   ENGINE_SOURCE,
 } from "../../benchmark/harness.ts";
 import { repositoryFiles } from "./repository.ts";
+import {
+  caAssertions,
+  CaCaseKind,
+  CaEvidenceProvenance,
+  type CaLedger,
+  caLedgerAuthorityValid,
+  caLedgerSchema,
+  canonicalCaValue,
+  inspectCaInventory,
+} from "../../benchmark/ca540.ts";
 
 export const CASES_DIR = "benchmark/cases";
 export const LEDGER_FILE = "ledger.json";
+const LEGACY_CA_FILE = "benchmark/ca540/2025/cases.json";
 
 const ledgerEntrySchema = z.object({
   case: z.string().min(1),
@@ -24,6 +35,14 @@ export const ledgerSchema = z.array(ledgerEntrySchema);
 export type Ledger = z.infer<typeof ledgerSchema>;
 
 export type Change =
+  | {
+    readonly kind: "assertion";
+    readonly product: string;
+    readonly case: string;
+    readonly path: string;
+    readonly before: unknown;
+    readonly after: unknown;
+  }
   | {
     readonly kind: "value";
     readonly product: string;
@@ -66,6 +85,23 @@ export function caseKey(
   return match ? { product: match[1], case: match[2] } : undefined;
 }
 
+/** CA tracks all critical contracts, inputs, source references and scenario coverage. */
+function evidenceKey(
+  path: string,
+): { product: string; case: string; file?: string } | undefined {
+  const ca =
+    /^benchmark\/cases\/(ca540\/2025)\/(?:(scenarios\.json)|([^/]+)\/(input|correct|sources)\.json)$/
+      .exec(path);
+  if (ca) {
+    return {
+      product: ca[1],
+      case: ca[2] ? "@manifest" : ca[3],
+      file: ca[2] ?? `${ca[4]}.json`,
+    };
+  }
+  return caseKey(path);
+}
+
 export function scoredValues(raw: unknown): Record<string, number> {
   return benchmarkExpectedSchema.parse(raw);
 }
@@ -83,6 +119,22 @@ export function caseChanges(
   before: unknown | undefined,
   after: unknown | undefined,
 ): Change[] {
+  if (product === "ca540/2025") {
+    const was = caAssertions(before);
+    const now = caAssertions(after);
+    return [...new Set([...Object.keys(was), ...Object.keys(now)])].sort()
+      .filter((path) =>
+        canonicalCaValue(was[path]) !== canonicalCaValue(now[path])
+      )
+      .map((path) => ({
+        kind: "assertion" as const,
+        product,
+        case: name,
+        path,
+        before: was[path],
+        after: now[path],
+      }));
+  }
   if (before === undefined && after === undefined) return [];
   if (before === undefined) {
     return [{ kind: "added", product, case: name, cited: isCited(after) }];
@@ -114,10 +166,37 @@ function citation(entry: Ledger[number] | undefined): string | undefined {
 /** Every change needs a ledger entry that states it and cites a publication. */
 export function ledgerProblems(
   changes: readonly Change[],
-  ledgers: ReadonlyMap<string, Ledger>,
+  ledgers: ReadonlyMap<string, Ledger | CaLedger>,
 ): Problem[] {
   return changes.flatMap((change): Problem[] => {
-    const ledger = ledgers.get(change.product) ?? [];
+    if (change.kind === "assertion") {
+      const parsed = caLedgerSchema.safeParse(ledgers.get(change.product));
+      const entry = parsed.success
+        ? parsed.data.find((candidate) =>
+          candidate.case === change.case && candidate.path === change.path &&
+          canonicalCaValue(candidate.before) ===
+            canonicalCaValue(change.before) &&
+          canonicalCaValue(candidate.after) === canonicalCaValue(change.after)
+        )
+        : undefined;
+      const independent = entry && caLedgerAuthorityValid(entry) &&
+        !(entry.provenance === CaEvidenceProvenance.MigratedExistingOracle &&
+          change.before !== undefined);
+      if (entry && independent) return [];
+      return [{
+        kind: "uncited-change",
+        product: change.product,
+        case: change.case,
+        line: change.path,
+        message:
+          `${change.path} changed or was removed without matching typed reviewed evidence`,
+        fix:
+          `Record exact before/after, official numerical authority or honest project policy authority, reviewer, date and explicit provenance in ${
+            ledgerPath(change.product)
+          }; approvedBy is not CA approval`,
+      }];
+    }
+    const ledger = (ledgers.get(change.product) ?? []) as Ledger;
     const file = ledgerPath(change.product);
     if (change.kind === "added") {
       if (change.cited) return [];
@@ -188,6 +267,38 @@ async function git(root: string, args: string[]): Promise<string> {
   return new TextDecoder().decode(result.stdout);
 }
 
+/** Preserve the original independent vectors across the one-time canonical migration. */
+function legacyCaBaseCases(raw: unknown): [string, unknown][] {
+  const cases = z.array(
+    z.object({
+      name: z.string().min(1),
+      taxableIncome: z.number().int().nonnegative(),
+      filingStatus: z.string().min(1),
+      expectedLine31: z.number().int().nonnegative(),
+      source: z.string().min(1),
+    }).strict(),
+  ).min(1).parse(raw);
+  const seen = new Set<string>();
+  return cases.flatMap((item): [string, unknown][] => {
+    if (seen.has(item.name)) throw new Error("Duplicate legacy CA oracle ID");
+    seen.add(item.name);
+    const directory = `${CASES_DIR}/ca540/2025/${item.name}`;
+    return [
+      [`${directory}/input.json`, {
+        product: "ca540",
+        year: 2025,
+        kind: CaCaseKind.Line31,
+        taxableIncome: item.taxableIncome,
+        filingStatus: item.filingStatus,
+      }],
+      [`${directory}/correct.json`, {
+        kind: CaCaseKind.Line31,
+        lines: { line31_tax: item.expectedLine31 },
+      }],
+      [`${directory}/sources.json`, { official: [item.source] }],
+    ];
+  });
+}
 async function baseCases(
   root: string,
   base: string,
@@ -199,21 +310,34 @@ async function baseCases(
     base,
     "--",
     CASES_DIR,
-  ])).split("\n").filter((path) => caseKey(path));
+    LEGACY_CA_FILE,
+  ])).split("\n").filter((path) =>
+    evidenceKey(path) || path === LEGACY_CA_FILE
+  );
   const entries: [string, unknown][] = [];
   for (const path of paths) {
-    entries.push([
-      path,
-      JSON.parse(await git(root, ["show", `${base}:${path}`])),
-    ]);
+    const raw = JSON.parse(await git(root, ["show", `${base}:${path}`]));
+    if (path === LEGACY_CA_FILE) entries.push(...legacyCaBaseCases(raw));
+    else entries.push([path, raw]);
   }
   return new Map(entries);
 }
 
 async function currentCases(root: string): Promise<Map<string, unknown>> {
   const entries: [string, unknown][] = [];
-  for (const path of (await repositoryFiles(root)).filter((p) => caseKey(p))) {
-    entries.push([path, JSON.parse(await Deno.readTextFile(join(root, path)))]);
+  for (
+    const path of (await repositoryFiles(root)).filter((p) => evidenceKey(p))
+  ) {
+    try {
+      entries.push([
+        path,
+        JSON.parse(await Deno.readTextFile(join(root, path))),
+      ]);
+    } catch (error) {
+      // Git's index can still list a working-tree deletion. Compare it as a
+      // removal against the base; the ledger/inventory must authorize it.
+      if (!(error instanceof Deno.errors.NotFound)) throw error;
+    }
   }
   return new Map(entries);
 }
@@ -221,13 +345,13 @@ async function currentCases(root: string): Promise<Map<string, unknown>> {
 async function currentLedgers(
   root: string,
   products: Iterable<string>,
-): Promise<Map<string, Ledger>> {
-  const entries: [string, Ledger][] = [];
+): Promise<Map<string, Ledger | CaLedger>> {
+  const entries: [string, Ledger | CaLedger][] = [];
   for (const product of new Set(products)) {
     try {
       entries.push([
         product,
-        ledgerSchema.parse(
+        (product === "ca540/2025" ? caLedgerSchema : ledgerSchema).parse(
           JSON.parse(await Deno.readTextFile(join(root, ledgerPath(product)))),
         ),
       ]);
@@ -248,27 +372,65 @@ export type OracleReport = {
 export async function oracleReport(
   root: string,
   base: string,
+  options: { requireCaInventory?: boolean } = {},
 ): Promise<OracleReport> {
   await git(root, ["rev-parse", "--verify", "--quiet", `${base}^{commit}`]);
-  const [was, now] = await Promise.all([
-    baseCases(root, base),
-    currentCases(root),
-  ]);
+  // Finish owned git readers before parsing current files can fail.
+  const was = await baseCases(root, base);
+  const now = await currentCases(root);
   const changes = [...new Set([...was.keys(), ...now.keys()])].sort().flatMap(
     (path) => {
-      const key = caseKey(path)!;
-      return caseChanges(key.product, key.case, was.get(path), now.get(path));
+      const key = evidenceKey(path)!;
+      const changes = caseChanges(
+        key.product,
+        key.case,
+        was.get(path),
+        now.get(path),
+      );
+      const file = key.file;
+      return file
+        ? changes.map((change) =>
+          change.kind === "assertion"
+            ? {
+              ...change,
+              path: change.path ? `${file}.${change.path}` : file,
+            }
+            : change
+        )
+        : changes;
     },
   );
   const ledgers = await currentLedgers(
     root,
     changes.map((change) => change.product),
   );
+  const inventoryProblems: Problem[] = [];
+  try {
+    await inspectCaInventory(join(root, CASES_DIR, "ca540", "2025"));
+  } catch (error) {
+    // Generic/federal-only isolated repositories retain their existing oracle contract.
+    const hasCa = [...was.keys(), ...now.keys()].some((path) =>
+      path.includes("/ca540/")
+    );
+    if (
+      options.requireCaInventory || hasCa ||
+      !(error instanceof Deno.errors.NotFound)
+    ) {
+      inventoryProblems.push({
+        kind: "missing-source",
+        product: "ca540/2025",
+        case: "@inventory",
+        message: error instanceof Error ? error.message : String(error),
+        fix:
+          "Restore nonempty canonical CA inventory, manifest, typed ledger and independent sources",
+      });
+    }
+  }
   return {
     base,
-    cases: now.size,
+    cases: [...now.keys()].filter((path) => caseKey(path)).length,
     changes,
-    problems: ledgerProblems(changes, ledgers),
+    problems: [...ledgerProblems(changes, ledgers), ...inventoryProblems],
   };
 }
 
@@ -289,7 +451,7 @@ if (import.meta.main) {
   const base = baseIndex === -1 ? "origin/main" : Deno.args[baseIndex + 1];
   let report: OracleReport;
   try {
-    report = await oracleReport(root, base);
+    report = await oracleReport(root, base, { requireCaInventory: true });
   } catch (error) {
     console.error(
       `${(error as Error).message}\nFetch the base first: git fetch origin ${

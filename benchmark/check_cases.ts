@@ -11,6 +11,7 @@ import {
   inspectBenchmarkCases,
   readCaseBaseline,
 } from "./harness.ts";
+import { inspectCaInventory } from "./ca540.ts";
 
 const repo = dirname(dirname(fromFileUrl(import.meta.url)));
 const root = join(repo, "benchmark", "cases");
@@ -19,6 +20,7 @@ const today = new Date().toISOString().slice(0, 10);
 
 let report;
 try {
+  await inspectCaInventory(join(root, "ca540", "2025"));
   const { found, problems } = await inspectBenchmarkCases(root);
   if (found.length === 0 && problems.length === 0) {
     throw new Error(`No benchmark cases: ${root}`);

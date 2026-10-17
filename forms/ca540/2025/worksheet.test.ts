@@ -1,65 +1,54 @@
-import { assertEquals, assertStringIncludes } from "@std/assert";
-import { calculateForm540 } from "./calculation.ts";
-import { form540InputSchema } from "./input.ts";
+import { assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
+import { PDFDocument } from "pdf-lib";
+import { assessForm540 } from "./assessment.ts";
+import { workpaperInput } from "./test-fixtures.ts";
 import { buildWorksheetPdf } from "./worksheet.ts";
 
-const input = form540InputSchema.parse({
-  taxYear: 2025,
-  residency: "full_year_ca",
-  filingStatus: "single",
-  federalAgi: 75_000,
-  stateWages: 81_000,
-  scheduleCaSubtractions: 1_000,
-  scheduleCaAdditions: 200,
-  usesItemizedDeductions: false,
-  personalExemptions: 1,
-  blindExemptions: 0,
-  seniorExemptions: 0,
-  dependentExemptions: 0,
-  taxpayerCanBeClaimedAsDependent: false,
-  line34SpecialTax: 0,
-  line40ChildDependentCareCredit: 0,
-  line45SpecialCredits: 0,
-  line46RenterCredit: 0,
-  line61AlternativeMinimumTax: 0,
-  line62BehavioralHealthServicesTax: 0,
-  line63OtherTaxes: 0,
-  line95PaymentsAfterUseTaxAndPenalty: 4_000,
-  review: {
-    fullYearCaliforniaResidence: true,
-    filingStatusEligibility: true,
-    federalAndCaliforniaIncomeReconciled: true,
-    standardDeductionEligibility: true,
-    creditsAndTaxesReviewed: true,
-    paymentsUseTaxAndPenaltyReviewed: true,
-  },
-});
-
-Deno.test("Form 540 worksheet exposes calculated lines and filing limits", async () => {
+Deno.test("Form 540 worksheet keeps amounts and every readiness limitation visible", async () => {
+  const assessment = assessForm540([{
+    ...workpaperInput,
+    review: {
+      fullYearCaliforniaResidence: false,
+      filingStatusEligibility: false,
+      federalAndCaliforniaIncomeReconciled: false,
+      standardDeductionEligibility: false,
+      creditsAndTaxesReviewed: false,
+      paymentsUseTaxAndPenaltyReviewed: false,
+    },
+  }]);
   const tmpDir = await Deno.makeTempDir();
   try {
     const pdfPath = `${tmpDir}/ca540-worksheet.pdf`;
-    await Deno.writeFile(
-      pdfPath,
-      await buildWorksheetPdf(calculateForm540(input)),
-    );
+    const bytes = await buildWorksheetPdf(assessment);
+    await Deno.writeFile(pdfPath, bytes);
     const { code, stdout, stderr } = await new Deno.Command("pdftotext", {
-      args: [pdfPath, "-"],
+      args: ["-layout", pdfPath, "-"],
       stdout: "piped",
       stderr: "piped",
     }).output();
     assertEquals(code, 0, new TextDecoder().decode(stderr));
     const text = new TextDecoder().decode(stdout);
-    assertStringIncludes(
-      text,
-      "California Form 540 TY2025 preparation worksheet",
-    );
-    assertStringIncludes(text, "Not an official Form 540");
-    assertStringIncludes(text, "Not e-fileable");
     assertStringIncludes(text, "Line 19 — Taxable income: $68,494");
     assertStringIncludes(text, "Line 31 — Tax: $2,864");
     assertStringIncludes(text, "Line 97 — Overpaid tax: $1,289");
+    for (const finding of assessment.report.entries) {
+      assertStringIncludes(text, finding.ruleNumber);
+    }
+    for (const coverage of assessment.report.coverage) {
+      assertStringIncludes(text, coverage.id);
+    }
+    const document = await PDFDocument.load(bytes);
+    const pages = text.split("\f").filter((page) => page.trim());
+    assertEquals(pages.length, document.getPageCount());
+    for (const page of pages) {
+      assertStringIncludes(page, "Not e-fileable");
+      assertStringIncludes(page, "Not an official Form 540");
+    }
   } finally {
     await Deno.remove(tmpDir, { recursive: true });
   }
+});
+
+Deno.test("invalid input cannot produce a misleading worksheet", async () => {
+  await assertRejects(() => buildWorksheetPdf(assessForm540([])), Error);
 });

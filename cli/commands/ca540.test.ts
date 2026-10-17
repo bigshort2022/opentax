@@ -1,8 +1,14 @@
-import { assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
+import {
+  assert,
+  assertEquals,
+  assertRejects,
+  assertStringIncludes,
+} from "@std/assert";
 import { createReturnCommand, getReturnCommand } from "./return.ts";
 import { formAddCommand } from "./form.ts";
 import { validateReturnCommand } from "./validate.ts";
 import { exportMefCommand, exportPdfCommand } from "./export.ts";
+import { isStateDiagnosticsReport } from "../../core/validation/state-report.ts";
 
 Deno.test("CA Form 540 return routes through calculation, review, and worksheet export", async () => {
   const baseDir = await Deno.makeTempDir();
@@ -57,20 +63,45 @@ Deno.test("CA Form 540 return routes through calculation, review, and worksheet 
 
     const validation = await validateReturnCommand({ returnId, baseDir });
     assertEquals(validation.report.canFile, false);
+    assert(isStateDiagnosticsReport(validation.report));
+    assertEquals(validation.report.readiness.status, "blocked");
     assertEquals(
-      validation.report.entries.map((entry) => entry.ruleNumber),
-      ["CA540_SCOPE_NOT_FILING_READY"],
+      validation.report.gates.find((gate) => gate.id === "mef_schema")?.status,
+      "unavailable",
+    );
+    const text = await validateReturnCommand({
+      returnId,
+      baseDir,
+      format: "text",
+    });
+    for (const gate of validation.report.gates) {
+      assertStringIncludes(text.formatted, `${gate.id}: ${gate.status}`);
+    }
+    assertEquals(
+      validation.report.entries.map((entry) => entry.ruleNumber).sort(),
+      [
+        "CA540_LOCAL_RULES_UNAVAILABLE",
+        "CA540_MEF_SCHEMA_UNAVAILABLE",
+        "CA540_REQUIRED_DOCUMENTS_UNKNOWN",
+        "CA540_SCOPE_NOT_FILING_READY",
+      ],
     );
 
-    const mefError = await assertRejects(
-      () => exportMefCommand({ returnId, baseDir }),
-      Error,
-      "not available for California Form 540",
-    );
-    assertEquals(
-      mefError.message,
-      "MeF export is not available for California Form 540",
-    );
+    for (
+      const flags of [{}, { force: true }, { draft: true }, {
+        force: true,
+        draft: true,
+      }]
+    ) {
+      const mefError = await assertRejects(
+        () => exportMefCommand({ returnId, baseDir, ...flags }),
+        Error,
+      );
+      assertEquals(
+        mefError.message,
+        "MeF export is not available for California Form 540",
+      );
+    }
     const outputPath = await exportPdfCommand({ returnId, baseDir });
     const { code, stdout } = await new Deno.Command("pdftotext", {
       args: [outputPath, "-"],
@@ -82,6 +113,33 @@ Deno.test("CA Form 540 return routes through calculation, review, and worksheet 
       new TextDecoder().decode(stdout),
       "Not an official Form 540",
     );
+  } finally {
+    await Deno.remove(baseDir, { recursive: true });
+  }
+});
+
+Deno.test("CA missing input produces diagnostics without fabricated output or replacement", async () => {
+  const baseDir = await Deno.makeTempDir();
+  try {
+    const { returnId } = await createReturnCommand({
+      year: 2025,
+      formType: "ca540",
+      baseDir,
+    });
+    const { report } = await validateReturnCommand({ returnId, baseDir });
+    assertEquals(report.canFile, false);
+    assertEquals(
+      report.entries.some((entry) => entry.ruleNumber === "CA540_INPUT_COUNT"),
+      true,
+    );
+    await assertRejects(() => getReturnCommand({ returnId, baseDir }), Error);
+    const outputPath = `${baseDir}/preserved.pdf`;
+    await Deno.writeTextFile(outputPath, "existing-output");
+    await assertRejects(
+      () => exportPdfCommand({ returnId, baseDir, outputPath }),
+      Error,
+    );
+    assertEquals(await Deno.readTextFile(outputPath), "existing-output");
   } finally {
     await Deno.remove(baseDir, { recursive: true });
   }

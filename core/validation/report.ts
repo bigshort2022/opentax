@@ -6,6 +6,10 @@
  */
 
 import type { DiagnosticEntry, DiagnosticsReport } from "./types.ts";
+import {
+  isStateDiagnosticsReport,
+  type StateDiagnosticsReport,
+} from "./state-report.ts";
 
 /** Format a diagnostics report as human-readable text. */
 export function formatDiagnosticsText(
@@ -13,6 +17,9 @@ export function formatDiagnosticsText(
   returnId: string,
   taxYear: number,
 ): string {
+  if (isStateDiagnosticsReport(report)) {
+    return formatStateDiagnosticsText(report);
+  }
   const lines: string[] = [];
   const w = 60;
   const sep = "\u2500".repeat(w);
@@ -28,7 +35,11 @@ export function formatDiagnosticsText(
     (e) => e.severity === "reject" || e.severity === "reject_and_stop",
   );
   if (errors.length > 0) {
-    lines.push(`  ERRORS (${errors.length})${" ".repeat(Math.max(0, 38 - String(errors.length).length))}MUST FIX`);
+    lines.push(
+      `  ERRORS (${errors.length})${
+        " ".repeat(Math.max(0, 38 - String(errors.length).length))
+      }MUST FIX`,
+    );
     lines.push(`  ${sep}`);
     for (const e of errors) {
       lines.push(formatEntry(e));
@@ -39,7 +50,11 @@ export function formatDiagnosticsText(
   // Warnings (alerts)
   const warnings = report.entries.filter((e) => e.severity === "alert");
   if (warnings.length > 0) {
-    lines.push(`  WARNINGS (${warnings.length})${" ".repeat(Math.max(0, 36 - String(warnings.length).length))}REVIEW`);
+    lines.push(
+      `  WARNINGS (${warnings.length})${
+        " ".repeat(Math.max(0, 36 - String(warnings.length).length))
+      }REVIEW`,
+    );
     lines.push(`  ${sep}`);
     for (const w of warnings) {
       lines.push(formatEntry(w));
@@ -54,7 +69,9 @@ export function formatDiagnosticsText(
   lines.push(`  Rules checked:  ${padNum(report.summary.total)}`);
   lines.push(`  Passed:         ${padNum(report.summary.passed)}`);
   lines.push(
-    `  Errors:         ${padNum(report.summary.rejected)}${report.summary.rejected > 0 ? "    <-- BLOCKS E-FILE" : ""}`,
+    `  Errors:         ${padNum(report.summary.rejected)}${
+      report.summary.rejected > 0 ? "    <-- BLOCKS E-FILE" : ""
+    }`,
   );
   lines.push(`  Warnings:       ${padNum(report.summary.alerts)}`);
   lines.push(`  Skipped (stub): ${padNum(report.summary.skipped)}`);
@@ -72,6 +89,40 @@ export function formatDiagnosticsText(
 /** Format a diagnostics report as JSON. */
 export function formatDiagnosticsJson(report: DiagnosticsReport): string {
   return JSON.stringify(report, null, 2);
+}
+
+function formatStateDiagnosticsText(report: StateDiagnosticsReport): string {
+  const lines = [
+    `CALIFORNIA FORM 540 TY${report.product.taxYear} -- WORKPAPER ONLY`,
+    `Local readiness: ${report.readiness.status}; canFile: ${report.canFile}`,
+    "Calculation evidence is not complete-return, transmission, or acceptance evidence.",
+    "",
+    `LOCAL GATES (${report.summary.total}; not counts of official tax rules)`,
+  ];
+  for (const gate of report.gates) lines.push(`  ${gate.id}: ${gate.status}`);
+  lines.push("", "FINDINGS");
+  for (const finding of report.entries) lines.push(formatEntry(finding));
+  lines.push(
+    "",
+    "COVERAGE (capability / applicability; no filing-ready percentage)",
+  );
+  for (const item of report.coverage) {
+    lines.push(`  ${item.id}: ${item.capability} / ${item.applicability}`);
+    lines.push(`    ${item.formRef} -- ${item.locator}`);
+    for (const evidence of item.evidence) {
+      lines.push(`    ${evidence.fact}: ${evidence.decision}`);
+    }
+  }
+  lines.push("", "EXTERNAL CHECKS");
+  for (const check of report.externalChecks) {
+    lines.push(`  ${check.id}: ${check.status}`);
+    lines.push(`    ${check.message}`);
+  }
+  lines.push(
+    "",
+    "No filing, submission, or payment is authorized by this report.",
+  );
+  return lines.join("\n");
 }
 
 function formatEntry(e: DiagnosticEntry): string {
