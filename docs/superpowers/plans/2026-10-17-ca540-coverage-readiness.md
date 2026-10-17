@@ -301,7 +301,7 @@ Focused bug/contract tests run before and after their relevant changes. Format o
 - [x] Preserve and document the 28 invalid federal fixture baseline without rerunning its benchmark or changing it opportunistically.
 - [x] Exercise the real synthetic CLI through calculations, text/JSON diagnostics, PDF rendering, and four MeF refusal combinations.
 - [x] Measure local assessment separately from PDF/startup/external checks; record limited observations below without an SLA claim.
-- [ ] Open a bounded PR from latest main under `codex/`, preserving unrelated work. State which gates remain unavailable. No automatic merge, release, provider enrollment, external test submission, or production filing authorization.
+- [x] Open [bounded PR #3](https://github.com/bigshort2022/opentax/pull/3) against `main` on `codex/ca540-full-filing-design`, preserving unrelated work and stating unavailable gates. No automatic merge, release, provider enrollment, external test submission, or production filing authorization.
 
 ## 5. Permanent regression acceptance matrix
 
@@ -385,3 +385,9 @@ Source/reference change-control review is separate from tax-professional or user
 | `check:oracle` | 137 cases, 819 numeric/typed migration changes, 0 problems |
 
 Independent state/runtime and canonical-evidence reviews closed all reported correctness findings. The oracle migration was additionally type-corrected and its working-tree-deletion handling repaired without weakening expected values: absent files become removals requiring evidence, and base Git readers complete before current-file errors can propagate. All 11 dedicated oracle regressions pass.
+
+Formatting passed for all 49 affected TypeScript/JSON files; the staged whitespace check passed.
+
+### Contribution handoff
+
+[PR #3](https://github.com/bigshort2022/opentax/pull/3) contains the separately committed arithmetic correction (`95516843`) and bounded implementation (`fb8ef56f`). Complete-return scenarios remain future work. GitHub CI status must be distinguished from the observed local results above; neither constitutes official FTB validation or filing authorization.
