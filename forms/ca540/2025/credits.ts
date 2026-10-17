@@ -44,16 +44,26 @@ export function calculateExemptionCredit(input: ExemptionCreditInput): number {
       "Exemption counts and federal AGI must be whole dollars",
     );
   }
-  const totalExemptions = counts.reduce((sum, count) => sum + count, 0);
-  const baseCredit = (input.personalExemptions + input.blindExemptions +
-        input.seniorExemptions) * EXEMPTION_CREDIT +
-    input.dependentExemptions * DEPENDENT_EXEMPTION_CREDIT;
+  const personalCount = input.personalExemptions + input.blindExemptions +
+    input.seniorExemptions;
+  const personalCredit = personalCount * EXEMPTION_CREDIT;
+  const dependentCredit = input.dependentExemptions * DEPENDENT_EXEMPTION_CREDIT;
+  const totalCredit = personalCredit + dependentCredit;
+  if (
+    !Number.isSafeInteger(personalCount) ||
+    !Number.isSafeInteger(personalCredit) ||
+    !Number.isSafeInteger(dependentCredit) ||
+    !Number.isSafeInteger(totalCredit)
+  ) {
+    throw new RangeError("Exemption credits exceed the safe whole-dollar range");
+  }
   const threshold = agiThreshold(input.filingStatus);
-  if (input.federalAgi <= threshold || totalExemptions === 0) return baseCredit;
-
+  if (input.federalAgi <= threshold) return totalCredit;
   const divisor = input.filingStatus === "separate" ? 1_250 : 2_500;
-  const phaseoutSteps = Math.ceil((input.federalAgi - threshold) / divisor);
-  const reducedCredit = baseCredit -
-    phaseoutSteps * totalExemptions * CREDIT_REDUCTION_PER_STEP;
-  return Math.max(0, reducedCredit);
+  const steps = Math.ceil((input.federalAgi - threshold) / divisor);
+  const reduction = steps * CREDIT_REDUCTION_PER_STEP;
+  // FTB line 32 worksheet floors personal/blind/senior and dependent groups
+  // separately before combining them (worksheet lines i, m, and n).
+  return personalCount * Math.max(0, EXEMPTION_CREDIT - reduction) +
+    input.dependentExemptions * Math.max(0, DEPENDENT_EXEMPTION_CREDIT - reduction);
 }

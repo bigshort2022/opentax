@@ -39,9 +39,26 @@ Deno.test("Form 540 married-separate phaseout uses the $1,250 divisor", () => {
   assertEquals(credits("separate", 253_454), 141);
 });
 
+Deno.test("Form 540 floors exemption credit groups separately", () => {
+  // FTB TY2025 line 32 AGI Limitation Worksheet, lines i, m, and n.
+  assertEquals(credits("single", 327_203, {
+    personal: 1,
+    dependents: 1,
+  }), 295);
+  // 25 steps: personal credit retains $3; 26 steps: it is exhausted.
+  assertEquals(credits("single", 314_703, { dependents: 1 }), 328);
+  assertEquals(credits("single", 314_704, { dependents: 1 }), 319);
+  // 79 steps: dependent credit retains $1; 80 steps: both groups exhausted.
+  assertEquals(credits("single", 449_703, { dependents: 1 }), 1);
+  assertEquals(credits("single", 449_704, { dependents: 1 }), 0);
+  assertEquals(credits("separate", 289_703, { dependents: 1 }), 295);
+});
+
 Deno.test("Form 540 exemption credits reject invalid counts and AGI", () => {
   assertThrows(() => credits("single", Number.NaN), RangeError);
   assertThrows(() => credits("single", 50_000, { personal: -1 }), RangeError);
+  assertThrows(() => credits("single", 50_000, { personal: Number.MAX_SAFE_INTEGER }), RangeError);
+  assertThrows(() => credits("single", 50_000, { dependents: Number.MAX_SAFE_INTEGER }), RangeError);
   assertThrows(
     () => credits("single", 50_000, { dependents: 1.5 }),
     RangeError,
