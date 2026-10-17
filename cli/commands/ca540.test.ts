@@ -58,16 +58,18 @@ Deno.test("CA Form 540 return routes through calculation, review, and worksheet 
     const validation = await validateReturnCommand({ returnId, baseDir });
     assertEquals(validation.report.canFile, false);
     assertEquals(
-      validation.report.entries.some((entry) =>
-        entry.ruleNumber === "CA540_SCOPE_NOT_FILING_READY"
-      ),
-      true,
+      validation.report.entries.map((entry) => entry.ruleNumber),
+      ["CA540_SCOPE_NOT_FILING_READY"],
     );
 
-    await assertRejects(
+    const mefError = await assertRejects(
       () => exportMefCommand({ returnId, baseDir }),
       Error,
       "not available for California Form 540",
+    );
+    assertEquals(
+      mefError.message,
+      "MeF export is not available for California Form 540",
     );
     const outputPath = await exportPdfCommand({ returnId, baseDir });
     const { code, stdout } = await new Deno.Command("pdftotext", {
