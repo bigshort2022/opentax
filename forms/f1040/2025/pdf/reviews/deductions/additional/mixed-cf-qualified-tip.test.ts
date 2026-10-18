@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
 import { PDFDocument } from "pdf-lib";
 import { f1040_2025 } from "../../../../index.ts";
@@ -83,7 +86,7 @@ const expected: Record<string, number[]> = {
 };
 const settled = new Map<string, any>();
 for (const c of mixedCfTipCases) {
-  Deno.test(`actual ${c.id} issued C/F/tips/health/WOTC/QBI/fullXSD/PDF`, async () => {
+  test(`actual ${c.id} issued C/F/tips/health/WOTC/QBI/fullXSD/PDF`, async () => {
     const inputs = c.inputs(), result = f1040_2025.executeReturn(inputs);
     assertEquals(result.diagnostics, []);
     const p: any = normalizeAllPending(result.pending),
@@ -161,7 +164,7 @@ for (const c of mixedCfTipCases) {
       f.line16_income_tax - f.line21_credits_total + f.line23_other_taxes,
     );
     if (p.form8995a) {
-      const a = calculateFarmWotcLines(p.form8995a);
+      const a = calculateFarmWotcLines(p.form8995a, 2025);
       assertEquals(
         p.form8995a.farm_wotc_filing_source.qualified_tip_qbi_source,
         source,
@@ -237,32 +240,32 @@ for (const c of mixedCfTipCases) {
         `<QualifiedTipsDeductionAmt>${e[2]}</QualifiedTipsDeductionAmt>`,
       );
     }
-    const file = await Deno.makeTempFile({ suffix: ".xml" });
+    const file = await sys.makeTempFile({ suffix: ".xml" });
     try {
-      await Deno.writeTextFile(file, xml);
-      const x = await new Deno.Command("xmllint", {
+      await fs.writeFile(file, xml);
+      const x = await new sys.Command("xmllint", {
         args: [
           "--noout",
           "--schema",
-          ".state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+          "irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
           file,
         ],
         stderr: "piped",
       }).output();
       assertEquals(x.code, 0, new TextDecoder().decode(x.stderr));
     } finally {
-      await Deno.remove(file);
+      await sys.remove(file);
     }
     const pdf = await prepared.renderPdf(), doc = await PDFDocument.load(pdf);
     assertEquals(doc.getForm().getFields().length, 0);
-    if (Deno.args.includes("--write-review-artifacts")) {
-      await Deno.mkdir(root, { recursive: true });
-      await Deno.writeTextFile(
+    if (process.argv.slice(2).includes("--write-review-artifacts")) {
+      await fs.mkdir(root, { recursive: true });
+      await fs.writeFile(
         `${root}/${c.id}-source-input.json`,
         JSON.stringify({ inputs, pending: p }, null, 2),
       );
-      await Deno.writeTextFile(`${root}/${c.id}-full-return.xml`, xml);
-      await Deno.writeFile(`${root}/${c.id}-filled-return.pdf`, pdf);
+      await fs.writeFile(`${root}/${c.id}-full-return.xml`, xml);
+      await fs.writeFile(`${root}/${c.id}-filled-return.pdf`, pdf);
     }
     settled.set(c.id, { p, filer });
     console.log(c.id, doc.getPageCount(), e);
@@ -275,7 +278,7 @@ for (
     "mixed-cf-tip-phase-wotc",
   ]
 ) {
-  Deno.test(`actual ${id} rejects borrowed farm/tip/owner/health/final sources`, async () => {
+  test(`actual ${id} rejects borrowed farm/tip/owner/health/final sources`, async () => {
     const saved = settled.get(id) ?? (() => {
       const r = f1040_2025.executeReturn(
         mixedCfTipCases.find((c) => c.id === id)!.inputs(),

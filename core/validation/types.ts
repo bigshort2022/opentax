@@ -60,6 +60,45 @@ export interface ReturnContext {
    * - If absent, null, or empty string, return [].
    */
   fieldArray(xmlName: string): readonly unknown[];
+
+  /** One context per emitted document governed by a rule prefix. */
+  forRulePrefix?(prefix: string): readonly ReturnContext[];
+
+  /**
+   * One context per emitted instance of a group ("Grp", or "Doc/Grp" for
+   * another document), where the group's own elements, and any `locals`, are
+   * read from that instance only. Empty when the group is absent or nothing
+   * was emitted.
+   */
+  groupInstances?(
+    group: string,
+    locals?: readonly string[],
+  ): readonly ReturnContext[];
+
+  /**
+   * One context per emitted document with this rule prefix, reading the
+   * document's own elements from itself only; empty when none.
+   */
+  emittedDocuments?(prefix: string): readonly ReturnContext[];
+
+  /**
+   * This context, except that an element absent from its own document is not
+   * read from another document unless the Return Header or Form 1040 has it.
+   */
+  ownDocumentOnly?(): ReturnContext;
+
+  /** Each emitted ReturnData document's prefix, documentId and the documentIds it references. */
+  documentReferences?(): readonly DocumentReferences[];
+
+  /** Emitted ReturnData documents: those counted and the declared 'documentCnt'. */
+  emittedDocumentCount?(): { readonly actual: number; readonly declared?: number };
+}
+
+/** How one emitted ReturnData document links to others. */
+export interface DocumentReferences {
+  readonly prefix: string;
+  readonly documentId?: string;
+  readonly references: readonly string[];
 }
 
 /** A rule check function. Returns true if the rule PASSES (no violation). */
@@ -71,7 +110,7 @@ export interface RuleDef {
   readonly ruleText: string;
   readonly severity: Severity;
   readonly category: ErrorCategory;
-  readonly check: RuleCheck | null; // null = stub (not yet implemented)
+  readonly check: RuleCheck;
 }
 
 /** A single diagnostic finding (rule violation or alert). */

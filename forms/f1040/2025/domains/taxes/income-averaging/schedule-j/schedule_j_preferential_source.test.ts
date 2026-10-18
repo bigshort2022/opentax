@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { buildPdfBytes, type PdfPageOrigin } from "../../../../pdf/builder.ts";
 import { assertSingleFarmQbiReturn } from "../../../deductions/business/form8995a/form8995a_single_farm_reconciliation.ts";
 import { assertEquals, assertRejects, assertThrows } from "@std/assert";
@@ -28,7 +31,7 @@ function sources(): Record<string, unknown> {
   input.schedule_j.tax_treatment.year2025.has_qualified_dividends = true;
   return input;
 }
-Deno.test("Schedule J derives preferential tax from issued dividend/farm sources and retains no-election pension ISO AMT", async () => {
+test("Schedule J derives preferential tax from issued dividend/farm sources and retains no-election pension ISO AMT", async () => {
   const input = sources();
   const actual = f1040_2025.executeReturn(input);
   assertEquals(actual.diagnostics, []);
@@ -54,25 +57,25 @@ Deno.test("Schedule J derives preferential tax from issued dividend/farm sources
     prepared.bundle,
     origins,
   );
-  const dir = Deno.env.get("SCHEDULE_J_PREFERENTIAL_EVIDENCE_DIR") ??
+  const dir = process.env.SCHEDULE_J_PREFERENTIAL_EVIDENCE_DIR ??
     ".state/research/schedulej-preferential-public";
-  await Deno.mkdir(dir, { recursive: true });
-  await Deno.writeTextFile(
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(
     `${dir}/source.json`,
     JSON.stringify(input, null, 2),
   );
-  await Deno.writeTextFile(`${dir}/pending.json`, JSON.stringify(p, null, 2));
-  await Deno.writeTextFile(`${dir}/return.xml`, prepared.bundle.xml);
-  await Deno.writeFile(`${dir}/return.pdf`, pdf);
-  await Deno.writeTextFile(
+  await fs.writeFile(`${dir}/pending.json`, JSON.stringify(p, null, 2));
+  await fs.writeFile(`${dir}/return.xml`, prepared.bundle.xml);
+  await fs.writeFile(`${dir}/return.pdf`, pdf);
+  await fs.writeFile(
     `${dir}/origins.json`,
     JSON.stringify(origins, null, 2),
   );
-  const validation = await new Deno.Command("xmllint", {
+  const validation = await new sys.Command("xmllint", {
     args: [
       "--noout",
       "--schema",
-      ".state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+      "irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
       `${dir}/return.xml`,
     ],
   }).output();
@@ -99,7 +102,7 @@ Deno.test("Schedule J derives preferential tax from issued dividend/farm sources
   delete missing.income_tax_calculation;
   assertThrows(() => assertScheduleJSourceReturn(missing));
 });
-Deno.test("Schedule J rejects public private tax operands and stale current tax treatment", () => {
+test("Schedule J rejects public private tax operands and stale current tax treatment", () => {
   const privateInput: any = sources();
   privateInput.schedule_j._derived_source = {};
   assertThrows(() => f1040_2025.executeReturn(privateInput));
@@ -114,13 +117,13 @@ Deno.test("Schedule J rejects public private tax operands and stale current tax 
   );
 });
 
-Deno.test("advanced farm QBI without averaging binds actual business and qualified income in native and direct PDF", async () => {
+test("advanced farm QBI without averaging binds actual business and qualified income in native and direct PDF", async () => {
   const input = sources();
   delete input.schedule_j;
   const actual = f1040_2025.executeReturn(input);
   assertEquals(actual.diagnostics, []);
   const p: any = normalizeAllPending(actual.pending);
-  assertSingleFarmQbiReturn(p);
+  assertSingleFarmQbiReturn(p, 2025);
   const filer = extractFilerIdentity(p.f1040)!;
   const prepared = await f1040_2025.prepareReturn!(actual.pending, filer);
   const origins: PdfPageOrigin[] = [];
@@ -131,25 +134,25 @@ Deno.test("advanced farm QBI without averaging binds actual business and qualifi
     prepared.bundle,
     origins,
   );
-  const dir = (Deno.env.get("SCHEDULE_J_PREFERENTIAL_EVIDENCE_DIR") ??
+  const dir = (process.env.SCHEDULE_J_PREFERENTIAL_EVIDENCE_DIR ??
     ".state/research/schedulej-preferential-public") + "/without-j";
-  await Deno.mkdir(dir, { recursive: true });
-  await Deno.writeTextFile(
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(
     `${dir}/source.json`,
     JSON.stringify(input, null, 2),
   );
-  await Deno.writeTextFile(`${dir}/pending.json`, JSON.stringify(p, null, 2));
-  await Deno.writeTextFile(`${dir}/return.xml`, prepared.bundle.xml);
-  await Deno.writeFile(`${dir}/return.pdf`, pdf);
-  await Deno.writeTextFile(
+  await fs.writeFile(`${dir}/pending.json`, JSON.stringify(p, null, 2));
+  await fs.writeFile(`${dir}/return.xml`, prepared.bundle.xml);
+  await fs.writeFile(`${dir}/return.pdf`, pdf);
+  await fs.writeFile(
     `${dir}/origins.json`,
     JSON.stringify(origins, null, 2),
   );
-  const validation = await new Deno.Command("xmllint", {
+  const validation = await new sys.Command("xmllint", {
     args: [
       "--noout",
       "--schema",
-      ".state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+      "irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
       `${dir}/return.xml`,
     ],
   }).output();
@@ -159,12 +162,12 @@ Deno.test("advanced farm QBI without averaging binds actual business and qualifi
     bad.form8995a.single_schedule_f_source[field] = field === "owner_ssn"
       ? "987654321"
       : 13595;
-    assertThrows(() => assertSingleFarmQbiReturn(normalizeAllPending(bad)));
+    assertThrows(() => assertSingleFarmQbiReturn(normalizeAllPending(bad), 2025));
     await assertRejects(() => f1040_2025.prepareReturn!(bad, filer));
     await assertRejects(() => buildPdfBytes(bad, filer));
   }
   const joined: any = structuredClone(actual.pending);
   joined.form8995a.single_schedule_f_source.item.line2_sales_products_raised +=
     1;
-  assertThrows(() => assertSingleFarmQbiReturn(normalizeAllPending(joined)));
+  assertThrows(() => assertSingleFarmQbiReturn(normalizeAllPending(joined), 2025));
 });

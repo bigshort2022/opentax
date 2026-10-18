@@ -1,10 +1,10 @@
 import { assertOwnedScheduleSE } from "../../../../domains/taxes/self-employment/schedule-se/schedule-se-owner-source.ts";
 import { element, elements } from "../../../../../mef/xml.ts";
 import { scheduleSELines } from "../../../../../nodes/intermediate/forms/taxes/self-employment/schedule_se/calculation.ts";
-import { CONFIG_BY_YEAR } from "../../../../../nodes/config/index.ts";
 import type { MefBuildContext, MefFormDescriptor } from "../../../form-descriptor.ts";
 import { FilingStatus as MefFilingStatus } from "../../../../../mef/header.ts";
 import { scheduleSeSpouseProprietor } from "../../../../domains/taxes/self-employment/schedule-se/schedule-se-proprietor.ts";
+import { mefTaxYear, mefYearConfig } from "../../../support/year-config.ts";
 
 export interface Fields {
   net_profit_schedule_c?: number | null;
@@ -47,14 +47,16 @@ function buildIRS1040ScheduleSE(
   fields: Input,
   context?: MefBuildContext,
 ): string {
-  const lines = scheduleSELines(fields, CONFIG_BY_YEAR[2025].ssWageBase);
+  const cfg = mefYearConfig(context);
+  const lines = scheduleSELines(fields, cfg.ssWageBase, cfg);
   const optional = fields.farm_optional_method_elected === true;
   const hasSeIncome = SE_INCOME_KEYS.some((key) =>
     typeof fields[key] === "number"
   );
   if (!hasSeIncome) return "";
-  // The printed 2025 Schedule SE directs the filer to stop at line 4c.
-  if (optional && !lines) return "";
+  // Under $400 on line 4c the filer stops, and i1040sse says not to file
+  // Schedule SE when lines 1a and 2 total less than $434.
+  if (!lines) return "";
 
   const pending = context?.pending;
   const spouseOwned = fields.owner_recipient === "S" ||
@@ -128,6 +130,7 @@ export const scheduleSE: MefFormDescriptor<
     const owned = context?.pending
       ? assertOwnedScheduleSE(
         context.pending as Record<string, Record<string, unknown>>,
+        mefTaxYear(context),
         context.filer,
       )
       : undefined;

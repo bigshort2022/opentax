@@ -1,4 +1,5 @@
-import { join } from "@std/path";
+import * as fs from "node:fs/promises";
+import { join } from "node:path";
 import { z } from "zod";
 import { f1040_2025 } from "../../forms/f1040/2025/index.ts";
 import { normalizeAllPending } from "../../forms/f1040/2025/return-processing/pending.ts";
@@ -9,6 +10,10 @@ import {
 } from "../../forms/f1040/nodes/intermediate/forms/income/business/form8582/ledger.ts";
 import { singletonPublicInputKeys } from "./public-input-keys.ts";
 import { buildEngineInputs, loadReturn } from "./store.ts";
+
+async function readBytes(path: string): Promise<Uint8Array> {
+  return new Uint8Array(await fs.readFile(path));
+}
 
 const candidateSchema = z.object({
   recordVersion: z.literal(1),
@@ -74,15 +79,11 @@ async function calculateCandidate(
 }
 
 async function writeSynced(path: string, bytes: Uint8Array) {
-  const file = await Deno.open(path, {
-    createNew: true,
-    write: true,
-    mode: 0o600,
-  });
+  const file = await fs.open(path, "wx", 0o600);
   try {
     let offset = 0;
     while (offset < bytes.length) {
-      const count = await file.write(bytes.subarray(offset));
+      const count = (await file.write(bytes.subarray(offset))).bytesWritten;
       if (count === 0) {
         throw new Error("Form 8582 snapshot write made no progress");
       }
@@ -90,7 +91,7 @@ async function writeSynced(path: string, bytes: Uint8Array) {
     }
     await file.sync();
   } finally {
-    file.close();
+    await file.close();
   }
 }
 
@@ -112,9 +113,9 @@ export async function archiveForm8582LedgerCandidate(
     throw new Error("Form 8582 ledger return ID differs from directory");
   }
   const root = join(returnPath, "form8582-ledger-candidates");
-  await Deno.mkdir(root, { recursive: true, mode: 0o700 });
+  await fs.mkdir(root, { recursive: true, mode: 0o700 });
   const staging = join(root, `.staging-${crypto.randomUUID()}`);
-  await Deno.mkdir(staging, { mode: 0o700 });
+  await fs.mkdir(staging, { mode: 0o700 });
   try {
     await writeSynced(join(staging, "source.json"), data.sourceBytes);
     await writeSynced(join(staging, "form8582.xml"), data.xmlBytes);
@@ -122,9 +123,9 @@ export async function archiveForm8582LedgerCandidate(
       join(staging, "record.json"),
       encoder.encode(JSON.stringify(data.record, null, 2)),
     );
-    await Deno.rename(staging, join(root, data.record.recordId));
+    await fs.rename(staging, join(root, data.record.recordId));
   } catch (error) {
-    await Deno.remove(staging, { recursive: true }).catch(() => {});
+    await fs.rm(staging, { recursive: true }).catch(() => {});
     throw error;
   }
   return data.record;
@@ -143,10 +144,10 @@ export async function readForm8582LedgerCandidate(
   const returnPath = join(baseDir, returnId);
   const path = join(returnPath, "form8582-ledger-candidates", recordId);
   const stored = candidateSchema.parse(
-    JSON.parse(await Deno.readTextFile(join(path, "record.json"))),
+    JSON.parse(await fs.readFile(join(path, "record.json"), "utf8")),
   );
-  const sourceBytes = await Deno.readFile(join(path, "source.json"));
-  const xmlBytes = await Deno.readFile(join(path, "form8582.xml"));
+  const sourceBytes = await readBytes(join(path, "source.json"));
+  const xmlBytes = await readBytes(join(path, "form8582.xml"));
   const expected = await calculateCandidate(
     returnPath,
     recordId,

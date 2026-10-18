@@ -9,7 +9,9 @@ import { FilingStatus, filingStatusSchema } from "../../../../../types.ts";
 import { f1040 } from "../../../../../outputs/general/return-assembly/f1040/index.ts";
 import type { NodeContext } from "../../../../../../../../core/types/node-context.ts";
 import { CONFIG_BY_YEAR } from "../../../../../config/index.ts";
+import type { F1040Config } from "../../../../../config/index.ts";
 import { lookupEic2025 } from "./table_2025.ts";
+import { lookupEicFromParameters } from "./table.ts";
 import { eicBirthResidencyReviewSchema } from "../../../../../../2025/domains/credits/earned-income/earned-income/eic-birth-residency.ts";
 
 import { eicDatedResidencyReviewSchema } from "../../../../../../2025/domains/credits/earned-income/earned-income/eic-dated-residency.ts";
@@ -111,6 +113,8 @@ export const priorEicDisallowanceReviewSchema = z.discriminatedUnion("status", [
     status: z.literal("requires_8862"),
     disallowed_year: z.number().int().min(1997).max(2024),
     disallowance_notice_reference: z.string().trim().min(1),
+    notice_copy_reference: z.string().trim().min(1).optional(),
+    notice_copy_sha256: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   }).strict(),
 ]);
 
@@ -123,6 +127,9 @@ export const inputSchema = z.object({
   se_net_profit: z.number().nonnegative().optional(),
   // Worksheet B Part 1 line 1d: Schedule SE line 13 reduces SE earned income.
   se_tax_deduction: z.number().nonnegative().optional(),
+  // Pub. 596 (2025) Rule 7, Disability Benefits: taxable employer disability
+  // retirement benefits before minimum retirement age, fed by f1099r.
+  disability_pension_earned_income: z.number().nonnegative().optional(),
 
   // Adjusted Gross Income — used for EITC phaseout when AGI > earned income
   agi: z.number().optional(),
@@ -175,15 +182,17 @@ function clampChildren(children: number): number {
   return Math.min(children, 3);
 }
 
+// IRC §32(c)(1)(A)(ii)(II): at least 25 but under 65 at the end of the year.
 function meetsChildlessAgeTest(
   dob: string | undefined,
   deathDate: string | undefined,
+  taxYear: number,
 ): boolean {
   if (dob === undefined) return false;
   if (deathDate === undefined) {
-    return dob > "1960-12-31" && dob < "2001-01-02";
+    return dob > `${taxYear - 65}-12-31` && dob < `${taxYear - 24}-01-02`;
   }
-  if (!deathDate.startsWith("2025-")) return false;
+  if (!deathDate.startsWith(`${taxYear}-`)) return false;
   const year = Number(dob.slice(0, 4));
   const month = Number(dob.slice(5, 7));
   const day = Number(dob.slice(8, 10));
@@ -194,7 +203,10 @@ function meetsChildlessAgeTest(
     deathDate < age65.toISOString().slice(0, 10);
 }
 
-export function childlessEicEligible(input: EitcInput): boolean {
+export function childlessEicEligible(
+  input: EitcInput,
+  taxYear: number,
+): boolean {
   if (
     input.taxpayer_can_be_claimed_as_dependent === true ||
     input.spouse_can_be_claimed_as_dependent === true
@@ -207,8 +219,9 @@ export function childlessEicEligible(input: EitcInput): boolean {
   const ageEligible = meetsChildlessAgeTest(
     input.taxpayer_dob,
     input.taxpayer_death_date,
+    taxYear,
   ) || (isJoint &&
-    meetsChildlessAgeTest(input.spouse_dob, input.spouse_death_date));
+    meetsChildlessAgeTest(input.spouse_dob, input.spouse_death_date, taxYear));
   if (!ageEligible || input.main_home_in_us_over_half_year !== true) {
     return false;
   }
@@ -262,12 +275,80 @@ export function eicTaxResidencyEligible(input: EitcInput): boolean {
   return input.filing_status === FilingStatus.MFJ;
 }
 
+type EicLookup = (amount: number, children: number, joint: boolean) => number;
+
+// TY2025 uses the published EIC Table. Later years build the table from the
+// year's §32(b) amounts by the same $50-row method until the IRS publishes it.
+function eicLookupForYear(taxYear: number, cfg: F1040Config): EicLookup {
+  if (taxYear === 2025) return lookupEic2025;
+  return (amount, children, joint) =>
+    lookupEicFromParameters(cfg.eitcByChildren, amount, children, joint);
+}
+
+// EIC Worksheet A line 4 / Worksheet B line 6: AGI is looked up only from the
+// phaseout start amount for the filer's status and child count.
+function agiComparisonThreshold(
+  cfg: F1040Config,
+  children: number,
+  joint: boolean,
+): number {
+  const params = cfg.eitcByChildren[Math.min(children, 3)];
+  return joint ? params.phaseoutStartMfj : params.phaseoutStart;
+}
+
+// The joint prior-election review attests residence "during 2025".
+function assertResidencyReviewForYear(
+  input: EitcInput,
+  taxYear: number,
+): void {
+  if (
+    taxYear !== 2025 &&
+    input.eic_tax_residency_review?.status === "joint_prior_election"
+  ) {
+    throw new Error(
+      `TY${taxYear} EIC does not yet support the joint prior-election residency review`,
+    );
+  }
+}
+
+// Pub. 596 (2025) ch. 5: EIC denied or reduced for any year after 1996, other
+// than for a math or clerical error, requires Form 8862, so a claim cannot
+// proceed without that answer.
+function requirePriorDisallowanceAnswer(
+  input: EitcInput,
+  credit: number,
+): number {
+  if (credit > 0 && input.prior_eic_disallowance_review === undefined) {
+    throw new Error(
+      "EIC needs general.prior_eic_disallowance_review: whether EIC was disallowed or reduced for a year after 1996 decides if Form 8862 is required",
+    );
+  }
+  return credit;
+}
+
 function computeEitc(
   input: EitcInput,
   investmentIncomeLimit: number,
+  lookupEic: EicLookup,
+  cfg: F1040Config,
+  taxYear: number,
+): number {
+  return requirePriorDisallowanceAnswer(
+    input,
+    tentativeEitc(input, investmentIncomeLimit, lookupEic, cfg, taxYear),
+  );
+}
+
+function tentativeEitc(
+  input: EitcInput,
+  investmentIncomeLimit: number,
+  lookupEic: EicLookup,
+  cfg: F1040Config,
+  taxYear: number,
 ): number {
   if (input.do_not_claim_eic === true) return 0;
   const earnedIncome = (input.earned_income ?? 0) +
+    (input.disability_pension_earned_income ?? 0) +
     (input.se_net_profit ?? 0) - (input.se_tax_deduction ?? 0);
   const agi = input.agi ?? earnedIncome;
   const children = clampChildren(input.qualifying_children ?? 0);
@@ -276,7 +357,10 @@ function computeEitc(
   if (input.filer_has_valid_ssns !== true) return 0;
   if (!eicTaxResidencyEligible(input)) return 0;
   if (input.form2555_filed === true) return 0;
-  if (!priorEicDisallowanceEligible(input, children)) return 0;
+  if (
+    input.prior_eic_disallowance_review !== undefined &&
+    !priorEicDisallowanceEligible(input, children)
+  ) return 0;
 
   // A separate return can use the 2025 separated-spouse rule only with a
   // qualifying child and reviewed residence/separation facts.
@@ -285,7 +369,7 @@ function computeEitc(
     (children === 0 || input.mfs_separation_reviewed !== true)
   ) return 0;
 
-  if (children === 0 && !childlessEicEligible(input)) return 0;
+  if (children === 0 && !childlessEicEligible(input, taxYear)) return 0;
   if (children > 0 && !childEicFilerEligible(input)) return 0;
 
   // Investment income disqualifier (IRC §32(i))
@@ -299,12 +383,11 @@ function computeEitc(
 
   // Worksheet A/B: look up earned income first. AGI gets a second lookup only
   // at or above the worksheet threshold, then the smaller credit controls.
-  const earnedCredit = lookupEic2025(earnedIncome, children, isJoint);
-  const agiComparisonThreshold = children === 0
-    ? (isJoint ? 17_730 : 10_620)
-    : (isJoint ? 30_470 : 23_350);
-  if (agi < agiComparisonThreshold) return earnedCredit;
-  return Math.min(earnedCredit, lookupEic2025(agi, children, isJoint));
+  const earnedCredit = lookupEic(earnedIncome, children, isJoint);
+  if (agi < agiComparisonThreshold(cfg, children, isJoint)) {
+    return earnedCredit;
+  }
+  return Math.min(earnedCredit, lookupEic(agi, children, isJoint));
 }
 
 function buildOutput(credit: number): NodeOutput[] {
@@ -324,7 +407,14 @@ class EitcNode extends TaxNode<typeof inputSchema> {
     if (!cfg) throw new Error(`No f1040 config for year ${ctx.taxYear}`);
 
     const input = inputSchema.parse(rawInput);
-    const credit = computeEitc(input, cfg.eitcInvestmentIncomeLimit);
+    assertResidencyReviewForYear(input, ctx.taxYear);
+    const credit = computeEitc(
+      input,
+      cfg.eitcInvestmentIncomeLimit,
+      eicLookupForYear(ctx.taxYear, cfg),
+      cfg,
+      ctx.taxYear,
+    );
     return {
       outputs: [
         ...buildOutput(credit),

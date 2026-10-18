@@ -1,7 +1,10 @@
+import { test } from "bun:test";
 import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import { FilingStatus } from "../../../../../mef/header.ts";
 import { scheduleA } from "./schedule_a.ts";
 import { purchasePointsCrossLoanFixture } from "../../../../../nodes/inputs/deductions/mortgage/f1098/purchase_points_cross_loan.fixture.ts";
+import { f1040_2025 } from "../../../../index.ts";
+import { normalizeAllPending } from "../../../../return-processing/pending.ts";
 
 // Descriptor tests exercise source ownership; final bundle tests verify Copy B bytes.
 const descriptorCopy = {
@@ -10,7 +13,7 @@ const descriptorCopy = {
   bytes: new Uint8Array(),
 };
 
-Deno.test("Schedule A native line 8a requires a retained Form 1098", () => {
+test("Schedule A native line 8a requires a retained Form 1098", () => {
   assertThrows(
     () =>
       scheduleA.build(
@@ -22,7 +25,7 @@ Deno.test("Schedule A native line 8a requires a retained Form 1098", () => {
   );
 });
 
-Deno.test("Schedule A native line 8a equals retained Form 1098 box 1 interest", () => {
+test("Schedule A native line 8a equals retained Form 1098 box 1 interest", () => {
   const source = {
     f1098s: [{
       lender_name: "Home Lender",
@@ -51,7 +54,7 @@ Deno.test("Schedule A native line 8a equals retained Form 1098 box 1 interest", 
   }
 });
 
-Deno.test("Schedule A native replays purchase points and the second mortgage", () => {
+test("Schedule A native replays purchase points and the second mortgage", () => {
   const fixture = purchasePointsCrossLoanFixture();
   const source = {
     f1098s: fixture.f1098.map((item) => ({
@@ -121,7 +124,7 @@ const pointsSource = {
   }],
 };
 
-Deno.test("Schedule A native box 6 points require matching recipient and filed amount", () => {
+test("Schedule A native box 6 points require matching recipient and filed amount", () => {
   const fields = { line_8a_mortgage_interest_1098: 20_400 };
   const context = { filer: pointsFiler, pending: { f1098: pointsSource } };
   assertStringIncludes(
@@ -150,25 +153,25 @@ Deno.test("Schedule A native box 6 points require matching recipient and filed a
 
 const itemized = { line_5a_state_income_tax: 8_000 };
 
-Deno.test("Schedule A XML is omitted when finalized Form 1040 uses standard deduction", () => {
+test("Schedule A XML is omitted when finalized Form 1040 uses standard deduction", () => {
   const xml = scheduleA.build(itemized, {
     pending: { f1040: { line12a_standard_deduction: 15_750 } },
   });
   assertEquals(xml, "");
 });
 
-Deno.test("Schedule A XML is present when finalized Form 1040 itemizes", () => {
+test("Schedule A XML is present when finalized Form 1040 itemizes", () => {
   const xml = scheduleA.build(itemized, {
     pending: { f1040: { line12e_itemized_deductions: 20_000 } },
   });
   assertStringIncludes(xml, "<IRS1040ScheduleA>");
 });
 
-Deno.test("standalone Schedule A descriptor retains its form-level rendering", () => {
+test("standalone Schedule A descriptor retains its form-level rendering", () => {
   assertStringIncludes(scheduleA.build(itemized), "<IRS1040ScheduleA>");
 });
 
-Deno.test("Schedule A XML keeps elected capital-gain property fail-closed until Form 8283 filing is complete", () => {
+test("Schedule A XML keeps elected capital-gain property fail-closed until Form 8283 filing is complete", () => {
   assertThrows(
     () =>
       scheduleA.build({
@@ -182,7 +185,7 @@ Deno.test("Schedule A XML keeps elected capital-gain property fail-closed until 
   );
 });
 
-Deno.test("Schedule A refuses a prior noncash carryover without its carryover-year Form 8283 source", () => {
+test("Schedule A refuses a prior noncash carryover without its carryover-year Form 8283 source", () => {
   const carryovers = [{
     contribution_id: "2024-land",
     contribution_year: 2024,
@@ -218,7 +221,7 @@ Deno.test("Schedule A refuses a prior noncash carryover without its carryover-ye
   );
 });
 
-Deno.test("Schedule A deducts the full Form 8396 line 3 even when the allowed credit is smaller", () => {
+test("Schedule A deducts the full Form 8396 line 3 even when the allowed credit is smaller", () => {
   const fields = {
     line_8a_mortgage_interest_1098: 15_000,
     form8396_interest_credit_reduction: 2_000,
@@ -252,5 +255,52 @@ Deno.test("Schedule A deducts the full Form 8396 line 3 even when the allowed cr
       }),
     Error,
     "differs from Form 8396 line 3",
+  );
+});
+
+test("Schedule A line 11 carries the dotted-line qualified contributions", () => {
+  const xml = scheduleA.build(
+    {
+      cash_contributions_to_50_percent_organizations: 250,
+      line_11_cash_contributions: 250,
+      line_11_qualified_contributions: 200,
+      charitable_limits_finalized: true,
+    },
+    { pending: { f1040: { line12e_itemized_deductions: 250 } } },
+  );
+  assertStringIncludes(
+    xml,
+    '<GiftsByCashOrCheckAmt qualifiedContributionsAmt="200">250</GiftsByCashOrCheckAmt>',
+  );
+});
+
+// Pub. 526 (2025), Carryovers; 2025 Schedule A line 13 instructions.
+test("Schedule A line 13 files prior-year carryovers the limits fully allow", () => {
+  const result = f1040_2025.executeReturn({
+    general: { filing_status: "single", taxpayer_ssn: "400-11-2222" },
+    w2: [{ box1_wages: 100_000, box2_fed_withheld: 10_000 }],
+    schedule_a: {
+      force_itemized: true,
+      cash_contributions_to_50_percent_organizations: 20_000,
+      prior_charitable_carryovers: [{
+        contribution_year: 2023,
+        category: "cash_60",
+        amount: 1_500,
+        source_document_reference: "2024 return carryover worksheet",
+        ordinary_carryover_rules_confirmed: true,
+      }],
+    },
+  });
+  assertEquals(result.diagnostics, []);
+  const pending = normalizeAllPending(result.pending);
+  assertEquals(pending.f1040.line12e_itemized_deductions, 21_500);
+  const xml = scheduleA.build(pending.schedule_a, { pending });
+  assertStringIncludes(
+    xml,
+    "<CarryoverFromPriorYearAmt>1500</CarryoverFromPriorYearAmt>",
+  );
+  assertStringIncludes(
+    xml,
+    "<TotalCharitableContriAmt>21500</TotalCharitableContriAmt>",
   );
 });

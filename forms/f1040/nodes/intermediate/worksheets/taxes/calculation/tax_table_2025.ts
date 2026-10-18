@@ -31,6 +31,17 @@ export function taxTable2025(income: number, status: FilingStatus): number {
   if (wholeDollarIncome >= 100_000) {
     throw new Error("The 2025 Tax Table stops below $100,000");
   }
+  return taxTableCell(wholeDollarIncome, bracketsForTableStatus(status));
+}
+
+/**
+ * Tax Table cell for whole-dollar income below $100,000 under any year's
+ * rate schedule, built the way the published 2025 table is (see above).
+ */
+function taxTableCell(
+  wholeDollarIncome: number,
+  brackets: ReadonlyArray<Bracket>,
+): number {
   const midpoint = wholeDollarIncome < 5
     ? 2.5
     : wholeDollarIncome < 15
@@ -40,7 +51,7 @@ export function taxTable2025(income: number, status: FilingStatus): number {
     : wholeDollarIncome < 3_000
     ? Math.floor(wholeDollarIncome / 25) * 25 + 12.5
     : Math.floor(wholeDollarIncome / 50) * 50 + 25;
-  const bracket = [...bracketsForTableStatus(status)].reverse().find((entry) =>
+  const bracket = [...brackets].reverse().find((entry) =>
     midpoint > entry.over
   );
   if (!bracket) return 0;
@@ -77,6 +88,37 @@ export function ordinaryTax2025(income: number, status: FilingStatus): number {
 }
 
 /**
+ * Ordinary tax for a year whose Tax Table is not yet published: the table
+ * cell derived from that year's rate schedule below $100,000, the Tax
+ * Computation Worksheet at or above.
+ */
+export function ordinaryTaxFromSchedule(
+  income: number,
+  brackets: ReadonlyArray<Bracket>,
+): number {
+  if (!Number.isFinite(income) || income < 0) {
+    throw new Error("Ordinary tax needs nonnegative taxable income");
+  }
+  const wholeDollarIncome = Math.round(income);
+  return wholeDollarIncome < 100_000
+    ? taxTableCell(wholeDollarIncome, brackets)
+    : Math.round(taxFromBrackets(wholeDollarIncome, brackets));
+}
+
+/** The rate thresholds and ordinary-tax rule one year's worksheets use. */
+export interface PreferentialRateSchedule {
+  readonly zeroCeiling: Record<FilingStatus, number>;
+  readonly twentyFloor: Record<FilingStatus, number>;
+  readonly ordinaryTax: (income: number, status: FilingStatus) => number;
+}
+
+export const PREFERENTIAL_RATE_SCHEDULE_2025: PreferentialRateSchedule = {
+  zeroCeiling: QDCGT_ZERO_CEILING_2025,
+  twentyFloor: QDCGT_TWENTY_FLOOR_2025,
+  ordinaryTax: ordinaryTax2025,
+};
+
+/**
  * TY2025 Qualified Dividends and Capital Gain Tax Worksheet, shared by
  * Form 1040 line 16 and Form 8615 lines 9, 15, and 17.
  * Lines 22 and 24 use the exact Tax Table below $100,000, even when the
@@ -90,31 +132,48 @@ export function qualifiedDividendTax2025(
   netCapitalGain: number,
   status: FilingStatus,
 ): number {
+  return qualifiedDividendTax(
+    taxableIncome,
+    qualifiedDividends,
+    netCapitalGain,
+    status,
+    PREFERENTIAL_RATE_SCHEDULE_2025,
+  );
+}
+
+/** The Qualified Dividends and Capital Gain Tax Worksheet for one year. */
+export function qualifiedDividendTax(
+  taxableIncome: number,
+  qualifiedDividends: number,
+  netCapitalGain: number,
+  status: FilingStatus,
+  schedule: PreferentialRateSchedule,
+): number {
   if (
     !Number.isFinite(taxableIncome) || !Number.isFinite(qualifiedDividends) ||
     !Number.isFinite(netCapitalGain) || taxableIncome < 0 ||
     qualifiedDividends < 0 || netCapitalGain < 0
   ) {
     throw new Error(
-      "The 2025 qualified-dividend worksheet needs nonnegative amounts",
+      "The qualified-dividend worksheet needs nonnegative amounts",
     );
   }
   const line1 = Math.round(taxableIncome);
   const line4 = Math.round(qualifiedDividends) + Math.round(netCapitalGain);
   const line5 = Math.max(0, line1 - line4);
-  const line7 = Math.min(line1, QDCGT_ZERO_CEILING_2025[status]);
+  const line7 = Math.min(line1, schedule.zeroCeiling[status]);
   const line8 = Math.min(line5, line7);
   const line9 = line7 - line8;
   const line10 = Math.min(line1, line4);
   const line12 = Math.max(0, line10 - line9);
-  const line14 = Math.min(line1, QDCGT_TWENTY_FLOOR_2025[status]);
+  const line14 = Math.min(line1, schedule.twentyFloor[status]);
   const line16 = Math.max(0, line14 - (line5 + line9));
   const line17 = Math.min(line12, line16);
   const line18 = line17 * 0.15;
   const line20 = Math.max(0, line10 - (line9 + line17));
   const line21 = line20 * 0.20;
-  const line22 = ordinaryTax2025(line5, status);
+  const line22 = schedule.ordinaryTax(line5, status);
   const line23 = line18 + line21 + line22;
-  const line24 = ordinaryTax2025(line1, status);
+  const line24 = schedule.ordinaryTax(line1, status);
   return Math.round(Math.min(line23, line24));
 }

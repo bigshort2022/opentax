@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import { execute } from "../../../../../../core/runtime/executor.ts";
 import { buildExecutionPlan } from "../../../../../../core/runtime/planner.ts";
@@ -70,7 +71,7 @@ const form8862 = {
   },
 };
 const context = { taxYear: 2025, formType: "f1040" };
-Deno.test("prior EIC disallowance calculates the credit but stops unauthenticated Form 8862 export", () => {
+test("prior EIC disallowance calculates the credit but stops unauthenticated Form 8862 export", () => {
   const withoutForm = execute(plan, registry, {
     general,
     w2: [w2],
@@ -89,12 +90,12 @@ Deno.test("prior EIC disallowance calculates the credit but stops unauthenticate
   assertThrows(
     () => buildMefXml(buildPending(result.pending), filer),
     Error,
-    "executor-owned authentication of prior IRS notice issuance and contents",
+    "retained prior IRS notice copy with matching SHA-256",
   );
   assertThrows(
     () => form8862Pdf.instances!(result.pending.f8862, filer, result.pending),
     Error,
-    "executor-owned authentication of prior IRS notice issuance and contents",
+    "retained prior IRS notice copy with matching SHA-256",
   );
 
   const wrongNotice = {

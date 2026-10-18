@@ -132,6 +132,7 @@ const inputSchema = z.object({
   line6b_ss_taxable: z.number().nonnegative().optional(),
   mfs_spouse_lived_with_taxpayer: z.boolean().optional(),
   mfs_eitc_separation_rule: z.boolean().optional(),
+  hoh_spouse_lived_apart: z.literal(true).optional(),
   // Line 7 — Capital gain or (loss) (Schedule D)
   line7_capital_gain: z.number().optional(),
   // Line 7a — Capital gain distributions (no Schedule D required)
@@ -155,6 +156,8 @@ const inputSchema = z.object({
   line12c_deduction_total: z.number().nonnegative().optional(),
   // Line 12e — Itemized deductions (Schedule A)
   line12e_itemized_deductions: z.number().optional(),
+  // TY2026 line 12f — non-itemizer cash charitable deduction (IRC §170(p))
+  line12f_nonitemizer_charitable: z.number().nonnegative().optional(),
   // Line 13 — QBI deduction (Form 8995 / 8995-A)
   line13_qbi_deduction: z.number().nonnegative().optional(),
   // Line 13b — Additional deductions from Schedule 1-A
@@ -364,7 +367,8 @@ function taxableIncome(input: F1040Input): number {
     return input.line15_taxable_income;
   }
   const agi = input.line11_agi ?? 0;
-  const deduction = deductionAmount(input);
+  const deduction = deductionAmount(input) +
+    (input.line12f_nonitemizer_charitable ?? 0);
   const qbi = input.line13_qbi_deduction ?? 0;
   const additionalDeductions = input.line13b_additional_deductions ?? 0;
   return Math.max(0, agi - deduction - qbi - additionalDeductions);
@@ -872,6 +876,7 @@ function assembleReturn(
     input.line11_agi ?? computed_line9 - computed_line10,
   );
   const computed_line14 = (deductionAmount(input)) +
+    (input.line12f_nonitemizer_charitable ?? 0) +
     (input.line13_qbi_deduction ?? 0) +
     (input.line13b_additional_deductions ?? 0);
   const computed_line15 = taxableIncome(input);
@@ -1058,6 +1063,10 @@ function assembleReturn(
   }
   if (input.line12e_itemized_deductions !== undefined) {
     result.line12e_itemized_deductions = input.line12e_itemized_deductions;
+  }
+  if (input.line12f_nonitemizer_charitable !== undefined) {
+    result.line12f_nonitemizer_charitable =
+      input.line12f_nonitemizer_charitable;
   }
   if (input.line13_qbi_deduction !== undefined) {
     result.line13_qbi_deduction = input.line13_qbi_deduction;

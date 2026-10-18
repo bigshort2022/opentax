@@ -1,3 +1,5 @@
+import { test } from "bun:test";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { pdfReviewFixtures } from "../../../../pdf/review-fixtures.ts";
 import { f1040_2025 } from "../../../../index.ts";
@@ -18,7 +20,7 @@ import { form5884Pdf } from "../../../../pdf/forms/credits/business/f5884.ts";
 const fixtures = pdfReviewFixtures.filter((f) =>
   f.id.startsWith("owned-controlled-mixed-cf-wotc")
 );
-Deno.test("actual controlled mixed C/F employers file separate owner SE/QBI and joint current credit in full XSD/PDF", async () => {
+test("actual controlled mixed C/F employers file separate owner SE/QBI and joint current credit in full XSD/PDF", async () => {
   assertEquals(fixtures.length, 4);
   const expected = [
     [90402, 4372, 17206, 2400, 56765],
@@ -30,7 +32,7 @@ Deno.test("actual controlled mixed C/F employers file separate owner SE/QBI and 
     const r = f1040_2025.executeReturn(f.inputs),
       p = normalizeAllPending(r.pending);
     assertEquals(r.diagnostics, []);
-    assertFarmWotcReturn(p.form8995a ?? p.form8995, p, f.filer);
+    assertFarmWotcReturn(p.form8995a ?? p.form8995, p, 2025, f.filer);
     assertEquals([
       Number(p.schedule1.line3_schedule_c) +
       Number(p.schedule1.line6_schedule_f),
@@ -64,7 +66,7 @@ Deno.test("actual controlled mixed C/F employers file separate owner SE/QBI and 
       assertEquals(owners[1].line10, 6321);
     }
     if (i === 3) {
-      const a = calculateFarmWotcLines(parentSchema.parse(p.form8995a));
+      const a = calculateFarmWotcLines(parentSchema.parse(p.form8995a), 2025);
       assertEquals(a.lossSchedule?.rows.map((row) => row.line1a), [
         181669,
         -11201,
@@ -83,7 +85,7 @@ Deno.test("actual controlled mixed C/F employers file separate owner SE/QBI and 
         use: p.f3800.allowed_credit,
         tax: p.f1040.line24_total_tax,
         phase: p.form8995a
-          ? calculateFarmWotcLines(parentSchema.parse(p.form8995a)).parent
+          ? calculateFarmWotcLines(parentSchema.parse(p.form8995a), 2025).parent
             .phaseIn
           : null,
       }),
@@ -97,11 +99,11 @@ Deno.test("actual controlled mixed C/F employers file separate owner SE/QBI and 
       prepared.bundle.xml.includes("DeductionDifferentiationStmt"),
       true,
     );
-    const proc = new Deno.Command("xmllint", {
+    const proc = new sys.Command("xmllint", {
       args: [
         "--noout",
         "--schema",
-        ".state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+        "irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
         "-",
       ],
       stdin: "piped",
@@ -132,7 +134,7 @@ Deno.test("actual controlled mixed C/F employers file separate owner SE/QBI and 
     }
   }
 });
-Deno.test("mixed C/F actual ownership attribution payroll and issued-income conflicts fail public native and PDF", async () => {
+test("mixed C/F actual ownership attribution payroll and issued-income conflicts fail public native and PDF", async () => {
   const f = fixtures[1];
   for (
     const [mutationIndex, change] of [
@@ -235,7 +237,7 @@ Deno.test("mixed C/F actual ownership attribution payroll and issued-income conf
       change(p);
       await assertRejects(() => f1040_2025.prepareReturn(p, f.filer));
       assertThrows(() =>
-        assertFarmWotcReturn(p.form8995a ?? p.form8995, p, f.filer)
+        assertFarmWotcReturn(p.form8995a ?? p.form8995, p, 2025, f.filer)
       );
       assertThrows(() =>
         scheduleC.build(p.schedule_c as any, { pending: p, filer: f.filer })

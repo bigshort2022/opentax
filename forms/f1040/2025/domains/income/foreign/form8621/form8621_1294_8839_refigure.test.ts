@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import {
   assertEquals,
   assertRejects,
@@ -14,6 +17,7 @@ import { pdfReviewFixtures } from "../../../../pdf/review-fixtures.ts";
 import { PficRegime } from "../../../../../nodes/inputs/income/foreign/f8621/index.ts";
 import { createHash } from "node:crypto";
 import { buildPending } from "../../../../mef/execution/pending.ts";
+const TY2025 = { taxYear: 2025, formType: "f1040" } as const;
 const base = pdfReviewFixtures.find((x) =>
   x.id === "single-reviewed-adoption-credit"
 )!;
@@ -77,25 +81,25 @@ async function retainAndValidatePacket(
   pdf: Uint8Array,
   origins: readonly PdfPageOrigin[],
 ): Promise<void> {
-  const root = Deno.env.get("FORM8621_ADOPTION_EVIDENCE_DIR") ??
+  const root = process.env.FORM8621_ADOPTION_EVIDENCE_DIR ??
     ".state/research/form8621-qef-adoption";
   const dir = kind === "full" ? root : `${root}/${kind}`;
-  await Deno.mkdir(dir, { recursive: true });
-  await Deno.writeTextFile(
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(
     `${dir}/source-pending.json`,
     JSON.stringify({ input, pending }, null, 2),
   );
-  await Deno.writeFile(`${dir}/return.pdf`, pdf);
-  await Deno.writeTextFile(`${dir}/return.xml`, xml);
-  await Deno.writeTextFile(
+  await fs.writeFile(`${dir}/return.pdf`, pdf);
+  await fs.writeFile(`${dir}/return.xml`, xml);
+  await fs.writeFile(
     `${dir}/origins.json`,
     JSON.stringify(origins, null, 2),
   );
-  const xsd = await new Deno.Command("xmllint", {
+  const xsd = await new sys.Command("xmllint", {
     args: [
       "--noout",
       "--schema",
-      ".state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+      "irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
       `${dir}/return.xml`,
     ],
     stderr: "piped",
@@ -103,7 +107,7 @@ async function retainAndValidatePacket(
   assertEquals(xsd.code, 0, new TextDecoder().decode(xsd.stderr));
 }
 
-Deno.test("Form 8621 Election B composes the reviewed Form 8839 staged return in both tax runs", async () => {
+test("Form 8621 Election B composes the reviewed Form 8839 staged return in both tax runs", async () => {
   const input = { ...base.inputs, f8621: [holding] };
   const result = f1040_2025.executeReturn(input);
   assertEquals(result.diagnostics, []);
@@ -190,7 +194,7 @@ Deno.test("Form 8621 Election B composes the reviewed Form 8839 staged return in
   );
 });
 
-Deno.test("Form 8621 Election B keeps an actual fully used adoption credit when only its shadow has a carryforward", async () => {
+test("Form 8621 Election B keeps an actual fully used adoption credit when only its shadow has a carryforward", async () => {
   const originalW2 = (base.inputs.w2 as Record<string, unknown>[])[0];
   const wage = {
     ...originalW2,
@@ -244,7 +248,7 @@ Deno.test("Form 8621 Election B keeps an actual fully used adoption credit when 
     Error,
     "PDF source differs from the prepared MeF return",
   );
-  const without = executeForm8839TwoPass(withoutInputs, true);
+  const without = executeForm8839TwoPass(withoutInputs, TY2025, true);
   const shadow = buildPending(without.pending);
   assertEquals(shadow.schedule3?.line6c_adoption_credit, 5_645);
   assertEquals(shadow.f1040?.line24_total_tax, 0);
@@ -277,7 +281,7 @@ Deno.test("Form 8621 Election B keeps an actual fully used adoption credit when 
   );
 });
 
-Deno.test("Form 8621 Election B records zero deferred tax when the full-return tax is unchanged", async () => {
+test("Form 8621 Election B records zero deferred tax when the full-return tax is unchanged", async () => {
   const smallHolding = {
     ...holding,
     qef_ordinary_income: 1,
@@ -351,7 +355,7 @@ const secondHolding = {
   },
 };
 
-Deno.test("two independent Election B holdings reconcile per-fund tax to the full adoption return", async () => {
+test("two independent Election B holdings reconcile per-fund tax to the full adoption return", async () => {
   const inputs = { ...base.inputs, f8621: [holding, secondHolding] };
   const result = f1040_2025.executeReturn(inputs);
   assertEquals(result.diagnostics, []);
@@ -425,7 +429,7 @@ Deno.test("two independent Election B holdings reconcile per-fund tax to the ful
   );
 });
 
-Deno.test("nonadditive simultaneous Election B differences stay guarded", () => {
+test("nonadditive simultaneous Election B differences stay guarded", () => {
   const originalW2 = (base.inputs.w2 as Record<string, unknown>[])[0];
   const wage = {
     ...originalW2,
@@ -450,19 +454,19 @@ Deno.test("nonadditive simultaneous Election B differences stay guarded", () => 
     executeForm8839TwoPass({
       ...source,
       f8621: [holding, secondHolding],
-    }).pending,
+    }, TY2025).pending,
   ).f1040!;
   const withoutFirst = buildPending(
     executeForm8839TwoPass({
       ...source,
       f8621: [undistributedRemoved(holding), withoutElection(secondHolding)],
-    }).pending,
+    }, TY2025).pending,
   ).f1040!;
   const withoutSecond = buildPending(
     executeForm8839TwoPass({
       ...source,
       f8621: [withoutElection(holding), undistributedRemoved(secondHolding)],
-    }).pending,
+    }, TY2025).pending,
   ).f1040!;
   const withoutBoth = buildPending(
     executeForm8839TwoPass({
@@ -471,7 +475,7 @@ Deno.test("nonadditive simultaneous Election B differences stay guarded", () => 
         undistributedRemoved(holding),
         undistributedRemoved(secondHolding),
       ],
-    }, true).pending,
+    }, TY2025, true).pending,
   ).f1040!;
   assertEquals(full.line22_tax_after_credits, 525);
   assertEquals(withoutFirst.line24_total_tax, 85);
@@ -512,7 +516,7 @@ const thirdHolding = {
   },
 };
 
-Deno.test("three independent Election B holdings retain separate sourced copies", async () => {
+test("three independent Election B holdings retain separate sourced copies", async () => {
   const inputs = {
     ...base.inputs,
     f8621: [holding, secondHolding, thirdHolding],

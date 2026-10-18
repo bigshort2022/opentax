@@ -86,7 +86,7 @@ class ScheduleSENode extends TaxNode<typeof inputSchema> {
         identity: input.owner_identity,
         businesses: input.owner_business_sources,
         wages: input.owner_wage_sources ?? [],
-      }, cfg.ssWageBase);
+      }, cfg.ssWageBase, cfg);
       const sole = owned.instances.length === 1
         ? owned.instances[0]
         : undefined;
@@ -114,6 +114,7 @@ class ScheduleSENode extends TaxNode<typeof inputSchema> {
           this.outputNodes.output(schedule1a, {
             qualified_tips_se_deduction: owned.deduction,
             qualified_tips_owner_se_source: owned.source,
+            qualified_tips_ss_wage_base: cfg.ssWageBase,
             qualified_tips_schedule_f_profit: input.net_profit_schedule_f ?? 0,
             qualified_tips_farm_optional_method:
               input.farm_optional_method_elected === true,
@@ -136,7 +137,7 @@ class ScheduleSENode extends TaxNode<typeof inputSchema> {
         ],
       };
     }
-    const lines = scheduleSELines(input, cfg.ssWageBase);
+    const lines = scheduleSELines(input, cfg.ssWageBase, cfg);
     const source = (line13Deduction: number) =>
       this.outputNodes.output(form7206, {
         schedule_se_source: {
@@ -167,7 +168,8 @@ class ScheduleSENode extends TaxNode<typeof inputSchema> {
       // Route net earnings (line 6) to Form 8959 Part II for Additional Medicare Tax.
       // i8959 line 8: "Enter your self-employment income from Schedule SE (Form 1040),
       // Part I, line 6." That is after the 92.35% multiplier. IRC §3101(b)(2).
-      this.outputNodes.output(form8959, { se_income: line6 }),
+      // Each spouse's Schedule SE is filed in whole dollars before they add.
+      this.outputNodes.output(form8959, { se_income: Math.round(line6) }),
       // Line 13 is a deduction attributable to the trade or business, so it reduces QBI.
       // i8995, Determining Your Qualified Business Income: the items to consider include
       // the "deductible part of self-employment tax".

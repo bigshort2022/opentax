@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals } from "@std/assert";
 import { calculateForm540 } from "./calculation.ts";
 import { form540InputSchema } from "./input.ts";
@@ -34,7 +35,7 @@ const simpleInput = {
   },
 } as const;
 
-Deno.test("Form 540 computes CA AGI, standard deduction, tax, credits, and balance", () => {
+test("Form 540 computes CA AGI, standard deduction, tax, credits, and balance", () => {
   const input = form540InputSchema.parse(simpleInput);
   const result = calculateForm540(input);
   assertEquals(result.lines.line12_state_wages, 81_000);
@@ -55,7 +56,7 @@ Deno.test("Form 540 computes CA AGI, standard deduction, tax, credits, and balan
   assertEquals(result.findings, []);
 });
 
-Deno.test("Form 540 taxable income does not become negative", () => {
+test("Form 540 taxable income does not become negative", () => {
   const input = form540InputSchema.parse({
     ...simpleInput,
     federalAgi: 0,

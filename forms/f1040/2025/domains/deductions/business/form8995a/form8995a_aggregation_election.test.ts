@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import {
   assert,
   assertEquals,
@@ -16,8 +19,8 @@ const expected = {
   3: [3214, 536786, 236786, 22500, 498536, 144035, 153358],
   4: [3750, 576250, 276250, 25000, 535500, 156972, 167698],
 };
-Deno.test("owned aggregation new election retains acquired businesses, complete annual disclosure and row overflow through full return", async () => {
-  const archive = await Deno.makeTempDir({
+test("owned aggregation new election retains acquired businesses, complete annual disclosure and row overflow through full return", async () => {
+  const archive = await sys.makeTempDir({
     prefix: "opentax-owned-aggregation-election-source-",
   });
   console.log("Owned aggregation actual source archive:", archive);
@@ -76,24 +79,24 @@ Deno.test("owned aggregation new election retains acquired businesses, complete 
       bundle,
       origins,
     );
-    await Deno.writeTextFile(`${archive}/${count}.xml`, bundle.xml);
-    await Deno.writeFile(`${archive}/${count}.pdf`, pdf);
-    await Deno.writeFile(
+    await fs.writeFile(`${archive}/${count}.xml`, bundle.xml);
+    await fs.writeFile(`${archive}/${count}.pdf`, pdf);
+    await fs.writeFile(
       `${archive}/${count}-annual.pdf`,
       bundle.attachments[0].bytes,
     );
-    const xsd = await new Deno.Command("xmllint", {
+    const xsd = await new sys.Command("xmllint", {
       args: [
         "--noout",
         "--schema",
-        ".state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+        "irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
         `${archive}/${count}.xml`,
       ],
       stdout: "piped",
       stderr: "piped",
     }).output();
     assertEquals(xsd.code, 0, new TextDecoder().decode(xsd.stderr));
-    await Deno.writeTextFile(
+    await fs.writeFile(
       `${archive}/${count}.json`,
       JSON.stringify(
         {
@@ -129,7 +132,7 @@ const mutations = [
   (s: any) =>
     s.election_history = {
       status: "continued_unchanged",
-      filed_2024_schedule_b_reference: "prior-ref",
+      filed_prior_year_schedule_b_reference: "prior-ref",
       no_material_change_confirmed: true,
     },
   (s: any) =>
@@ -138,7 +141,7 @@ const mutations = [
     s.annual_disclosure.no_commissioner_disaggregation_confirmed = false,
   (s: any) => s.rpe_aggregation_present = true,
 ];
-Deno.test("owned aggregation public input rejects missing annual events, conflicting source identities and unsupported RPE elections", () => {
+test("owned aggregation public input rejects missing annual events, conflicting source identities and unsupported RPE elections", () => {
   for (const mutate of mutations) {
     const fixture = ownedAggregationElectionFixture(3);
     mutate((fixture.inputs.qbi_aggregation as any).aggregation_filing_details);
@@ -149,7 +152,7 @@ Deno.test("owned aggregation public input rejects missing annual events, conflic
     );
   }
 });
-Deno.test("owned aggregation native and directPDF reject conflicting annual source and missing required native statement", async () => {
+test("owned aggregation native and directPDF reject conflicting annual source and missing required native statement", async () => {
   const fixture = ownedAggregationElectionFixture(3);
   const good = f1040_2025.executeReturn(fixture.inputs);
   assertEquals(good.diagnostics, []);

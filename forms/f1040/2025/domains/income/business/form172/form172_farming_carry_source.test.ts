@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertRejects } from "@std/assert";
 import { stageForm172FarmingCarrySource } from "./form172_farming_carry_source.ts";
 function origin() {
@@ -34,47 +35,6 @@ function origin() {
     capital_gains: [],
     capital_losses: [],
     prior_nol_deductions: [],
-  };
-}
-
-function legacy() {
-  const {
-    noncapital_income,
-    noncapital_deductions,
-    capital_gains,
-    capital_losses,
-    prior_nol_deductions,
-  } = origin();
-  noncapital_deductions[1].amount = 6350;
-  return {
-    source_format: "reviewed_legacy_loss_year",
-    reference: "legacy-origin",
-    tax_year: 2017,
-    taxpayer_ssn: "111223333",
-    filing_status: "single",
-    inventory: {
-      noncapital_income,
-      noncapital_deductions,
-      capital_gains,
-      capital_losses,
-      prior_nol_deductions,
-    },
-    reviewed_form1040: {
-      reference: "return-2017",
-      tax_year: 2017,
-      taxpayer_ssn: "111223333",
-      filing_status: "single",
-      agi: -103000,
-      standard_or_itemized_deduction: 6350,
-      personal_exemptions: 4050,
-      reported_taxable_income: 0,
-    },
-    section199_deduction: { reference: "dpad-review", amount: 3000 },
-    limitations_review: {
-      reference: "historic-limit-review",
-      at_risk_and_passive_limits_applied: true,
-      itemized_phaseout_applied: true,
-    },
   };
 }
 
@@ -196,7 +156,7 @@ async function source() {
     },
   };
 }
-Deno.test("Form 172 three mixed carry source packages reproduce both derived balances", async () => {
+test("Form 172 three mixed carry source packages reproduce both derived balances", async () => {
   const { documents, binding } = await source();
   const r = await stageForm172FarmingCarrySource(binding, documents);
   assertEquals(r.originLoss, 100000);
@@ -224,7 +184,7 @@ Deno.test("Form 172 three mixed carry source packages reproduce both derived bal
     ]
   ) assertEquals(flag, false);
 });
-Deno.test("Form 172 mixed carry source rejects tampering missing duplicate and extra packages", async () => {
+test("Form 172 mixed carry source rejects tampering missing duplicate and extra packages", async () => {
   const { documents, binding } = await source();
   for (const i of [0, 1, 2]) {
     const changed = documents.map((d) => ({
@@ -242,7 +202,7 @@ Deno.test("Form 172 mixed carry source rejects tampering missing duplicate and e
     ], [...documents, { reference: "extra", bytes: documents[0].bytes }]]
   ) await assertRejects(() => stageForm172FarmingCarrySource(binding, docs));
 });
-Deno.test("Form 172 mixed carry source rejects owner year and envelope substitutions", async () => {
+test("Form 172 mixed carry source rejects owner year and envelope substitutions", async () => {
   const { documents, binding } = await source();
   for (
     const patch of [
@@ -259,7 +219,7 @@ Deno.test("Form 172 mixed carry source rejects owner year and envelope substitut
     );
   }
 });
-Deno.test("Form 172 mixed carry source recalculates classification and annual facts after digest verification", async () => {
+test("Form 172 mixed carry source recalculates classification and annual facts after digest verification", async () => {
   const { documents, binding } = await source();
   const { v } = mixed();
   v.nonfarming_business_item_ids = [];
@@ -282,7 +242,7 @@ Deno.test("Form 172 mixed carry source recalculates classification and annual fa
     }])
   );
 });
-Deno.test("Form 172 mixed carry source rejects duplicate JSON keys BOM whitespace and invalid UTF8", async () => {
+test("Form 172 mixed carry source rejects duplicate JSON keys BOM whitespace and invalid UTF8", async () => {
   const { documents, binding } = await source();
   const text = new TextDecoder().decode(documents[2].bytes);
   for (
@@ -309,7 +269,7 @@ Deno.test("Form 172 mixed carry source rejects duplicate JSON keys BOM whitespac
     );
   }
 });
-Deno.test("Form 172 mixed carry source owns every binding and package before first digest await", async () => {
+test("Form 172 mixed carry source owns every binding and package before first digest await", async () => {
   const { documents, binding } = await source();
   const pending = stageForm172FarmingCarrySource(binding, documents);
   binding.taxpayer_ssn = "999887777";

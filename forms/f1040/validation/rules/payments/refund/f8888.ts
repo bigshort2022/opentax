@@ -5,14 +5,26 @@
  */
 
 import type { RuleDef } from "../../../../../../core/validation/types.ts";
-import { rule, allDistinct, eqField, eqSum, hasNonZero, hasValue, ifThen, notGtNum, } from "../../../../../../core/validation/mod.ts";
+import {
+  all,
+  allDistinct,
+  any,
+  eqField,
+  eqSumOfAll,
+  formPresent,
+  hasNonZero,
+  hasValue,
+  ifThen,
+  notGtNum,
+  rule,
+} from "../../../../../../core/validation/mod.ts";
 
 export const F8888_RULES: readonly RuleDef[] = [
   rule(
     "F8888-001-04",
     "reject",
     "math_error",
-    eqSum("TotalAllocationOfRefundAmt", "DirectDepositRefundAmt", "RefundByCheckAmt"),
+    eqSumOfAll("TotalAllocationOfRefundAmt", "DirectDepositRefundAmt", "RefundByCheckAmt"),
     "The sum of all amounts on Form 8888, 'DirectDepositRefundAmt' and 'RefundByCheckAmt' must be equal to 'TotalAllocationOfRefundAmt'.",
   ),
   rule(
@@ -40,7 +52,7 @@ export const F8888_RULES: readonly RuleDef[] = [
     "F8888-020",
     "reject",
     "incorrect_data",
-    notGtNum("AmendedReturnInd", 999),
+    ifThen(all(any(hasValue("AmendedReturnInd"), hasValue("SupersededReturnInd"), hasValue("CorrectedReturnInd")), formPresent("form8888")), notGtNum("TotalAllocationOfRefundAmt", 999_999_999)),
     "If 'AmendedReturnInd' [1040, 1040NR], 'SupersededReturnInd' [1040, 1040NR, 1040SSPR] or 'CorrectedReturnInd' [1040SSPR] in the return is checked, and Form 8888 is present in the return, then 'TotalAllocationOfRefundAmt' must not be greater than 999,999,999.",
   ),
 ];

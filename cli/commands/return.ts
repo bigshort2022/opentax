@@ -1,4 +1,4 @@
-import { join } from "@std/path";
+import { join } from "node:path";
 import { productCatalog } from "../../catalog.ts";
 import {
   isStateFormDefinition,
@@ -6,6 +6,8 @@ import {
 } from "../../core/types/form-definition.ts";
 import { buildEngineInputs, createReturn, loadReturn } from "../store/store.ts";
 import { singletonPublicInputKeys } from "../store/public-input-keys.ts";
+import { resolveSourceBytes } from "./return-source-files.ts";
+import { returnHints } from "./return-hints.ts";
 import { normalizeAllPending } from "../../forms/f1040/2025/return-processing/pending.ts";
 
 function getCatalogEntry(formType: string, year: number): ProductDefinition {
@@ -155,6 +157,8 @@ function softValidationWarnings(
     );
   }
 
+  warnings.push(...returnHints(pending));
+
   return warnings;
 }
 
@@ -199,7 +203,10 @@ export async function getReturnCommand(
     };
   }
 
-  const engineInputs = buildEngineInputs(inputs, singletonPublicInputKeys(def));
+  const engineInputs = await resolveSourceBytes(
+    returnPath,
+    buildEngineInputs(inputs, singletonPublicInputKeys(def)),
+  );
   const result = def.executeReturn(engineInputs);
   const pending = normalizeAllPending(result.pending);
 
@@ -216,7 +223,8 @@ export async function getReturnCommand(
     formType: meta.formType ?? "f1040",
     summary: extractSummary(f1040),
     forms: collectForms(pending),
-    lines: f1040,
+    // A Form 4868 is its own submission; its filed lines are form4868.
+    lines: def.formType === "f4868" ? pending["form4868"] ?? {} : f1040,
     warnings,
     carryforwards: result.carryforwards,
   };

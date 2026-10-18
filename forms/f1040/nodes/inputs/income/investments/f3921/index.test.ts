@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import { buildStartNode, inputNodes } from "../../../../../2025/return-processing/start.ts";
 import { form6251 } from "../../../../intermediate/forms/taxes/amt/form6251/index.ts";
@@ -28,7 +29,7 @@ const exercise = {
   amount_paid_for_option: 0,
 } as const;
 
-Deno.test("Form 3921 boxes 3–5 route a vested, retained ISO spread to Form 6251 line 2i", () => {
+test("Form 3921 boxes 3–5 route a vested, retained ISO spread to Form 6251 line 2i", () => {
   const start = buildStartNode(inputNodes);
   const source = start.compute(ctx, { f3921: [exercise] });
   assertEquals(source.outputs[0].nodeType, "f3921");
@@ -70,7 +71,7 @@ Deno.test("Form 3921 boxes 3–5 route a vested, retained ISO spread to Form 625
       pending: {
         f3921: {
           f3921s: copies,
-          iso_amt_basis_ledger: buildIsoAmtBasisLedger({ f3921s: copies }),
+          iso_amt_basis_ledger: buildIsoAmtBasisLedger({ f3921s: copies }, 2025),
         },
       },
     }),
@@ -83,7 +84,7 @@ Deno.test("Form 3921 boxes 3–5 route a vested, retained ISO spread to Form 625
   );
 });
 
-Deno.test("Form 3921 blocks a sold, unvested, or extra-cost exercise", () => {
+test("Form 3921 blocks a sold, unvested, or extra-cost exercise", () => {
   for (
     const change of [
       { shares_disposed_during_exercise_year: 1 },
@@ -101,7 +102,7 @@ Deno.test("Form 3921 blocks a sold, unvested, or extra-cost exercise", () => {
   }
 });
 
-Deno.test("Form 3921 rejects an exercise outside 2025 and ignores a nonpositive spread", () => {
+test("Form 3921 rejects an exercise outside 2025 and ignores a nonpositive spread", () => {
   assertThrows(
     () =>
       f3921.compute(ctx, {
@@ -129,8 +130,8 @@ Deno.test("Form 3921 rejects an exercise outside 2025 and ignores a nonpositive 
   );
 });
 
-Deno.test("retained ISO exercise emits a cent-precise regular and AMT basis lot", () => {
-  const ledger = buildIsoAmtBasisLedger({ f3921s: [exercise] });
+test("retained ISO exercise emits a cent-precise regular and AMT basis lot", () => {
+  const ledger = buildIsoAmtBasisLedger({ f3921s: [exercise] }, 2025);
   assertEquals(ledger, [{
     tax_year: 2025,
     source_document_reference: "Issued Form 3921 copy 1",
@@ -146,33 +147,33 @@ Deno.test("retained ISO exercise emits a cent-precise regular and AMT basis lot"
   assertEquals(result.outputs[1].fields.iso_amt_basis_ledger, ledger);
 });
 
-Deno.test("Form 3921 issued copies reject duplicates and reconcile owner and amount", () => {
+test("Form 3921 issued copies reject duplicates and reconcile owner and amount", () => {
   const prepared = {
     f3921s: [exercise],
-    iso_amt_basis_ledger: buildIsoAmtBasisLedger({ f3921s: [exercise] }),
+    iso_amt_basis_ledger: buildIsoAmtBasisLedger({ f3921s: [exercise] }, 2025),
   };
   assertEquals(
     inputSchema.safeParse({ f3921s: [exercise, exercise] }).success,
     false,
   );
-  assertForm3921IsoSource(prepared, 1_500, ["111223333"]);
+  assertForm3921IsoSource(prepared, 1_500, ["111223333"], 2025);
   assertThrows(
-    () => assertForm3921IsoSource(prepared, 1_500, ["999887777"]),
+    () => assertForm3921IsoSource(prepared, 1_500, ["999887777"], 2025),
     Error,
     "employee must match",
   );
   assertThrows(
-    () => assertForm3921IsoSource(prepared, 1_499, ["111223333"]),
+    () => assertForm3921IsoSource(prepared, 1_499, ["111223333"], 2025),
     Error,
     "must equal",
   );
   assertThrows(
-    () => assertForm3921IsoSource({ f3921s: [exercise] }, 1_500, ["111223333"]),
+    () => assertForm3921IsoSource({ f3921s: [exercise] }, 1_500, ["111223333"], 2025),
     Error,
     "AMT basis ledger",
   );
   assertThrows(
-    () => assertForm3921IsoSource(undefined, 1_500, ["111223333"]),
+    () => assertForm3921IsoSource(undefined, 1_500, ["111223333"], 2025),
     Error,
     "issued Form 3921",
   );

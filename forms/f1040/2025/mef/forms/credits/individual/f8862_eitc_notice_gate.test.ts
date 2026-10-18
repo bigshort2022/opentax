@@ -1,4 +1,5 @@
-import { assertThrows } from "@std/assert";
+import { test } from "bun:test";
+import { assertStringIncludes, assertThrows } from "@std/assert";
 import { FilingStatus } from "../../../../../mef/header.ts";
 import type { F8862Input } from "../../../../../nodes/inputs/credits/individual/f8862/index.ts";
 import { form8862Pdf } from "../../../../pdf/forms/credits/individual/f8862.ts";
@@ -43,7 +44,7 @@ const pending = {
   eitc: { credit_amount: 500, qualifying_children: 0 },
 };
 const authenticationError =
-  "executor-owned authentication of prior IRS notice issuance and contents";
+  "retained prior IRS notice copy with matching SHA-256";
 
 function rejectsBoth(
   source: F8862Input,
@@ -62,7 +63,7 @@ function rejectsBoth(
   );
 }
 
-Deno.test("Form 8862 EITC-only childless and income-only claims retain calculation joins but cannot export an unauthenticated notice", () => {
+test("Form 8862 EITC-only childless and income-only claims retain calculation joins but cannot export an unauthenticated notice", () => {
   rejectsBoth(fields, pending, authenticationError);
   rejectsBoth(
     {
@@ -76,7 +77,7 @@ Deno.test("Form 8862 EITC-only childless and income-only claims retain calculati
   );
 });
 
-Deno.test("Form 8862 EITC notice and final-credit tampering fails before the authentication gate", () => {
+test("Form 8862 EITC notice and final-credit tampering fails before the authentication gate", () => {
   for (
     const final of [
       {
@@ -125,4 +126,47 @@ Deno.test("Form 8862 EITC notice and final-credit tampering fails before the aut
     ...pending,
     f1040: { ...pending.f1040, line27_eitc: 0 },
   }, "positive finalized Form 1040 line 27");
+});
+
+test("Form 8862 exports only with the retained notice copy whose bytes match its recorded SHA-256", () => {
+  const digest = "b".repeat(64);
+  const reviewed = {
+    ...pending,
+    general: {
+      ...general,
+      prior_eic_disallowance_review: {
+        ...general.prior_eic_disallowance_review,
+        notice_copy_reference: "2023-eic-notice-copy",
+        notice_copy_sha256: digest,
+      },
+    },
+  };
+  const retained = { "2023-eic-notice-copy": digest };
+  assertStringIncludes(
+    form8862.build(fields, {
+      pending: reviewed,
+      filer,
+      retainedSourceSha256ByReference: retained,
+    }),
+    "<EICClaimedInd>X</EICClaimedInd>",
+  );
+  for (
+    const [final, hashes] of [
+      [pending, retained],
+      [reviewed, {}],
+      [reviewed, { "2023-eic-notice-copy": "c".repeat(64) }],
+      [reviewed, { "other-copy": digest }],
+    ] as const
+  ) {
+    assertThrows(
+      () =>
+        form8862.build(fields, {
+          pending: final,
+          filer,
+          retainedSourceSha256ByReference: hashes,
+        }),
+      Error,
+      authenticationError,
+    );
+  }
 });

@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 /**
  * E2E integration tests for complete F1040 return computation.
  *
@@ -60,7 +61,7 @@ function runReturn(inputs: Record<string, unknown>): ExecuteResult {
 //     line33_total_payments             = $11,000
 //     line35a_refund                    = $3,045
 
-Deno.test("E2E Scenario 1: single W-2 wage earner — wages flow through AGI, standard deduction, tax calculation to final refund", () => {
+test("E2E Scenario 1: single W-2 wage earner — wages flow through AGI, standard deduction, tax calculation to final refund", () => {
   const result = runReturn({
     general: {
       filing_status: FilingStatus.Single,
@@ -176,7 +177,7 @@ Deno.test("E2E Scenario 1: single W-2 wage earner — wages flow through AGI, st
 //     line33_total_payments = $0          (no withholding)
 //     line37_amount_owed    = line24_total_tax  (owes full computed tax)
 
-Deno.test("E2E Scenario 2: self-employed Schedule C — SE income and SE deduction flow through pipeline to amount owed", () => {
+test("E2E Scenario 2: self-employed Schedule C — SE income and SE deduction flow through pipeline to amount owed", () => {
   const result = runReturn({
     general: {
       filing_status: FilingStatus.Single,
@@ -228,12 +229,12 @@ Deno.test("E2E Scenario 2: self-employed Schedule C — SE income and SE deducti
   );
 
   // ── Income tax calculation node inputs ────────────────────────────────────
-  // Taxable income = 74,348 − 15,750 (std ded) − 11,719.60 (QBI deduction) = 46,878.40
+  // Taxable income = 74,348 − 15,750 (std ded) − 11,720 (line 13) = 46,878
   const itcPending = result.pending["income_tax_calculation"] ?? {};
   assertEquals(
     Math.round((itcPending["taxable_income"] as number) * 100) / 100,
-    46_878.4,
-    "income_tax_calculation should receive taxable_income = $46,878.40",
+    46_878,
+    "income_tax_calculation should receive taxable_income = $46,878",
   );
 
   // ── F1040 final scalar summary ─────────────────────────────────────────────
@@ -316,7 +317,7 @@ function singleGeneral() {
   };
 }
 
-Deno.test("E2E Scenario 3a: foreign employer compensation with no W-2 — reaches AGI (IRC §61(a)(1))", () => {
+test("E2E Scenario 3a: foreign employer compensation with no W-2 — reaches AGI (IRC §61(a)(1))", () => {
   const result = runReturn({
     general: singleGeneral(),
     fec: [fecItem(20_000)],
@@ -343,7 +344,7 @@ Deno.test("E2E Scenario 3a: foreign employer compensation with no W-2 — reache
   );
 });
 
-Deno.test("E2E: clergy allowance without matched evidence stops the return", () => {
+test("E2E: clergy allowance without matched evidence stops the return", () => {
   const result = runReturn({
     general: singleGeneral(),
     clergy: [{
@@ -366,7 +367,7 @@ Deno.test("E2E: clergy allowance without matched evidence stops the return", () 
   );
 });
 
-Deno.test("E2E: ministerial loss without matched evidence stops the return", () => {
+test("E2E: ministerial loss without matched evidence stops the return", () => {
   const result = runReturn({
     general: singleGeneral(),
     clergy: [{
@@ -393,7 +394,7 @@ Deno.test("E2E: ministerial loss without matched evidence stops the return", () 
   );
 });
 
-Deno.test("E2E Scenario 3b: foreign employer compensation beside a W-2 — lines 1a and 1h total", () => {
+test("E2E Scenario 3b: foreign employer compensation beside a W-2 — lines 1a and 1h total", () => {
   const result = runReturn({
     general: singleGeneral(),
     w2: [
@@ -441,7 +442,7 @@ Deno.test("E2E Scenario 3b: foreign employer compensation beside a W-2 — lines
   );
 });
 
-Deno.test("E2E Scenario 4a: 1099-DIV and trust K-1 dividends combine without node failures", () => {
+test("E2E Scenario 4a: 1099-DIV and trust K-1 dividends combine without node failures", () => {
   const result = runReturn({
     general: singleGeneral(),
     w2: [{
@@ -474,7 +475,7 @@ Deno.test("E2E Scenario 4a: 1099-DIV and trust K-1 dividends combine without nod
   assertEquals(result.pending["f1040"]?.["line24_total_tax"], 1_559);
 });
 
-Deno.test("E2E Scenario 4b: multiple 1099-DIV and trust K-1 entries all reach AGI", () => {
+test("E2E Scenario 4b: multiple 1099-DIV and trust K-1 entries all reach AGI", () => {
   const result = runReturn({
     general: singleGeneral(),
     f1099div: [
@@ -511,7 +512,7 @@ Deno.test("E2E Scenario 4b: multiple 1099-DIV and trust K-1 entries all reach AG
   assertEquals(result.pending["f1040"]?.["line24_total_tax"], 0);
 });
 
-Deno.test("E2E Schedule A: computed context replaces duplicate direct inputs", () => {
+test("E2E Schedule A: computed context replaces duplicate direct inputs", () => {
   const result = runReturn({
     general: singleGeneral(),
     w2: [{
@@ -520,7 +521,7 @@ Deno.test("E2E Schedule A: computed context replaces duplicate direct inputs", (
     }],
     schedule_a: {
       filing_status: FilingStatus.Single,
-      agi: 349_154,
+      agi: 300_000,
       line_8a_mortgage_interest_1098: 46_984.65,
     },
   });
@@ -530,13 +531,15 @@ Deno.test("E2E Schedule A: computed context replaces duplicate direct inputs", (
     result.pending["schedule_a"]?.["filing_status"],
     FilingStatus.Single,
   );
-  assertEquals(result.pending["schedule_a"]?.["agi"], 349_154.37);
+  // The computed whole-dollar AGI (Form 1040 line 11) replaces the direct entry.
+  assertEquals(result.pending["schedule_a"]?.["agi"], 349_154);
   assertEquals(
     result.pending["schedule_a"]?.["line_8a_mortgage_interest_1098"],
     46_984.65,
   );
+  // Schedule A line 17 is entered in whole dollars.
   assertEquals(
     result.pending["standard_deduction"]?.["itemized_deductions"],
-    46_984.65,
+    46_985,
   );
 });

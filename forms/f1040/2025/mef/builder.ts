@@ -29,7 +29,10 @@ import { assertReviewedForm8283PdfFields } from "./forms/deductions/charitable/f
 import { assertForm8978SourceBytes } from "../domains/taxes/passthrough/form8978/form8978_source.ts";
 import { buildReturnHeader, FilingStatus } from "../../mef/header.ts";
 import { element, elements } from "../../mef/xml.ts";
-import { F1040_2025_CONFIG } from "../config.ts";
+import {
+  assertMefReturnVersion,
+  MEF_RETURN_VERSION_BY_TAX_YEAR,
+} from "../../mef/return-versions.ts";
 import { PDFDocument } from "pdf-lib";
 import { isValidMefPdfFilename } from "./attachments/pdf-attachment-filename.ts";
 import { assertMefPdfEnvelope } from "./attachments/pdf-attachment-envelope.ts";
@@ -78,17 +81,18 @@ import { assertForm8858FilingSource } from "../../nodes/inputs/general/foreign/f
 import { assertBox11Line10Sources } from "../../nodes/inputs/income/rental-passthrough/k1_partnership/box11_line10.ts";
 import { assertForm8915FSourceLinks } from "../../nodes/inputs/income/retirement/f8915f/index.ts";
 import { assertW2GPayerCopyContents } from "./identity/w2g-payer-copy.ts";
+import { assertForm8874CdeStatusEvidence } from "../domains/credits/business/form8874/form8874_cde_status_evidence.ts";
 import { assertLine1bHouseholdWageSource } from "../domains/income/other/line1b-household-wages.ts";
 import { assertBusinessSchedule1Amounts } from "../domains/income/business/business-schedule1-reconciliation.ts";
-import { assertPositiveW2GRecipient } from "./forms/income/other/w2g.ts";
+import { assertPositiveW2GRecipient } from "./forms/income/gambling/w2g.ts";
 import { reconciledForm8908Source } from "./forms/credits/business/f8908_source_reconciliation.ts";
 import { assertForm8908PwaSubmittedPdfs } from "./forms/credits/business/f8908_pwa.ts";
 import { assertPreparedVehicleAcknowledgments } from "./forms/deductions/charitable/f8283/f8283_vehicle_sale_evidence.ts";
 import { assertForm1098IssuerCopies } from "../../nodes/inputs/deductions/mortgage/f1098/issuer_copy.ts";
 import { assertExtensionPaymentSource } from "../domains/payments/settlement/extension-payment-reconciliation.ts";
 import { assert1099RRecipientOwner } from "../domains/income/retirement/f1099r/f1099r-recipient-owner.ts";
-import { assertNecWithholdingRecipient } from "../domains/payments/withholding/f1099n/f1099nec-withholding-owner.ts";
-import { assert1099BRecipientOwner } from "../domains/income/other/f1099b/f1099b-recipient-owner.ts";
+import { assertNecWithholdingRecipient } from "../domains/payments/withholding/f1099nec/f1099nec-withholding-owner.ts";
+import { assert1099BRecipientOwner } from "../domains/income/investments/f1099b/f1099b-recipient-owner.ts";
 import {
   assertCapitalSaleSourceRows,
   assertNoRepeatedBrokerSaleSources,
@@ -96,7 +100,7 @@ import {
 import {
   assertPatrIssuedCopies,
   assertPatrWithholdingRecipient,
-} from "../domains/payments/withholding/f1099p/f1099patr-withholding-owner.ts";
+} from "../domains/payments/withholding/f1099patr/f1099patr-withholding-owner.ts";
 import {
   assertForm4852FilingRoute,
   assertLine1aWageSource,
@@ -134,7 +138,7 @@ import {
   assertFinalBalanceProjection,
   assertQualifiedDividendSubset,
 } from "../return-processing/return-wide-arithmetic.ts";
-import { assertDividendIncomeSources } from "../domains/income/other/f1099d/f1099div-income-reconciliation.ts";
+import { assertDividendIncomeSources } from "../domains/income/investments/f1099div/f1099div-income-reconciliation.ts";
 import {
   assertScheduleBInterestJoin,
   assertScheduleBPreparedProjection,
@@ -158,6 +162,7 @@ import {
 export interface MefBundle {
   readonly form8886Packets?: PreparedForm8886ReturnPackets;
   readonly retainedSourceDocuments?: readonly Form4852RetainedDocument[];
+  readonly retainedSourceSha256ByReference?: Readonly<Record<string, string>>;
   readonly xml: string;
   readonly attachments: ReadonlyArray<MefPdfAttachment>;
   readonly pending: MefFormsPending;
@@ -279,22 +284,14 @@ function buildReturnXml(
   attachmentSha256ByFileName?: Readonly<Record<string, string>>,
   form4852EvidenceVerified = false,
   preparedForm8886?: PreparedForm8886ReturnPackets,
+  retainedSourceSha256ByReference?: Readonly<Record<string, string>>,
 ): {
   readonly xml: string;
   readonly form3800Parts?: Form3800DocumentParts;
   readonly documents: readonly MefDocumentFragment[];
 } {
   assertEmployeeContributionReturn(pending);
-  if (year !== 2025 || returnType !== "1040") {
-    throw new Error(
-      "TY2025 Form 1040 export requires year 2025 and return type 1040",
-    );
-  }
-  if (schemaVersion !== F1040_2025_CONFIG.mefSchemaVersion) {
-    throw new Error(
-      "TY2025 Form 1040 export requires the reviewed MeF schema version",
-    );
-  }
+  assertMefReturnVersion(year, schemaVersion, returnType);
   if (!filer) {
     throw new Error("MeF export requires a real filer identity");
   }
@@ -308,15 +305,15 @@ function buildReturnXml(
   }
   assertGeneral1040HeaderSource(pending);
   assertDigitalAssetDispositionAnswer(pending);
-  assertGeneral1040DependentSource(pending);
+  assertGeneral1040DependentSource(pending, year);
   assertGeneral1040DepositSource(pending, filer);
-  assert1098EInterestSource(pending, filer);
-  assert1099RRecipientOwner(pending.f1099r, filer);
-  assertPositiveW2GRecipient(pending.w2g, filer);
+  assert1098EInterestSource(pending, filer, year);
+  assert1099RRecipientOwner(pending.f1099r, filer, year);
+  assertPositiveW2GRecipient(pending.w2g, filer, year);
   assertNecWithholdingRecipient(pending.f1099nec, filer);
-  assert1099BRecipientOwner(pending.f1099b, filer);
+  assert1099BRecipientOwner(pending.f1099b, filer, year);
   assertNoRepeatedBrokerSaleSources(pending.f1099b, pending.f8949);
-  assertCapitalSaleSourceRows(pending);
+  assertCapitalSaleSourceRows(pending, year);
   assertPatrIssuedCopies(pending.f1099patr);
   assertPatrWithholdingRecipient(pending.f1099patr, filer);
   assertLine1bHouseholdWageSource(pending);
@@ -336,18 +333,18 @@ function buildReturnXml(
   assertBusinessSchedule1Amounts(pending);
   assertOwned7203RequiredCopies(pending);
   assertHsaExcessRequiredCopy(pending);
-  assertRequiredLtcSource({ pending, filer });
+  assertRequiredLtcSource({ pending, filer, taxYear: year });
   assertLine1iCombatPayElectionSource(pending);
   assertSchedule2W2Line13Sources(pending);
   assertSchedule2W2Line17KSource(pending);
   assertSchedule2Line17HSources(pending, filer);
-  assertSchedule2Form4137Tax(pending);
-  assertLine1cForm4137Income(pending);
-  assertSchedule2Form8919Tax(pending);
-  assertLine1gForm8919Wages(pending);
-  assertSchedule2ScheduleHTax(pending);
+  assertSchedule2Form4137Tax(pending, year);
+  assertLine1cForm4137Income(pending, year);
+  assertSchedule2Form8919Tax(pending, year);
+  assertLine1gForm8919Wages(pending, year);
+  assertSchedule2ScheduleHTax(pending, year);
   assertSchedule2Form8960Tax(pending);
-  assertSchedule2ScheduleSETax(pending);
+  assertSchedule2ScheduleSETax(pending, year);
   assertSchedule2Form8828Tax(pending);
   assertSchedule2Form8936Repayment(pending);
   assertSchedule3Form8859Credit(pending);
@@ -358,23 +355,27 @@ function buildReturnXml(
   assertF8288WithholdingOwner(pending.f8288, filer);
   assertSocialSecurityBenefitSource(pending);
   assertBenefitStatementOwner(pending, filer);
-  assertRrb1099rPensionSource(pending, filer);
-  assertIra1099rIncomeSource(pending);
+  assertRrb1099rPensionSource(pending, filer, year);
+  assertIra1099rIncomeSource(pending, year);
   assertExtensionPaymentSource(pending, filer);
   assertForm8915FSourceLinks(pending);
   assertKIncomeClassification(pending);
-  assertEitcChildSources(pending, filer);
+  assertEitcChildSources(pending, filer, year);
   assertKReportedErrorSources(pending, filer);
   assertScheduleCReceiptSourceIdentity(pending, filer);
   assertScheduleCStatutoryW2Sources(pending, filer);
   assertKWithholdingSourceIdentity(pending, filer);
-  assertKPersonalSaleSources(pending, filer);
+  assertKPersonalSaleSources(pending, filer, year);
   assertSchedule1Box3SourceIdentity(pending, filer);
   assertSchedule1Box8SourceIdentity(pending, filer);
   assertSchedule1Form8814Source(pending);
-  assertSchedule1Form8621Source(pending);
-  assertScheduleJSourceReturn(pending, executeComposedSourceReturn);
-  assertSingleFarmQbiReturn(pending);
+  assertSchedule1Form8621Source(pending, { taxYear: year, formType: "f1040" });
+  assertScheduleJSourceReturn(
+    pending,
+    (inputs) =>
+      executeComposedSourceReturn(inputs, { taxYear: year, formType: "f1040" }),
+  );
+  assertSingleFarmQbiReturn(pending, year);
   assertSchedule1NecSourceIdentity(pending, filer);
   assertSchedule1KSourceIdentity(pending, filer);
   assertScheduleFFarmSourceIdentity(pending, filer);
@@ -418,11 +419,13 @@ function buildReturnXml(
   );
   const initial = buildFragments(pending, {
     phase: "discovery",
+    taxYear: year,
     preparedForm8886,
     filer,
     binaryAttachmentFileNames,
     attachmentDescriptionsByFileName,
     attachmentSha256ByFileName,
+    retainedSourceSha256ByReference,
     pending,
   });
   const documentIdsByPendingKey = Object.fromEntries(
@@ -452,6 +455,7 @@ function buildReturnXml(
   let form3800Parts: Form3800DocumentParts | undefined;
   const linked = buildFragments(pending, {
     phase: "final",
+    taxYear: year,
     preparedForm8886,
     filer,
     binaryAttachmentFileNames,
@@ -460,6 +464,7 @@ function buildReturnXml(
     documentIdsByPendingKey,
     documentIdsByTag,
     documentIdsByAttachmentFileName,
+    retainedSourceSha256ByReference,
     pending,
     onPreparedForm3800(parts) {
       if (form3800Parts) {
@@ -519,16 +524,18 @@ export function assertPreparedBundleProjection(
   if (!filer.timestamp && !retainedTimestamp) {
     throw new Error("Prepared MeF XML has no replayable ReturnTs");
   }
+  const year = Number(/<TaxYr>(\d{4})<\/TaxYr>/.exec(bundle.xml)?.[1]);
   const projected = buildReturnXml(
     bundle.pending,
     filer.timestamp ? filer : { ...filer, timestamp: `${retainedTimestamp}Z` },
-    F1040_2025_CONFIG.mefSchemaVersion,
-    2025,
+    MEF_RETURN_VERSION_BY_TAX_YEAR[year] ?? "",
+    year,
     "1040",
     bundle.attachments,
     bundle.attachmentSha256ByFileName,
     bundle.retainedSourceDocuments !== undefined,
     bundle.form8886Packets,
+    bundle.retainedSourceSha256ByReference,
   );
   if (projected.xml !== bundle.xml) {
     throw new Error(
@@ -615,7 +622,7 @@ export async function buildMefBundle(
       );
     }
   }
-  await assertForm1098IssuerCopies(pending);
+  await assertForm1098IssuerCopies(pending, options.year ?? 2025);
   const retainedSourceDocuments = (options.retainedSourceDocuments ?? []).map((
     d,
   ) => ({
@@ -627,12 +634,22 @@ export async function buildMefBundle(
     options.filer,
     retainedSourceDocuments,
   );
+  await assertForm8874CdeStatusEvidence(
+    pending,
+    retainedSourceDocuments,
+    options.year ?? 2025,
+  );
+  const retainedSourceSha256ByReference = Object.fromEntries(
+    await Promise.all(retainedSourceDocuments.map(async (d) =>
+      [d.document_reference, await sha256Hex(d.bytes)] as const
+    )),
+  );
   const generated = await Promise.all(
     ALL_MEF_FORMS.map((form) =>
       "buildBinaryAttachments" in form && form.buildBinaryAttachments
         ? form.buildBinaryAttachments(
           (pending[form.pendingKey as keyof MefFormsPending] ?? {}) as never,
-          { filer: options.filer, pending },
+          { filer: options.filer, pending, taxYear: options.year },
         )
         : Promise.resolve([] as ReadonlyArray<MefPdfAttachment>)
     ),
@@ -700,6 +717,7 @@ export async function buildMefBundle(
     attachmentSha256ByFileName,
     pending.f4852 !== undefined,
     options.form8886?.prepared,
+    retainedSourceSha256ByReference,
   );
   const form8886Packets = options.form8886 && options.filer
     ? await finalizeForm8886NativeReturnPackets(
@@ -723,6 +741,7 @@ export async function buildMefBundle(
     form3800Parts: prepared.form3800Parts,
     form8886Packets,
     retainedSourceDocuments,
+    retainedSourceSha256ByReference,
     attachments,
     pending,
     sourceSha256: await preparedSourceSha256(pending, options.filer),

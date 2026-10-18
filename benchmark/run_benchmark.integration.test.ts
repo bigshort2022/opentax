@@ -1,5 +1,9 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../scripts/support/sys.ts";
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { dirname, fromFileUrl, join } from "@std/path";
+import { dirname, join } from "node:path";
+import { fileURLToPath as fromFileUrl } from "node:url";
 
 const root = dirname(fromFileUrl(import.meta.url));
 const validForms = [
@@ -18,25 +22,31 @@ for (
   const scenario of [
     "mismatch",
     "command-error",
+    "invalid-input",
     "executor-error",
     "missing-case",
     "unsupported",
     "source-gap",
   ] as const
 ) {
-  Deno.test(`benchmark process fails closed: ${scenario}`, async () => {
-    const form = `__integrity_${crypto.randomUUID()}`;
+  test(`benchmark process fails closed: ${scenario}`, async () => {
+    const form = scenario === "missing-case"
+      ? `__integrity_${crypto.randomUUID()}`
+      : "f1040";
+    const name = `__integrity_${crypto.randomUUID()}`;
     const caseRoot = join(root, "cases", form);
-    const caseDir = join(caseRoot, "2025", "synthetic");
-    const runtime = await Deno.makeTempDir();
+    const caseDir = join(caseRoot, "2025", name);
+    const runtime = await sys.makeTempDir();
     try {
-      await Deno.mkdir(caseDir, { recursive: true });
-      const forms = scenario === "command-error"
+      await fs.mkdir(caseDir, { recursive: true });
+      const forms = scenario === "invalid-input"
         ? [{ node_type: "__nonexistent_node", data: {} }]
+        : scenario === "command-error"
+        ? [validForms[0], validForms[0], validForms[1]]
         : scenario === "executor-error"
         ? [validForms[1]]
         : validForms;
-      await Deno.writeTextFile(
+      await fs.writeFile(
         join(caseDir, "input.json"),
         JSON.stringify({ year: 2025, forms }),
       );
@@ -47,7 +57,7 @@ for (
         : scenario === "unsupported"
         ? { line1a_wages: 120000, ordinary_taxable: 123 }
         : { line1a_wages: 120000 };
-      await Deno.writeTextFile(
+      await fs.writeFile(
         join(caseDir, "correct.json"),
         JSON.stringify({
           ...(scenario === "source-gap"
@@ -66,17 +76,14 @@ for (
         }),
       );
       if (scenario === "missing-case") {
-        await Deno.mkdir(join(caseRoot, "2025", "incomplete"));
+        await fs.mkdir(join(caseRoot, "2025", "incomplete"));
       }
-      const { code, stdout, stderr } = await new Deno.Command("deno", {
+      const { code, stdout, stderr } = await new sys.Command(process.execPath, {
         args: [
-          "run",
-          "--allow-read",
-          "--allow-write",
-          "--allow-run=deno",
           join(root, "run_benchmark.ts"),
           "--form",
           form,
+          ...(scenario === "missing-case" ? [] : ["--case", name]),
           "--json",
         ],
         cwd: runtime,
@@ -95,6 +102,17 @@ for (
         );
         return;
       }
+      if (scenario === "invalid-input") {
+        assertStringIncludes(
+          new TextDecoder().decode(stderr),
+          "__nonexistent_node is not a valid input",
+        );
+        assertEquals(
+          new TextDecoder().decode(stdout).includes('{"total":'),
+          false,
+        );
+        return;
+      }
       const jsonLine = new TextDecoder().decode(stdout).split("\n").find(
         (line) => line.startsWith('{"total":'),
       );
@@ -102,7 +120,7 @@ for (
       const report = JSON.parse(jsonLine);
       {
         assertEquals(report.fail, 1);
-        assertEquals(report.failing, ["synthetic"]);
+        assertEquals(report.failing, [name]);
         if (scenario === "mismatch") {
           assertEquals(
             report.failures[0].lineFailures.filter((
@@ -135,8 +153,10 @@ for (
         }
       }
     } finally {
-      await Deno.remove(caseRoot, { recursive: true });
-      await Deno.remove(runtime, { recursive: true });
+      await sys.remove(scenario === "missing-case" ? caseRoot : caseDir, {
+        recursive: true,
+      });
+      await sys.remove(runtime, { recursive: true });
     }
-  });
+  }, 60_000);
 }

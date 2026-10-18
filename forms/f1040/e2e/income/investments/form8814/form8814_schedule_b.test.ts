@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../scripts/support/sys.ts";
 import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import { buildExecutionPlan } from "../../../../../../core/runtime/planner.ts";
 import { execute } from "../../../../../../core/runtime/executor.ts";
@@ -16,7 +19,7 @@ const filer: FilerIdentity = {
   originator: { efin: "123456", originatorType: "ERO" },
 };
 
-Deno.test("Form 8814 and a below-threshold 1099-DIV trigger Schedule B once", async () => {
+test("Form 8814 and a below-threshold 1099-DIV trigger Schedule B once", async () => {
   const result = execute(buildExecutionPlan(registry), registry, {
     schedule_b_part_iii: {
       foreign_accounts_question: false,
@@ -82,29 +85,29 @@ Deno.test("Form 8814 and a below-threshold 1099-DIV trigger Schedule B once", as
   );
   assertStringIncludes(xml, "<IRS8814");
   const xsdPath = new URL(
-    "../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+    "../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
     import.meta.url,
   ).pathname;
   try {
-    await Deno.stat(xsdPath);
+    await sys.stat(xsdPath);
   } catch {
     throw new Error(`Missing verification prerequisite: ${xsdPath}`);
   }
-  const path = await Deno.makeTempFile({ suffix: ".xml" });
+  const path = await sys.makeTempFile({ suffix: ".xml" });
   try {
-    await Deno.writeTextFile(path, xml);
-    const checked = await new Deno.Command("xmllint", {
+    await fs.writeFile(path, xml);
+    const checked = await new sys.Command("xmllint", {
       args: ["--noout", "--schema", xsdPath, path],
       stdout: "piped",
       stderr: "piped",
     }).output();
     assertEquals(checked.code, 0, new TextDecoder().decode(checked.stderr));
   } finally {
-    await Deno.remove(path);
+    await sys.remove(path);
   }
 });
 
-Deno.test("Form 8814 investment income cannot enter the limited Form 4952 export route", () => {
+test("Form 8814 investment income cannot enter the limited Form 4952 export route", () => {
   const result = execute(buildExecutionPlan(registry), registry, {
     schedule_b_part_iii: {
       foreign_accounts_question: false,

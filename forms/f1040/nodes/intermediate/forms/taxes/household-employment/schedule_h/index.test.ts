@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import { schedule_h } from "./index.ts";
 
@@ -76,7 +77,7 @@ const nonstudentMinorFuta = {
   },
 };
 
-Deno.test("Schedule H unrelated nonstudent minor's principal household work owes FICA and FUTA", () => {
+test("Schedule H unrelated nonstudent minor's principal household work owes FICA and FUTA", () => {
   assertEquals(
     findOutput(compute(nonstudentMinorFuta), "schedule2")?.fields
       .line9_household_employment,
@@ -113,7 +114,7 @@ Deno.test("Schedule H unrelated nonstudent minor's principal household work owes
   );
 });
 
-Deno.test("Schedule H unrelated student minor owes FUTA without FICA", () => {
+test("Schedule H unrelated student minor owes FUTA without FICA", () => {
   assertEquals(
     findOutput(compute(studentMinorFuta), "schedule2")?.fields
       .line9_household_employment,
@@ -151,19 +152,19 @@ Deno.test("Schedule H unrelated student minor owes FUTA without FICA", () => {
 
 // ─── Smoke Tests ─────────────────────────────────────────────────────────────
 
-Deno.test("smoke — empty input returns no outputs", () => {
+test("smoke — empty input returns no outputs", () => {
   const result = compute({});
   assertEquals(result.outputs.length, 0);
 });
 
-Deno.test("zero wages → no tax", () => {
+test("zero wages → no tax", () => {
   const result = compute({ ss_wages: 0, medicare_wages: 0 });
   assertEquals(result.outputs.length, 0);
 });
 
 // ─── Explicit taxable wage lines ────────────────────────────────────────────
 
-Deno.test("total payroll alone cannot determine each employee's FICA wages", () => {
+test("total payroll alone cannot determine each employee's FICA wages", () => {
   assertThrows(
     () => compute({ total_cash_wages: 2_000 }),
     Error,
@@ -171,7 +172,7 @@ Deno.test("total payroll alone cannot determine each employee's FICA wages", () 
   );
 });
 
-Deno.test("2,800 of already-taxable wages produces the form-line tax", () => {
+test("2,800 of already-taxable wages produces the form-line tax", () => {
   // Employer SS: $2,800 × 6.2% = $173.60
   // Employer Medicare: $2,800 × 1.45% = $40.60
   // Employee SS: $2,800 × 6.2% = $173.60
@@ -182,7 +183,7 @@ Deno.test("2,800 of already-taxable wages produces the form-line tax", () => {
   assertEquals(s2?.fields.line9_household_employment, 428);
 });
 
-Deno.test("10,000 of already-taxable wages produces the full combined tax", () => {
+test("10,000 of already-taxable wages produces the full combined tax", () => {
   // Full FICA: 15.3% × $10,000 = $1,530.
   const result = compute({ ss_wages: 10_000, medicare_wages: 10_000 });
   const s2 = findOutput(result, "schedule2");
@@ -191,7 +192,7 @@ Deno.test("10,000 of already-taxable wages produces the full combined tax", () =
 
 // ─── FICA Tax Computation ─────────────────────────────────────────────────────
 
-Deno.test("ambiguous aggregate FICA wages require both taxable wage lines", () => {
+test("ambiguous aggregate FICA wages require both taxable wage lines", () => {
   assertThrows(
     () => compute({ fica_wages: 10_000 }),
     Error,
@@ -199,7 +200,7 @@ Deno.test("ambiguous aggregate FICA wages require both taxable wage lines", () =
   );
 });
 
-Deno.test("explicit ss_wages and medicare_wages — computed separately", () => {
+test("explicit ss_wages and medicare_wages — computed separately", () => {
   // SS wages $10,000, Medicare wages $10,000
   // Same as above: $1,530
   const result = compute({
@@ -210,7 +211,7 @@ Deno.test("explicit ss_wages and medicare_wages — computed separately", () => 
   assertEquals(s2?.fields.line9_household_employment, 1_530);
 });
 
-Deno.test("aggregate taxable SS wages from multiple employees are not capped again", () => {
+test("aggregate taxable SS wages from multiple employees are not capped again", () => {
   // Each employee's wage base has already been applied to the line 1 input.
   // Medicare employer+employee: $200,000 × 2.9% = $5,800
   // Total: $24,800 + $5,800 = $30,600.
@@ -223,7 +224,7 @@ Deno.test("aggregate taxable SS wages from multiple employees are not capped aga
   assertEquals(tax, 30_600);
 });
 
-Deno.test("Additional Medicare Tax applies only to sourced per-employee excess wages", () => {
+test("Additional Medicare Tax applies only to sourced per-employee excess wages", () => {
   const result = compute({
     ss_wages: 176_100,
     medicare_wages: 220_000,
@@ -256,7 +257,7 @@ Deno.test("Additional Medicare Tax applies only to sourced per-employee excess w
 
 // ─── Federal Income Tax Withheld ─────────────────────────────────────────────
 
-Deno.test("federal income tax withheld adds to total", () => {
+test("federal income tax withheld adds to total", () => {
   // $10,000 FICA wages → $1,530 FICA + $1,000 federal withheld = $2,530
   const result = compute({
     ss_wages: 10_000,
@@ -267,7 +268,7 @@ Deno.test("federal income tax withheld adds to total", () => {
   assertEquals(s2?.fields.line9_household_employment, 2_530);
 });
 
-Deno.test("one-worker FICA-only payroll reaches Schedule 2 without FUTA", () => {
+test("one-worker FICA-only payroll reaches Schedule 2 without FUTA", () => {
   const source = {
     cash_wages_over_2025_limit: true,
     cash_wages_over_quarter_limit: false,
@@ -317,7 +318,7 @@ Deno.test("one-worker FICA-only payroll reaches Schedule 2 without FUTA", () => 
 
 // ─── FUTA ─────────────────────────────────────────────────────────────────────
 
-Deno.test("single-state Section A FUTA is 0.6% of taxable wages", () => {
+test("single-state Section A FUTA is 0.6% of taxable wages", () => {
   // $10,000 FICA wages plus $7,000 taxable FUTA wages.
   const result = compute({
     ss_wages: 10_000,
@@ -353,7 +354,7 @@ Deno.test("single-state Section A FUTA is 0.6% of taxable wages", () => {
   assertEquals(s2?.fields.line9_household_employment, 1_572);
 });
 
-Deno.test("Section B FUTA routes the credit-reduced tax to Schedule 2", () => {
+test("Section B FUTA routes the credit-reduced tax to Schedule 2", () => {
   const result = compute({
     cash_wages_over_quarter_limit: true,
     federal_unemployment: {
@@ -396,7 +397,7 @@ Deno.test("Section B FUTA routes the credit-reduced tax to Schedule 2", () => {
 
 // ─── Explicit Withholding Amounts ────────────────────────────────────────────
 
-Deno.test("employee withholding fields cannot override Schedule H tax", () => {
+test("employee withholding fields cannot override Schedule H tax", () => {
   assertThrows(
     () =>
       compute({
@@ -412,7 +413,7 @@ Deno.test("employee withholding fields cannot override Schedule H tax", () => {
 
 // ─── Combined Scenario ────────────────────────────────────────────────────────
 
-Deno.test("combined: FICA + federal withholding + Section A FUTA", () => {
+test("combined: FICA + federal withholding + Section A FUTA", () => {
   // FICA wages $20,000:
   // Employer+Employee SS: $20,000 × 12.4% = $2,480
   // Employer+Employee Medicare: $20,000 × 2.9% = $580
@@ -458,7 +459,7 @@ Deno.test("combined: FICA + federal withholding + Section A FUTA", () => {
   assertEquals(s2?.fields.line9_household_employment, 5_102);
 });
 
-Deno.test("Schedule H unrelated-worker withholding requires a distinct reviewed W-4 in both payroll routes", () => {
+test("Schedule H unrelated-worker withholding requires a distinct reviewed W-4 in both payroll routes", () => {
   const ficaOnly = {
     cash_wages_over_2025_limit: true,
     cash_wages_over_quarter_limit: false,
@@ -567,14 +568,14 @@ Deno.test("Schedule H unrelated-worker withholding requires a distinct reviewed 
 
 // ─── Output Routing ───────────────────────────────────────────────────────────
 
-Deno.test("output routes to schedule2 line9_household_employment", () => {
+test("output routes to schedule2 line9_household_employment", () => {
   // $5,000 FICA wages → 15.3% = $765
   const result = compute({ ss_wages: 5_000, medicare_wages: 5_000 });
   const s2 = findOutput(result, "schedule2");
   assertEquals(s2?.fields.line9_household_employment, 765);
 });
 
-Deno.test("FUTA payroll applies the $7,000 cap separately to each sourced employee", () => {
+test("FUTA payroll applies the $7,000 cap separately to each sourced employee", () => {
   const unemployment = {
     paid_only_one_state: true,
     all_contributions_paid_on_time: true,
@@ -696,7 +697,7 @@ Deno.test("FUTA payroll applies the $7,000 cap separately to each sourced employ
   );
 });
 
-Deno.test("FUTA quarter test accepts a documented prior-year threshold only when current quarters are below $1,000", () => {
+test("FUTA quarter test accepts a documented prior-year threshold only when current quarters are below $1,000", () => {
   const federal_unemployment = {
     paid_only_one_state: true,
     all_contributions_paid_on_time: true,
@@ -736,4 +737,85 @@ Deno.test("FUTA quarter test accepts a documented prior-year threshold only when
     )?.fields.line9_household_employment,
     5,
   );
+});
+
+// ── TY2026 ───────────────────────────────────────────────────────────────────
+// Draft 2026 Schedule H (irs/corpus/ty2026/draft/f1040sh.pdf) line A and
+// MeF 2026v1.0 rules SH-F1040-008-11/009-11: the cash-wage threshold is
+// $3,000. Lines 2 and 4: 12.4% and 2.9% of the cash wages.
+
+function compute2026(input: Record<string, unknown>) {
+  return schedule_h.compute({ taxYear: 2026, formType: "f1040" }, input);
+}
+
+function ficaOnly2026(wages: number, taxableWages: number) {
+  return {
+    cash_wages_over_2025_limit: taxableWages > 0,
+    cash_wages_over_quarter_limit: false,
+    ss_wages: taxableWages,
+    medicare_wages: taxableWages,
+    fica_only_payroll: {
+      all_household_employees_included: true,
+      prior_year_payroll_source_reference: "2025-synthetic-payroll-review",
+      prior_year_quarter_cash_wages: [0, 0, 0, 0],
+      employee_wages: [{
+        employee_id: "synthetic-worker-1",
+        payroll_source_reference: "2026-synthetic-payroll-review",
+        relationship: "unrelated",
+        age_18_or_older_for_fica: true,
+        ordinary_cash_only: true,
+        annual_cash_wages: wages,
+        quarterly_cash_wages: [wages / 4, wages / 4, wages / 4, wages / 4],
+        w2: {
+          source_reference: "2026-synthetic-household-w2",
+          box2_federal_income_tax_withheld: 0,
+          box3_social_security_wages: taxableWages,
+          box5_medicare_wages: taxableWages,
+        },
+      }],
+    },
+  };
+}
+
+test("2026: FICA-only payroll taxes $3,600 of cash wages", () => {
+  // $446 Social Security plus $104 Medicare.
+  assertEquals(
+    findOutput(compute2026(ficaOnly2026(3_600, 3_600)), "schedule2")?.fields
+      .line9_household_employment,
+    550,
+  );
+});
+
+test("2026: cash wages below $3,000 are not FICA wages", () => {
+  assertEquals(compute2026(ficaOnly2026(2_996, 0)).outputs, []);
+  assertThrows(
+    () => compute2026(ficaOnly2026(2_996, 2_996)),
+    Error,
+    "W-2 FICA wages differ from payroll",
+  );
+  // TY2025's $2,800 threshold taxed the same wages: $372 + $87.
+  assertEquals(
+    findOutput(compute(ficaOnly2026(2_996, 2_996)), "schedule2")?.fields
+      .line9_household_employment,
+    459,
+  );
+});
+
+test("2026: FUTA and minor classifications stay refused", () => {
+  assertThrows(
+    () =>
+      compute2026({
+        ...ficaOnly2026(3_600, 3_600),
+        fica_only_payroll: {
+          ...ficaOnly2026(3_600, 3_600).fica_only_payroll,
+          employee_wages: [{
+            ...ficaOnly2026(3_600, 3_600).fica_only_payroll.employee_wages[0],
+            age_18_or_older_for_fica: false,
+          }],
+        },
+      }),
+    Error,
+    "minor FICA classifications are not supported for 2026",
+  );
+  assertThrows(() => compute2026(studentMinorFuta), Error);
 });

@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import { FilingStatus } from "../../../../../types.ts";
 import { FilingStatus as HeaderFilingStatus } from "../../../../../../mef/header.ts";
@@ -75,7 +76,7 @@ function aggregationInput() {
       tax_year_end: "2025-12-31",
       tax_year_end_source_reference: "calendar-year-ledger",
       election_history: {
-        status: "new_2025",
+        status: "new_election",
         no_prior_election_confirmed: true,
       },
       annual_disclosure: {
@@ -124,7 +125,7 @@ function aggregationInput() {
         ubia: 100_000,
         owner_share_pct: 100,
         ownership_start_date: "2020-01-01",
-        owned_on_2025_12_31: true,
+        owned_on_tax_year_end: true,
         ownership_source_reference: "north-ownership-ledger",
         qbi_adjustments: {
           deductible_se_tax: 5_000,
@@ -147,7 +148,7 @@ function aggregationInput() {
         ubia: 100_000,
         owner_share_pct: 100,
         ownership_start_date: "2025-01-01",
-        owned_on_2025_12_31: true,
+        owned_on_tax_year_end: true,
         ownership_source_reference: "south-ownership-ledger",
         qbi_adjustments: {
           deductible_se_tax: 4_000,
@@ -204,9 +205,9 @@ function stagedContext() {
   };
 }
 
-Deno.test("Schedule B evidence derives two member totals and emits companion", () => {
+test("Schedule B evidence derives two member totals and emits companion", () => {
   const input = aggregationInput();
-  const derived = validateTwoBusinessAggregationSource(input);
+  const derived = validateTwoBusinessAggregationSource(input, 2025);
   assertEquals(derived.qbi, 171_000);
   assertEquals(derived.w2Wages, 30_000);
   assertEquals(derived.ubia, 200_000);
@@ -218,7 +219,7 @@ Deno.test("Schedule B evidence derives two member totals and emits companion", (
   );
 });
 
-Deno.test("Schedule B source rejects changed member amounts and duplicate factors", () => {
+test("Schedule B source rejects changed member amounts and duplicate factors", () => {
   const input = aggregationInput();
   assertThrows(
     () =>
@@ -231,7 +232,7 @@ Deno.test("Schedule B source rejects changed member amounts and duplicate factor
             index,
           ) => index === 0 ? { ...member, qbi: member.qbi + 1 } : member),
         },
-      })),
+      }), 2025),
     Error,
     "member QBI, wages, UBIA",
   );
@@ -246,13 +247,13 @@ Deno.test("Schedule B source rejects changed member amounts and duplicate factor
             input.aggregation_filing_details!.operational_factors[0],
           ],
         },
-      })),
+      }), 2025),
     Error,
     "distinct sourced operational factors",
   );
 });
 
-Deno.test("Schedule B requires reviewed allocation and no other business adjustments", () => {
+test("Schedule B requires reviewed allocation and no other business adjustments", () => {
   const input = aggregationInput();
   assertThrows(() =>
     inputSchema.parse({
@@ -287,7 +288,7 @@ Deno.test("Schedule B requires reviewed allocation and no other business adjustm
   );
 });
 
-Deno.test("Schedule B source rejects short ownership and mismatched election names", () => {
+test("Schedule B source rejects short ownership and mismatched election names", () => {
   const input = aggregationInput();
   assertThrows(
     () =>
@@ -304,7 +305,7 @@ Deno.test("Schedule B source rejects short ownership and mismatched election nam
               : member
           ),
         },
-      })),
+      }), 2025),
     Error,
     "majority-year ownership",
   );
@@ -316,13 +317,13 @@ Deno.test("Schedule B source rejects short ownership and mismatched election nam
           ...input.aggregation_groups![0],
           business_names: ["North Store", "Unknown"],
         }],
-      })),
+      }), 2025),
     Error,
     "member identities",
   );
 });
 
-Deno.test("staged Schedule B and aggregated parent derive matching native and PDF values", () => {
+test("staged Schedule B and aggregated parent derive matching native and PDF values", () => {
   const { input, filer, pending, context } = stagedContext();
   const parentXml = buildStagedAggregatedIRS8995A(input, context);
   const scheduleXml = buildStagedIRS8995AScheduleB(input, context);
@@ -339,7 +340,10 @@ Deno.test("staged Schedule B and aggregated parent derive matching native and PD
   );
   assertStringIncludes(scheduleXml, "<EIN>123456789</EIN>");
   assertStringIncludes(scheduleXml, "<EIN>987654321</EIN>");
-  assertStringIncludes(scheduleXml, "<PriorYearChangeDesc>South Store acquired 2025-01-01</PriorYearChangeDesc>");
+  assertStringIncludes(
+    scheduleXml,
+    "<PriorYearChangeDesc>South Store acquired 2025-01-01</PriorYearChangeDesc>",
+  );
   assertStringIncludes(
     scheduleXml,
     "<TotQlfyBusinessIncomeOrLossAmt>171000</TotQlfyBusinessIncomeOrLossAmt>",
@@ -359,7 +363,7 @@ Deno.test("staged Schedule B and aggregated parent derive matching native and PD
   assertEquals(schedulePdf?.total_qbi, 171_000);
 });
 
-Deno.test("staged Schedule B refuses missing companion, changed Schedule C, and wrong filer", () => {
+test("staged Schedule B refuses missing companion, changed Schedule C, and wrong filer", () => {
   const { input, filer, pending, context } = stagedContext();
   assertThrows(
     () =>
@@ -413,6 +417,23 @@ Deno.test("staged Schedule B refuses missing companion, changed Schedule C, and 
         pending: {
           ...pending,
           f1040: { ...pending.f1040, line3a_qualified_dividends: 100 },
+        },
+      }),
+    Error,
+    // Dividends with no retained investment source fail before reconciliation.
+    "Aggregation capital limit needs retained investment sources",
+  );
+  assertThrows(
+    () =>
+      buildStagedIRS8995AScheduleB(input, {
+        ...context,
+        pending: {
+          ...pending,
+          f1040: {
+            ...pending.f1040,
+            line15_taxable_income:
+              (pending.f1040?.line15_taxable_income as number) + 1,
+          },
         },
       }),
     Error,

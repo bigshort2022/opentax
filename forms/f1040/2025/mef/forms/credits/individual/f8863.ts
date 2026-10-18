@@ -20,6 +20,7 @@ import {
   validateForm8863FilingSource,
 } from "../../../../../nodes/inputs/credits/individual/f8863/index.ts";
 import type { MefBuildContext, MefFormDescriptor } from "../../../form-descriptor.ts";
+import { mefTaxYear } from "../../../support/year-config.ts";
 
 export function assertForm8863FinalizedReturn(
   fields: F8863Input,
@@ -292,7 +293,11 @@ export function assertForm8863FinalizedReturn(
     fields,
     pending,
     filer.primarySSN,
-    (source) => educationDependentSourceEligible(dependentSchema.parse(source)),
+    (source) =>
+      educationDependentSourceEligible(
+        dependentSchema.parse(source),
+        mefTaxYear(context),
+      ),
     filer.spouse?.ssn,
   );
 }
@@ -338,7 +343,11 @@ function institutionXml(
   ]);
 }
 
-function studentXml(item: F8863Item, credit: "aoc" | "llc"): string {
+function studentXml(
+  item: F8863Item,
+  credit: "aoc" | "llc",
+  taxYear: number,
+): string {
   const details = item.filing_details;
   const ssn = item.student_ssn?.replaceAll("-", "");
   if (!details || !ssn || !/^\d{9}$/.test(ssn)) {
@@ -370,7 +379,7 @@ function studentXml(item: F8863Item, credit: "aoc" | "llc"): string {
       "Form 8863 AOC filing needs explicit eligibility and under-24 answers",
     );
   }
-  validateForm8863FilingSource(item, credit);
+  validateForm8863FilingSource(item, credit, taxYear);
   const aoc = credit === "aoc"
     ? calculateAocStudentLines(item.aoc_adjusted_expenses ?? 0)
     : null;
@@ -417,7 +426,7 @@ export const form8863: MefFormDescriptor<"f8863", F8863Input> = {
         "Married filing separately cannot file an education credit claim source",
       );
     }
-    const lines = calculateForm8863Lines(fields);
+    const lines = calculateForm8863Lines(fields, mefTaxYear(context));
     if (!lines || (lines.line8 === 0 && lines.line19 === 0)) return "";
     const students = [
       ...lines.aocStudents.map((item) => ({ item, credit: "aoc" as const })),
@@ -463,7 +472,9 @@ export const form8863: MefFormDescriptor<"f8863", F8863Input> = {
         element("CalcTentativeEducationCrAmt", lines.line18),
         element("NonrefundableEducationCrAmt", lines.line19),
       ]),
-      ...students.map(({ item, credit }) => studentXml(item, credit)),
+      ...students.map(({ item, credit }) =>
+        studentXml(item, credit, mefTaxYear(context))
+      ),
     ]);
     assertForm8863FinalizedReturn(fields, lines, context);
     return xml;

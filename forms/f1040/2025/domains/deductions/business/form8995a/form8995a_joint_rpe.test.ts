@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { assert, assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { f1040_2025 } from "../../../../index.ts";
 import { extractFilerIdentity } from "../../../../../mef/filer.ts";
@@ -10,10 +13,9 @@ import {
   jointRpeCases,
   jointRpeFixture,
 } from "./form8995a_joint_rpe_fixture.ts";
-// deno-lint-ignore no-explicit-any
 type Row = Record<string, any>;
 for (const c of jointRpeCases) {
-  Deno.test(`issued RPE ${c.name}: actual owner, phased limit, intact copies and final tax`, async () => {
+  test(`issued RPE ${c.name}: actual owner, phased limit, intact copies and final tax`, async () => {
     const input = await jointRpeFixture(c);
     const result = f1040_2025.executeReturn(input);
     assertEquals(result.diagnostics, []);
@@ -59,7 +61,7 @@ for (const c of jointRpeCases) {
       tax - payments,
     ]);
     const fields = inputSchema.parse(pending.form8995a);
-    const lines = calculateTwoBusinessAggregationLines(fields);
+    const lines = calculateTwoBusinessAggregationLines(fields, 2025);
     const phase = c.count === 4 && c.wages === 100000;
     assertEquals(lines.parent.phaseInRequired, phase);
     assertEquals(lines.parent.line39, c.deduction);
@@ -75,14 +77,14 @@ for (const c of jointRpeCases) {
       calculateTwoBusinessAggregationLines({
         ...fields,
         taxable_income: 394600,
-      })
+      }, 2025)
     );
     if (c.count === 4) {
       for (const excess of [1, 99999, 100000, 100001]) {
         const p = calculateTwoBusinessAggregationLines({
           ...fields,
           taxable_income: 394600 + excess,
-        }).parent;
+        }, 2025).parent;
         assertEquals(
           p.line39,
           excess <= 100000 ? 70000 - Math.round(3750 * excess / 100000) : 66250,
@@ -108,17 +110,11 @@ for (const c of jointRpeCases) {
       (xml.match(/<BusinessAggregationInfoGrp>/g) ?? []).length,
       c.count,
     );
-    const permission = await Deno.permissions.query({
-      name: "env",
-      variable: "JOINT_RPE_EVIDENCE",
-    });
-    const root = permission.state === "granted"
-      ? Deno.env.get("JOINT_RPE_EVIDENCE")
-      : undefined;
-    const dir = root ? `${root}/${c.name}` : await Deno.makeTempDir();
-    await Deno.mkdir(dir, { recursive: true });
+    const root = process.env.JOINT_RPE_EVIDENCE;
+    const dir = root ? `${root}/${c.name}` : await sys.makeTempDir();
+    await fs.mkdir(dir, { recursive: true });
     try {
-      await Deno.writeTextFile(
+      await fs.writeFile(
         `${dir}/source.json`,
         JSON.stringify(
           { input, filer, pending: prepared.bundle.pending },
@@ -126,9 +122,9 @@ for (const c of jointRpeCases) {
           2,
         ),
       );
-      await Deno.writeTextFile(`${dir}/return.xml`, xml);
+      await fs.writeFile(`${dir}/return.xml`, xml);
       const origins: Parameters<typeof buildPdfBytes>[4] = [];
-      await Deno.writeFile(
+      await fs.writeFile(
         `${dir}/return.pdf`,
         await buildPdfBytes(
           prepared.bundle.pending,
@@ -138,24 +134,24 @@ for (const c of jointRpeCases) {
           origins,
         ),
       );
-      await Deno.writeTextFile(
+      await fs.writeFile(
         `${dir}/origins.json`,
         JSON.stringify(origins, null, 2),
       );
-      await Deno.writeFile(
+      await fs.writeFile(
         `${dir}/annual.pdf`,
         prepared.bundle.attachments[0].bytes,
       );
-      await Deno.writeFile(
+      await fs.writeFile(
         `${dir}/issued.pdf`,
         prepared.bundle.attachments[1].bytes,
       );
-      const xsd = await new Deno.Command("xmllint", {
+      const xsd = await new sys.Command("xmllint", {
         args: [
           "--noout",
           "--schema",
           new URL(
-            "../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+            "../../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
             import.meta.url,
           ).pathname,
           `${dir}/return.xml`,
@@ -163,7 +159,7 @@ for (const c of jointRpeCases) {
         stdout: "piped",
         stderr: "piped",
       }).output();
-      await Deno.writeFile(`${dir}/xsd.log`, xsd.stderr);
+      await fs.writeFile(`${dir}/xsd.log`, xsd.stderr);
       assertEquals(xsd.code, 0, new TextDecoder().decode(xsd.stderr));
       for (
         const kind of [
@@ -214,7 +210,7 @@ for (const c of jointRpeCases) {
         );
       }
     } finally {
-      if (!root) await Deno.remove(dir, { recursive: true });
+      if (!root) await sys.remove(dir, { recursive: true });
     }
     for (const kind of ["missing-spouse", "foreign-owner", "duplicate-owner"]) {
       const changed = structuredClone(input);

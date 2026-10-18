@@ -1,3 +1,4 @@
+import { roundWholeDollars } from "../../../../../../whole-dollars.ts";
 import { inputSchema as w2SourceSchema } from "../../../../../../nodes/inputs/income/wages/w2/index.ts";
 import { assertQualifiedTipQbiSource } from "../../../../../domains/deductions/business/form8995/form8995_qualified_tip_source.ts";
 import { assertIndependentOwnerHealth } from "../../../../../domains/adjustments/health/form7206/form7206_independent_owner_source.ts";
@@ -6,6 +7,8 @@ import { assertOwnedScheduleSE } from "../../../../../domains/taxes/self-employm
 import { jointOwnerQbi } from "../../../../../../nodes/intermediate/forms/deductions/business/form8995/joint-owner.ts";
 import { CONFIG_BY_YEAR } from "../../../../../../nodes/config/index.ts";
 import type { Filed8995 } from "./f8995-route.ts";
+import { assertMultiBusinessInvestmentSources } from "./f8995-investment.ts";
+import { inputSchema as form8995InputSchema } from "../../../../../../nodes/intermediate/forms/deductions/business/form8995/index.ts";
 import {
   calculateSingleScheduleCForm7206,
   reconcileSingleScheduleCGraphSource,
@@ -19,10 +22,13 @@ import { extractFilerIdentity } from "../../../../../../mef/filer.ts";
 export function assertJointOwner8995(
   fields: Record<string, unknown>,
   raw: Readonly<Record<string, unknown>> | undefined,
+  taxYear: number,
 ): Filed8995 {
   if (!raw) throw new Error("Joint owner QBI needs the complete source return");
+  const cfg = CONFIG_BY_YEAR[taxYear];
+  if (!cfg) throw new Error(`No f1040 config for year ${taxYear}`);
   const p = normalizeAllPending(raw as Record<string, unknown>);
-  const owned = assertOwnedScheduleSE(p);
+  const owned = assertOwnedScheduleSE(p, taxYear);
   const f = p.f1040;
   const g = p.general;
   if (
@@ -50,7 +56,7 @@ export function assertJointOwner8995(
   const rawFamily = p.form7206?.independent_schedule_c_plans;
   const family = rawFamily === undefined
     ? undefined
-    : assertIndependentOwnerHealth(p);
+    : assertIndependentOwnerHealth(p, taxYear);
   const rawPlan = p.form7206?.single_schedule_c_plan;
   const plan = rawPlan === undefined
     ? undefined
@@ -109,16 +115,34 @@ export function assertJointOwner8995(
       "Joint Form8995 health adjustment must join the actual sourced Form7206 plan",
     );
   }
-  const tips = assertQualifiedTipQbiSource(fields, p);
+  const tips = assertQualifiedTipQbiSource(fields, p, taxYear);
   const additional = Number(f.line13b_additional_deductions ?? 0);
+  // Ordinary interest, dividends and capital sales replay from their copies;
+  // they enter AGI on lines 2b, 3b and 7 and Form 8995 line 12 (i8995).
+  const investment = [p.f1099int, p.f1099div, p.f1099b, p.schedule_d]
+      .some((source) => source !== undefined)
+    ? assertMultiBusinessInvestmentSources(
+      form8995InputSchema.parse(fields),
+      p,
+      taxYear,
+      false,
+      String(g.spouse_ssn ?? ""),
+      false,
+    )
+    : undefined;
+  const investmentAgi = investment === undefined ? 0 : roundWholeDollars(
+    investment.interest,
+  ) + roundWholeDollars(investment.ordinary) +
+    roundWholeDollars(investment.returnCapital);
   const expected = jointOwnerQbi(
     owned.source,
     f.line11_agi - f.line12c_deduction_total - additional,
-    CONFIG_BY_YEAR[2025].ssWageBase,
+    cfg.ssWageBase,
     plan,
     health,
     family?.source,
     tips.source,
+    investment?.filedQbiCapitalLimit ?? 0,
   );
   if (
     canonical(fields.joint_se_source) !== canonical(owned.source) ||
@@ -127,8 +151,12 @@ export function assertJointOwner8995(
     g.qbi_no_prior_loss_or_suspended_loss_confirmed !== true ||
     g.qbi_not_patron_of_specified_cooperative_confirmed !== true ||
     g.filing_status !== "mfj" || fields.filing_status !== "mfj" ||
-    Math.abs(f.line11_agi - (wages + profit - owned.deduction - health)) >=
-      .000001 ||
+    // AGI adds the whole-dollar lines 1z, 2b, 3b and 7, not source cents.
+    Math.abs(
+        f.line11_agi -
+          (roundWholeDollars(wages) + investmentAgi + profit -
+            owned.deduction - health),
+      ) >= .000001 ||
     Number(f.line10_adjustments ?? 0) !== owned.deduction + health ||
     Number(f.line1a_wages ?? 0) !== wages ||
     Number(f.line13_qbi_deduction ?? 0) !== expected.line15 ||
@@ -150,13 +178,14 @@ export function assertJointOwner8995(
       "sep_retirement",
       "form8995a",
     ].some((key) => p[key] !== undefined) ||
-    [
-      "line2b_taxable_interest",
-      "line3a_qualified_dividends",
-      "line3b_ordinary_dividends",
-      "line7_capital_gain",
-      "line7a_cap_gain_distrib",
-    ].some((key) => Number(f[key] ?? 0) !== 0)
+    (investment === undefined &&
+      [
+        "line2b_taxable_interest",
+        "line3a_qualified_dividends",
+        "line3b_ordinary_dividends",
+        "line7_capital_gain",
+      ].some((key) => Number(f[key] ?? 0) !== 0)) ||
+    Number(f.line7a_cap_gain_distrib ?? 0) !== 0
   ) {
     throw new Error(
       "Joint owner Form8995 source, attributable deduction, business rows or Form1040 totals differ",

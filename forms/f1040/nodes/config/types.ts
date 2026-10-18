@@ -2,6 +2,52 @@
 import type { FilingStatus } from "../types.ts";
 import type { Bracket } from "./2025.ts";
 
+/** IRC §32(b) amounts for one qualifying-child count. */
+export type EitcParameters = {
+  readonly creditRate: number;
+  readonly phaseoutRate: number;
+  readonly earnedIncomeAmount: number;
+  readonly maxCredit: number;
+  readonly phaseoutStart: number;
+  readonly phaseoutStartMfj: number;
+  readonly phaseoutEnd: number;
+  readonly phaseoutEndMfj: number;
+};
+
+/** Standard mileage rates in dollars per mile, from `from` (ISO date) on. */
+export type MileagePeriod = {
+  readonly from: string;
+  readonly business: number;
+  readonly medicalMoving: number;
+  readonly charitable: number;
+};
+
+/** IRC §21(a)(2)(B) as amended for 2026: the second applicable-percentage step. */
+export type DepCareSecondPhaseout = {
+  readonly agiThreshold: number;
+  readonly agiThresholdMfj: number;
+  readonly bracketSize: number;
+  readonly bracketSizeMfj: number;
+  readonly floorRate: number;
+};
+
+/** IRC §36B(b)(3)(A) applicable percentage band, in hundredths of a percent. */
+export type PtcApplicablePercentageBand = {
+  /** Household income as a percentage of the FPL: at least this. */
+  readonly fromFplPct: number;
+  /** Less than this; the last band includes it. */
+  readonly toFplPct: number;
+  readonly initial: number;
+  readonly final: number;
+};
+
+/** IRC §36B(f)(2)(B) repayment limitation below `maxFplPct`. */
+export type PtcRepaymentCap = {
+  readonly maxFplPct: number;
+  readonly singleCap: number;
+  readonly otherCap: number;
+};
+
 export interface F1040Config {
   // ── Tax brackets ──────────────────────────────────────────────────────────
   bracketsMfj: ReadonlyArray<Bracket>;
@@ -38,6 +84,16 @@ export interface F1040Config {
   additionalMedicareThresholdMfs: number;
   additionalMedicareThresholdOther: number;
 
+  // ── Schedule SE optional methods ─────────────────────────────────────────
+  /** Part II line 14: maximum income for the optional methods. */
+  seOptionalMethodMaximum: number;
+  /**
+   * The farm optional method is available when gross farm income is at most
+   * the first amount or net farm profits are below the second.
+   */
+  seFarmOptionalGrossIncomeLimit: number;
+  seFarmOptionalNetProfitLimit: number;
+
   // ── NIIT ──────────────────────────────────────────────────────────────────
   niitThresholdMfj: number;
   niitThresholdMfs: number;
@@ -63,11 +119,20 @@ export interface F1040Config {
   // ── QBI ───────────────────────────────────────────────────────────────────
   qbiThresholdSingle: number;
   qbiThresholdMfj: number;
+  /** Equal to the single amount through TY2025; $25 above it in TY2026. */
+  qbiThresholdMfs: number;
   /** Section 199A phase-in range for joint returns; other statuses use half. */
   qbiPhaseInRange: number;
 
   // ── EITC ──────────────────────────────────────────────────────────────────
   eitcInvestmentIncomeLimit: number;
+  /** Indexed by qualifying children: 0, 1, 2, 3 or more. */
+  eitcByChildren: readonly [
+    EitcParameters,
+    EitcParameters,
+    EitcParameters,
+    EitcParameters,
+  ];
 
   // ── CTC / ACTC ────────────────────────────────────────────────────────────
   ctcPerChild: number;
@@ -103,7 +168,9 @@ export interface F1040Config {
   luxuryAutoYear1NoBonus: number;
   luxuryAutoYear1WithBonus: number;
   luxuryAutoYear2: number;
+  /** Third recovery year; later years use `luxuryAutoSucceedingYears`. */
   luxuryAutoYear3Plus: number;
+  luxuryAutoSucceedingYears: number;
 
   // ── Household Employment (Schedule H) ─────────────────────────────────────
   householdFicaThreshold: number;
@@ -124,6 +191,11 @@ export interface F1040Config {
   depCareEmployerExclusionMfs: number;
   depCareCreditRateAgiThreshold: number;
   depCareCreditRateBracketSize: number;
+  depCareCreditMaxRate: number;
+  /** Floor of the first reduction step. */
+  depCareCreditFirstFloorRate: number;
+  /** null when the year has a single reduction step. */
+  depCareCreditSecondPhaseout: DepCareSecondPhaseout | null;
 
   // ── ACA Premium Tax Credit (8962) ─────────────────────────────────────────
   fplBase: number;
@@ -182,4 +254,71 @@ export interface F1040Config {
   sepContributionRate: number;
   sepMaxContribution: number;
   simpleEmployerMatchRate: number;
+
+  // ── Schedule 1-A: tips, overtime, vehicle loan interest ──────────────────
+  qualifiedTipsCap: number;
+  qualifiedOvertimeCap: number;
+  qualifiedOvertimeCapMfj: number;
+  tipsOvertimePhaseoutThreshold: number;
+  tipsOvertimePhaseoutThresholdMfj: number;
+  /** Reduction per whole $1,000 of MAGI over the threshold. */
+  tipsOvertimePhaseoutPerThousand: number;
+  vehicleLoanInterestCap: number;
+  vehicleLoanInterestPhaseoutThreshold: number;
+  vehicleLoanInterestPhaseoutThresholdMfj: number;
+  /** Reduction per $1,000 or portion of MAGI over the threshold. */
+  vehicleLoanInterestPhaseoutPerThousand: number;
+
+  // ── Charitable and itemized-deduction limits ─────────────────────────────
+  /** 1040 line 12f; zero when the year has no non-itemizer deduction. */
+  nonitemizerCharitableLimit: number;
+  nonitemizerCharitableLimitMfj: number;
+  /** Share of the contribution base disallowed under IRC §170(b)(1)(I). */
+  charitableAgiFloorRate: number;
+  /** IRC §68(a) reduction fraction; zero when §68 does not apply. */
+  itemizedDeductionReductionRate: number;
+  /** IRC §163(h)(3)(E): mortgage insurance premiums as residence interest. */
+  mortgageInsurancePremiumsDeductible: boolean;
+
+  // ── QBI minimum deduction (IRC §199A(i)) ─────────────────────────────────
+  qbiMinimumDeduction: number;
+  qbiMinimumDeductionQbiFloor: number;
+
+  // ── Adoption (8839) ──────────────────────────────────────────────────────
+  adoptionCreditMax: number;
+  adoptionCreditRefundableMax: number;
+  adoptionPhaseoutStart: number;
+  adoptionPhaseoutRange: number;
+
+  // ── Dependents and educators ─────────────────────────────────────────────
+  qualifyingRelativeGrossIncomeLimit: number;
+  dependentStandardDeductionFloor: number;
+  dependentStandardDeductionEarnedIncomeAddOn: number;
+  educatorExpenseLimit: number;
+
+  // ── Standard mileage rates ───────────────────────────────────────────────
+  /** Ordered by `from`; a rate applies to miles driven from that date. */
+  standardMileageRates: ReadonlyArray<MileagePeriod>;
+
+  // ── Trump accounts (IRC §§128, 530A) ─────────────────────────────────────
+  trumpAccountContributionLimit: number;
+  trumpAccountEmployerExclusionLimit: number;
+
+  // ── Taxes and payments ───────────────────────────────────────────────────
+  /** AMT exemption reduction per dollar of AMTI over the phase-out start. */
+  amtExemptionPhaseOutRate: number;
+  /** Form 8962 Tables 1-1 (`fplBase`), 1-2 Alaska and 1-3 Hawaii. */
+  fplBaseAlaska: number;
+  fplIncrementAlaska: number;
+  fplBaseHawaii: number;
+  fplIncrementHawaii: number;
+  ptcApplicablePercentages: ReadonlyArray<PtcApplicablePercentageBand>;
+  /** Household income above this FPL percentage gets no PTC; null if none. */
+  ptcIncomeLimitFplPct: number | null;
+  /** IRC §36B(c)(2)(C)(i)(II); also the Pub. 974 QSEHRA affordability test. */
+  ptcRequiredContributionPercentage: number;
+  /** Empty when the year has no repayment limitation. */
+  ptcRepaymentCaps: ReadonlyArray<PtcRepaymentCap>;
+  /** IRC §36B(c)(1)(B): lawfully present individuals below 100% FPL. */
+  ptcLawfullyPresentBelow100Fpl: boolean;
 }

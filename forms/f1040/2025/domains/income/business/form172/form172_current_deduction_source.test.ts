@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertRejects } from "@std/assert";
 import { stageForm172CurrentDeductionSource } from "./form172_current_deduction_source.ts";
 function origin() {
@@ -34,47 +35,6 @@ function origin() {
     capital_gains: [],
     capital_losses: [],
     prior_nol_deductions: [],
-  };
-}
-
-function legacy() {
-  const {
-    noncapital_income,
-    noncapital_deductions,
-    capital_gains,
-    capital_losses,
-    prior_nol_deductions,
-  } = origin();
-  noncapital_deductions[1].amount = 6350;
-  return {
-    source_format: "reviewed_legacy_loss_year",
-    reference: "legacy-origin",
-    tax_year: 2017,
-    taxpayer_ssn: "111223333",
-    filing_status: "single",
-    inventory: {
-      noncapital_income,
-      noncapital_deductions,
-      capital_gains,
-      capital_losses,
-      prior_nol_deductions,
-    },
-    reviewed_form1040: {
-      reference: "return-2017",
-      tax_year: 2017,
-      taxpayer_ssn: "111223333",
-      filing_status: "single",
-      agi: -103000,
-      standard_or_itemized_deduction: 6350,
-      personal_exemptions: 4050,
-      reported_taxable_income: 0,
-    },
-    section199_deduction: { reference: "dpad-review", amount: 3000 },
-    limitations_review: {
-      reference: "historic-limit-review",
-      at_risk_and_passive_limits_applied: true,
-      itemized_phaseout_applied: true,
-    },
   };
 }
 
@@ -216,7 +176,7 @@ async function source(mixedKind = false) {
   };
   return { documents, binding };
 }
-Deno.test("Form172 retained current packages reproduce regular and mixed deduction and closing", async () => {
+test("Form172 retained current packages reproduce regular and mixed deduction and closing", async () => {
   for (const mixedKind of [false, true]) {
     const { documents, binding } = await source(mixedKind);
     const r = await stageForm172CurrentDeductionSource(binding, documents);
@@ -238,7 +198,7 @@ Deno.test("Form172 retained current packages reproduce regular and mixed deducti
     ) assertEquals(flag, false);
   }
 });
-Deno.test("Form172 current source rejects every tampered missing duplicate and extra package", async () => {
+test("Form172 current source rejects every tampered missing duplicate and extra package", async () => {
   for (const mixedKind of [false, true]) {
     const { documents, binding } = await source(mixedKind);
     for (let i = 0; i < documents.length; i++) {
@@ -268,7 +228,7 @@ Deno.test("Form172 current source rejects every tampered missing duplicate and e
     );
   }
 });
-Deno.test("Form172 current source rejects owner year kind and asserted result substitutions", async () => {
+test("Form172 current source rejects owner year kind and asserted result substitutions", async () => {
   const { documents, binding } = await source();
   for (
     const patch of [
@@ -293,7 +253,7 @@ Deno.test("Form172 current source rejects owner year kind and asserted result su
     }, mixedSource.documents)
   );
 });
-Deno.test("Form172 current source recomputes current and historical facts after replacement digest", async () => {
+test("Form172 current source recomputes current and historical facts after replacement digest", async () => {
   const { documents, binding } = await source();
   for (
     const patch of [{ reference: "different" }, {
@@ -336,7 +296,7 @@ Deno.test("Form172 current source recomputes current and historical facts after 
     ])
   );
 });
-Deno.test("Form172 current source rejects noncanonical duplicate keys and invalid UTF8", async () => {
+test("Form172 current source rejects noncanonical duplicate keys and invalid UTF8", async () => {
   const { documents, binding } = await source();
   const text = new TextDecoder().decode(documents[2].bytes);
   for (
@@ -364,7 +324,7 @@ Deno.test("Form172 current source rejects noncanonical duplicate keys and invali
     );
   }
 });
-Deno.test("Form172 current source owns bindings and every byte before first await", async () => {
+test("Form172 current source owns bindings and every byte before first await", async () => {
   const { documents, binding } = await source(true);
   const pending = stageForm172CurrentDeductionSource(binding, documents);
   binding.taxpayer_ssn = "999887777";

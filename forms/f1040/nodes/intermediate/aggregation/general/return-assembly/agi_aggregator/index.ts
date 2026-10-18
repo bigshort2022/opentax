@@ -14,6 +14,7 @@ import { schedule1 } from "../../../../../outputs/general/return-assembly/schedu
 import { scheduleA } from "../../../../../inputs/deductions/itemized/schedule_a/index.ts";
 import { standard_deduction } from "../../../../worksheets/deductions/standard/standard_deduction/index.ts";
 import { eitc } from "../../../../forms/credits/earned-income/eitc/index.ts";
+import { schedule_r } from "../../../../../inputs/credits/elderly-disabled/schedule_r/index.ts";
 import { f8812 } from "../../../../../inputs/credits/child/f8812/index.ts";
 import { f2441 } from "../../../../../inputs/credits/individual/f2441/index.ts";
 import { form8995 } from "../../../../forms/deductions/business/form8995/index.ts";
@@ -227,6 +228,8 @@ export const inputSchema = z.object({
   at_risk_recapture: z.number().nonnegative().optional(),
   // Form 8990 §163(j) disallowed business interest add-back
   biz_interest_disallowed_add_back: z.number().nonnegative().optional(),
+  // Form 461 line 16 excess business loss, added back on Schedule 1 line 8p
+  line8p_excess_business_loss: z.number().nonnegative().optional(),
   // Form 7203 basis disallowance adjusts Schedule 1 line 5 income.
   basis_disallowed_add_back: z.number().nonnegative().optional(),
 
@@ -443,7 +446,8 @@ function nonSsaIncomeBeforePal(input: AgiInput): number {
     (input.line8z_taxable_grants ?? 0) +
     (input.at_risk_disallowed_add_back ?? 0) +
     (input.at_risk_recapture ?? 0) +
-    (input.biz_interest_disallowed_add_back ?? 0)
+    (input.biz_interest_disallowed_add_back ?? 0) +
+    (input.line8p_excess_business_loss ?? 0)
   );
 }
 
@@ -561,9 +565,14 @@ function computeAdjustedSli(
   return Math.round(raw * (1 - phaseOutRatio));
 }
 
-/** Replay the TY2025 Schedule 1 line 21 result from retained AGI inputs. */
-export function expectedTy2025StudentLoanDeduction(rawInput: unknown): number {
-  return computeAdjustedSli(inputSchema.parse(rawInput), CONFIG_BY_YEAR[2025]);
+/** Replay the Schedule 1 line 21 result from retained AGI inputs. */
+export function expectedStudentLoanDeduction(
+  rawInput: unknown,
+  taxYear = 2025,
+): number {
+  const cfg = CONFIG_BY_YEAR[taxYear];
+  if (!cfg) throw new Error(`No f1040 config for year ${taxYear}`);
+  return computeAdjustedSli(inputSchema.parse(rawInput), cfg);
 }
 
 // Sum above-the-line deductions (Schedule 1 Part II).
@@ -691,7 +700,8 @@ function scheduleOnePartI(input: AgiInput): number {
     (input.line8z_taxable_grants ?? 0) +
     (input.at_risk_disallowed_add_back ?? 0) +
     (input.at_risk_recapture ?? 0) +
-    (input.biz_interest_disallowed_add_back ?? 0) -
+    (input.biz_interest_disallowed_add_back ?? 0) +
+    (input.line8p_excess_business_loss ?? 0) -
     remainingAllowedPassiveLoss(input) -
     (input.line8d_foreign_earned_income_exclusion ?? 0)
   );
@@ -718,6 +728,7 @@ class AgiAggregatorNode extends TaxNode<typeof inputSchema> {
       standard_deduction,
       scheduleA,
       eitc,
+      schedule_r,
       f8812,
       f2441,
       form8995,
@@ -840,6 +851,8 @@ class AgiAggregatorNode extends TaxNode<typeof inputSchema> {
         agi,
         investment_income_floor: eicInvestmentIncomeFloor,
       }),
+      // Schedule R line 14 is Form 1040 line 11.
+      this.outputNodes.output(schedule_r, { auto_agi: agi }),
       // Pass AGI to f8812 for CTC/ACTC phase-out computation
       this.outputNodes.output(f8812, { auto_agi: agi }),
       // Pass AGI to f2441 for dependent care credit rate calculation

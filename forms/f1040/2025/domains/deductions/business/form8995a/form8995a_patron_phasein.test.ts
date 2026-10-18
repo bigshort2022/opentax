@@ -1,3 +1,5 @@
+import { test } from "bun:test";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import {
   assert,
   assertEquals,
@@ -47,10 +49,10 @@ const options = (filer: typeof pdfReviewFixtures[number]["filer"]) => ({
 });
 async function assertSchema(xml: string) {
   const xsd = new URL(
-    "../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+    "../../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
     import.meta.url,
   ).pathname;
-  const process = new Deno.Command("xmllint", {
+  const process = new sys.Command("xmllint", {
     args: ["--noout", "--schema", xsd, "-"],
     stdin: "piped",
     stdout: "piped",
@@ -63,7 +65,7 @@ async function assertSchema(xml: string) {
   assertEquals(result.code, 0, new TextDecoder().decode(result.stderr));
 }
 
-Deno.test("actual patron sources phase in wages before Schedule D and DPAD with full XML/PDF", async () => {
+test("actual patron sources phase in wages before Schedule D and DPAD with full XML/PDF", async () => {
   const expected = [
     ["phase-farm", 210117, .25634, 3889, 41284, 13552, 10000, 37732, 62678],
     [
@@ -96,7 +98,7 @@ Deno.test("actual patron sources phase in wages before Schedule D and DPAD with 
   ) {
     const { fixture, pending } = prepared(kind);
     const input = inputSchema.parse(pending.form8995a);
-    const lines = calculateOneBusiness8995ALines(input);
+    const lines = calculateOneBusiness8995ALines(input, 2025);
     const schedule = calculatePatronScheduleDLines(input);
     const amounts = patronSourceAmounts(input.patron_business_source!);
     assertEquals(amounts.filed_gross - amounts.filed_expenses, amounts.profit);
@@ -153,7 +155,7 @@ Deno.test("actual patron sources phase in wages before Schedule D and DPAD with 
   }
 });
 
-Deno.test("public patron whole-dollar threshold boundaries retain source and filed equations", async () => {
+test("public patron whole-dollar threshold boundaries retain source and filed equations", async () => {
   for (const target of [197300, 197301, 247299, 247300, 247301]) {
     const original = prepared("phase-farm").fixture;
     const inputs = structuredClone(original.inputs) as any;
@@ -178,6 +180,7 @@ Deno.test("public patron whole-dollar threshold boundaries retain source and fil
     const pending = buildPending(result.pending) as any;
     const lines = calculateOneBusiness8995ALines(
       inputSchema.parse(pending.form8995a),
+      2025,
     );
     assertEquals(lines.line33, target);
     assertEquals(lines.phaseInRequired, target > 197300 && target <= 247300);
@@ -198,7 +201,7 @@ Deno.test("public patron whole-dollar threshold boundaries retain source and fil
   }
 });
 
-Deno.test("phase-in patron rejects detached sources, percentages' operands and final native/PDF joins", async () => {
+test("phase-in patron rejects detached sources, percentages' operands and final native/PDF joins", async () => {
   for (const kind of ["phase-farm", "phase-c-health", "phase-income-cap"]) {
     const { fixture, pending: base } = prepared(kind);
     for (

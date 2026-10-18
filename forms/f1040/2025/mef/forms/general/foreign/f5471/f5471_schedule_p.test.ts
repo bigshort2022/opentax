@@ -1,3 +1,5 @@
+import { test } from "bun:test";
+import * as sys from "../../../../../../../../scripts/support/sys.ts";
 import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import {
   form8992Cfc,
@@ -7,17 +9,17 @@ import {
 import { form5471ScheduleP } from "./f5471_schedule_p.ts";
 
 const xsd = new URL(
-  "../../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/Shared/IRS5471ScheduleP/IRS5471ScheduleP.xsd",
+  "../../../../../../../../irs/mef/2025v5.4/Shared/IRS5471ScheduleP/IRS5471ScheduleP.xsd",
   import.meta.url,
 ).pathname;
 let schemaAvailable = false;
 try {
-  schemaAvailable = Deno.statSync(xsd).isFile;
+  schemaAvailable = sys.statSync(xsd).isFile;
 } catch {
   // Research schema bundle is optional in another workspace.
 }
 
-Deno.test("Schedule P sole-shareholder PTEP agrees with Schedule J", () => {
+test("Schedule P sole-shareholder PTEP agrees with Schedule J", () => {
   const xml = form5471ScheduleP.build({}, {
     filer: form8992Filer,
     pending: form8992Pending,
@@ -51,12 +53,7 @@ Deno.test("Schedule P sole-shareholder PTEP agrees with Schedule J", () => {
     }), Error);
 });
 
-Deno.test({
-  name: "Schedule P bounded native XML satisfies TY2025 v5.4 XSD",
-  ignore: !schemaAvailable,
-  sanitizeOps: false,
-  sanitizeResources: false,
-  fn: async () => {
+test.skipIf(!schemaAvailable)("Schedule P bounded native XML satisfies TY2025 v5.4 XSD", async () => {
     const xml = form5471ScheduleP.build({}, {
       filer: form8992Filer,
       pending: form8992Pending,
@@ -64,7 +61,7 @@ Deno.test({
       /^<IRS5471ScheduleP/,
       '<IRS5471ScheduleP xmlns="http://www.irs.gov/efile" documentId="IRS5471SchedulePTest1"',
     );
-    const command = new Deno.Command("xmllint", {
+    const command = new sys.Command("xmllint", {
       args: ["--noout", "--schema", xsd, "-"],
       stdin: "piped",
       stdout: "piped",
@@ -75,5 +72,4 @@ Deno.test({
     await writer.close();
     const result = await command.output();
     assertEquals(result.success, true, new TextDecoder().decode(result.stderr));
-  },
-});
+  });

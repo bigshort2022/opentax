@@ -748,6 +748,24 @@ export const SCENARIO_1040_02_FACTS = {
     qualifyingSurvivingSpouseChecked: false,
   },
   formerSpouseSsn: "400001037",
+  // Form 1040 page 2 (packet page 3), Paid Preparer Use Only.
+  preparer: {
+    name: "Walter Young",
+    ptin: "P00000001",
+    selfEmployed: true,
+    signatureDate: "2026-04-05",
+    phone: "8001234567",
+    firmName: "Young's Tax Service",
+    firmEin: "000000079",
+    firmAddress: {
+      line1: "1111 New York Avenue",
+      city: "New York",
+      state: "NY",
+      zip: "10022",
+    },
+  },
+  printedLine27cDoNotClaimEic: true,
+  printedPresidentialCampaignYou: true,
   dependent: {
     firstName: "Jacob",
     lastName: "Jones",
@@ -773,6 +791,8 @@ export const SCENARIO_1040_02_FACTS = {
       box4SocialSecurityWithholding: 1_830,
       box5MedicareWages: 29_513,
       box6MedicareWithholding: 428,
+      state: "NJ",
+      stateWages: 29_513,
       statutoryEmployee: true,
       stateIncomeTaxWithheld: 927,
     },
@@ -792,6 +812,8 @@ export const SCENARIO_1040_02_FACTS = {
       box4SocialSecurityWithholding: 528,
       box5MedicareWages: 8_513,
       box6MedicareWithholding: 123,
+      state: "NJ",
+      stateWages: 8_513,
       statutoryEmployee: false,
       stateIncomeTaxWithheld: 101,
     },
@@ -832,6 +854,15 @@ export const SCENARIO_1040_02_FACTS = {
   },
   form8283: {
     donee: "Goodwill",
+    doneeAddress: {
+      line1: "936 Folly Road",
+      city: "Charleston",
+      state: "SC",
+      zip: "29412",
+    },
+    dateAcquired: "Various",
+    howAcquired: "Purchase",
+    fairMarketValueMethod: "Thrift Store Value",
     propertyDescription: "Clothes and toys",
     donationDate: "2025-11-13",
     costBasis: 3_470,
@@ -907,7 +938,7 @@ export const SCENARIO_1040_04_FACTS = {
   },
   form3800: {
     partIIIline1f: {
-      registrationNumber: "PAZ12305555",
+      registrationNumber: "PAZ123055555",
       transferorEinEntry: "APPLD FOR",
       creditTransferElectionAmount: 13_200,
       combinedCredit: 13_200,
@@ -921,7 +952,7 @@ export const SCENARIO_1040_04_FACTS = {
     },
   },
   form8835: {
-    registrationNumber: "PAZ12305555",
+    registrationNumber: "PAZ123055555",
     facilityOwner: "Texas Solar Energy",
     facilityOwnerTin: "000000029",
     facilityAddress: "808 Spring Love Lane, Houston, TX 77004",

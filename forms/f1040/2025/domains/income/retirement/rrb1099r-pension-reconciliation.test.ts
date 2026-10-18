@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { buildExecutionPlan } from "../../../../../../core/runtime/planner.ts";
 import { execute } from "../../../../../../core/runtime/executor.ts";
@@ -42,10 +43,10 @@ function filed(gross: number, taxable = gross) {
   };
 }
 
-Deno.test("RRB-1099-R pension source replays filed lines 5a and 5b", () => {
-  assertRrb1099rPensionSource({ rrb1099r, f1040: filed(5_500) }, filer);
+test("RRB-1099-R pension source replays filed lines 5a and 5b", () => {
+  assertRrb1099rPensionSource({ rrb1099r, f1040: filed(5_500) }, filer, 2025);
   assertThrows(
-    () => assertRrb1099rPensionSource({ rrb1099r, f1040: filed(6_000) }, filer),
+    () => assertRrb1099rPensionSource({ rrb1099r, f1040: filed(6_000) }, filer, 2025),
     Error,
     "lines 5a and 5b or AGI differ from retained pension sources",
   );
@@ -74,13 +75,13 @@ const substitutePension = {
   }],
 };
 
-Deno.test("issued and substitute pensions replay without a railroad statement", () => {
+test("issued and substitute pensions replay without a railroad statement", () => {
   assertRrb1099rPensionSource({
     f1099r: issuedPension,
     f4852: substitutePension,
     f1040: { ...filed(5_000, 3_500), line25b_withheld_1099: 0 },
     agi_aggregator: { line5b_pension_taxable: 3_500 },
-  }, filer);
+  }, filer, 2025);
   assertRrb1099rPensionSource({
     f1099r: {
       f1099rs: [{
@@ -89,13 +90,13 @@ Deno.test("issued and substitute pensions replay without a railroad statement", 
       }],
     },
     f1040: { ...filed(0, 3_000), line25b_withheld_1099: 0 },
-  }, filer);
+  }, filer, 2025);
   assertThrows(
     () =>
       assertRrb1099rPensionSource({
         f1099r: issuedPension,
         f1040: { ...filed(3_001, 2_000), line25b_withheld_1099: 0 },
-      }, filer),
+      }, filer, 2025),
     Error,
     "lines 5a and 5b or AGI differ",
   );
@@ -105,13 +106,13 @@ Deno.test("issued and substitute pensions replay without a railroad statement", 
         f1099r: issuedPension,
         f1040: { ...filed(3_000, 2_000), line25b_withheld_1099: 0 },
         agi_aggregator: { line5b_pension_taxable: 2_001 },
-      }, filer),
+      }, filer, 2025),
     Error,
     "lines 5a and 5b or AGI differ",
   );
 });
 
-Deno.test("native and PDF reject unsourced positive pension amounts", async () => {
+test("native and PDF reject unsourced positive pension amounts", async () => {
   const pending = {
     f1040: { ...filed(1_000), line25b_withheld_1099: 0 },
   };
@@ -124,7 +125,7 @@ Deno.test("native and PDF reject unsourced positive pension amounts", async () =
   await assertRejects(() => buildPdfBytes(pending, filer), Error, message);
 });
 
-Deno.test("existing Form 4972 Part II pension deposit keeps its separate AGI review", () => {
+test("existing Form 4972 Part II pension deposit keeps its separate AGI review", () => {
   const fixture = pdfReviewFixtures.find((row) =>
     row.id === "single-elected-lump-sum-part-ii"
   )!;
@@ -135,17 +136,17 @@ Deno.test("existing Form 4972 Part II pension deposit keeps its separate AGI rev
     { taxYear: 2025, formType: "f1040" },
   );
   assertEquals(result.diagnostics, []);
-  assertRrb1099rPensionSource(result.pending, fixture.filer);
+  assertRrb1099rPensionSource(result.pending, fixture.filer, 2025);
 });
 
-Deno.test("RRB with issued and substitute pensions replays both filed amounts exactly", async () => {
+test("RRB with issued and substitute pensions replays both filed amounts exactly", async () => {
   const pending = {
     rrb1099r,
     f1099r: issuedPension,
     f4852: substitutePension,
     f1040: { ...filed(10_500, 9_000), line25b_withheld_1099: 550 },
   };
-  assertRrb1099rPensionSource(pending, filer);
+  assertRrb1099rPensionSource(pending, filer, 2025);
   for (
     const wrong of [
       { ...pending, f1040: { ...pending.f1040, line5a_pension_gross: 10_501 } },
@@ -156,7 +157,7 @@ Deno.test("RRB with issued and substitute pensions replays both filed amounts ex
     ]
   ) {
     assertThrows(
-      () => assertRrb1099rPensionSource(wrong, filer),
+      () => assertRrb1099rPensionSource(wrong, filer, 2025),
       Error,
       "lines 5a and 5b or AGI differ",
     );
@@ -171,7 +172,7 @@ Deno.test("RRB with issued and substitute pensions replays both filed amounts ex
   await assertRejects(() => buildPdfBytes(pending, filer), Error, guard);
 });
 
-Deno.test("a substitute W-2 cannot justify inflated RRB pension lines", () => {
+test("a substitute W-2 cannot justify inflated RRB pension lines", () => {
   const pending = {
     rrb1099r,
     f4852: {
@@ -180,13 +181,13 @@ Deno.test("a substitute W-2 cannot justify inflated RRB pension lines", () => {
     f1040: filed(7_500),
   };
   assertThrows(
-    () => assertRrb1099rPensionSource(pending, filer),
+    () => assertRrb1099rPensionSource(pending, filer, 2025),
     Error,
     "lines 5a and 5b or AGI differ",
   );
 });
 
-Deno.test("an issued IRA cannot justify inflated RRB pension lines", () => {
+test("an issued IRA cannot justify inflated RRB pension lines", () => {
   const pending = {
     rrb1099r,
     f1099r: {
@@ -198,13 +199,13 @@ Deno.test("an issued IRA cannot justify inflated RRB pension lines", () => {
     f1040: filed(8_500),
   };
   assertThrows(
-    () => assertRrb1099rPensionSource(pending, filer),
+    () => assertRrb1099rPensionSource(pending, filer, 2025),
     Error,
     "lines 5a and 5b or AGI differ",
   );
 });
 
-Deno.test("same-payer issued and substitute 1099-R needs source overlap review", () => {
+test("same-payer issued and substitute 1099-R needs source overlap review", () => {
   const pending = {
     rrb1099r,
     f1099r: issuedPension,
@@ -214,13 +215,13 @@ Deno.test("same-payer issued and substitute 1099-R needs source overlap review",
     f1040: filed(10_500, 9_000),
   };
   assertThrows(
-    () => assertRrb1099rPensionSource(pending, filer),
+    () => assertRrb1099rPensionSource(pending, filer, 2025),
     Error,
     "source overlap needs review",
   );
 });
 
-Deno.test("Form 4972 ordinary cannot inflate pension without its source", () => {
+test("Form 4972 ordinary cannot inflate pension without its source", () => {
   assertThrows(
     () =>
       assertRrb1099rPensionSource({
@@ -229,13 +230,13 @@ Deno.test("Form 4972 ordinary cannot inflate pension without its source", () => 
           ...filed(6_000),
           line5b_form4972_ordinary: 500,
         },
-      }, filer),
+      }, filer, 2025),
     Error,
     "needs its source",
   );
 });
 
-Deno.test("mixed RRB and issued pensions reach full-graph pension and AGI totals", () => {
+test("mixed RRB and issued pensions reach full-graph pension and AGI totals", () => {
   const result = execute(buildExecutionPlan(registry), registry, {
     general: {
       filing_status: "single",
@@ -255,10 +256,10 @@ Deno.test("mixed RRB and issued pensions reach full-graph pension and AGI totals
   assertEquals(result.pending.f1040?.line5a_pension_gross, 8_500);
   assertEquals(result.pending.f1040?.line5b_pension_taxable, 7_500);
   assertEquals(result.pending.f1040?.line11_agi, 7_500);
-  assertRrb1099rPensionSource(result.pending, filer);
+  assertRrb1099rPensionSource(result.pending, filer, 2025);
 });
 
-Deno.test("mixed RRB and substitute pensions reach full-graph pension and AGI totals", () => {
+test("mixed RRB and substitute pensions reach full-graph pension and AGI totals", () => {
   const result = execute(buildExecutionPlan(registry), registry, {
     general: {
       filing_status: "single",
@@ -278,10 +279,10 @@ Deno.test("mixed RRB and substitute pensions reach full-graph pension and AGI to
   assertEquals(result.pending.f1040?.line5a_pension_gross, 7_500);
   assertEquals(result.pending.f1040?.line5b_pension_taxable, 7_000);
   assertEquals(result.pending.f1040?.line11_agi, 7_000);
-  assertRrb1099rPensionSource(result.pending, filer);
+  assertRrb1099rPensionSource(result.pending, filer, 2025);
 });
 
-Deno.test("native and PDF exports reject an inflated RRB-1099-R pension", async () => {
+test("native and PDF exports reject an inflated RRB-1099-R pension", async () => {
   const pending = { rrb1099r, f1040: filed(6_000) };
   const message = "lines 5a and 5b or AGI differ from retained pension sources";
   assertThrows(
@@ -292,7 +293,7 @@ Deno.test("native and PDF exports reject an inflated RRB-1099-R pension", async 
   await assertRejects(() => buildPdfBytes(pending, filer), Error, message);
 });
 
-Deno.test("native and PDF exports reject the former SSEB route on RRB-1099-R", async () => {
+test("native and PDF exports reject the former SSEB route on RRB-1099-R", async () => {
   const pending = {
     rrb1099r: {
       rrb1099rs: [{
@@ -314,7 +315,7 @@ Deno.test("native and PDF exports reject the former SSEB route on RRB-1099-R", a
   );
 });
 
-Deno.test("RRB-1099-R pension reaches full-graph gross, taxable, and AGI", () => {
+test("RRB-1099-R pension reaches full-graph gross, taxable, and AGI", () => {
   const result = execute(buildExecutionPlan(registry), registry, {
     general: {
       filing_status: "single",
@@ -333,16 +334,16 @@ Deno.test("RRB-1099-R pension reaches full-graph gross, taxable, and AGI", () =>
   assertEquals(result.pending.f1040?.line5a_pension_gross, 5_500);
   assertEquals(result.pending.f1040?.line5b_pension_taxable, 5_500);
   assertEquals(result.pending.f1040?.line11_agi, 5_500);
-  assertRrb1099rPensionSource(result.pending, filer);
+  assertRrb1099rPensionSource(result.pending, filer, 2025);
 });
 
-Deno.test("RRB-1099-R pension recipient must belong to this return", async () => {
+test("RRB-1099-R pension recipient must belong to this return", async () => {
   const wrong = {
     rrb1099rs: [{ ...rrb1099r.rrb1099rs[0], recipient_tin: "999887777" }],
   };
   const pending = { rrb1099r: wrong, f1040: filed(5_500) };
   assertThrows(
-    () => assertRrb1099rPensionSource(pending, filer),
+    () => assertRrb1099rPensionSource(pending, filer, 2025),
     Error,
     "recipient must match taxpayer or joint spouse",
   );
@@ -358,7 +359,7 @@ Deno.test("RRB-1099-R pension recipient must belong to this return", async () =>
   );
 });
 
-Deno.test("repeated RRB-1099-R copies need distinct issued references", async () => {
+test("repeated RRB-1099-R copies need distinct issued references", async () => {
   const copy = rrb1099r.rrb1099rs[0];
   const repeated = {
     rrb1099r: { rrb1099rs: [copy, { ...copy }] },
@@ -401,7 +402,7 @@ Deno.test("repeated RRB-1099-R copies need distinct issued references", async ()
   });
 });
 
-Deno.test("RRB-1099-R payer spelling cannot bypass repeated-copy guard", async () => {
+test("RRB-1099-R payer spelling cannot bypass repeated-copy guard", async () => {
   const copy = rrb1099r.rrb1099rs[0];
   const variant = { ...copy, payer_name: "Railroad  Retirement Board." };
   const totals = {

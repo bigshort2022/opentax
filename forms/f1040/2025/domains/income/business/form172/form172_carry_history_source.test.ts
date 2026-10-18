@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertRejects } from "@std/assert";
 import { stageForm172CarryHistorySource } from "./form172_carry_history_source.ts";
 
@@ -97,17 +98,6 @@ function history() {
     ),
   };
 }
-function origin2024() {
-  const o = origin();
-  o.tax_year = 2024;
-  o.reference = "origin-2024";
-  o.reviewed_form1040.tax_year = 2024;
-  o.reviewed_form1040.reference = "return-2024";
-  o.reviewed_form1040.line12_standard_or_itemized_deduction = 14600;
-  o.noncapital_deductions[1].amount = 14600;
-  return o;
-}
-
 async function sha(bytes: Uint8Array) {
   return Array.from(
     new Uint8Array(
@@ -134,7 +124,7 @@ async function source() {
   };
   return { binding, documents };
 }
-Deno.test("Form 172 retained origin and history bytes reproduce complete arithmetic", async () => {
+test("Form 172 retained origin and history bytes reproduce complete arithmetic", async () => {
   const { binding, documents } = await source();
   const r = await stageForm172CarryHistorySource(binding, documents);
   assertEquals(r.originLoss, 100000);
@@ -153,7 +143,7 @@ Deno.test("Form 172 retained origin and history bytes reproduce complete arithme
     ]
   ) assertEquals(v, false);
 });
-Deno.test("Form 172 retained history rejects altered missing duplicate or extra documents", async () => {
+test("Form 172 retained history rejects altered missing duplicate or extra documents", async () => {
   const { binding, documents } = await source();
   const altered = documents.map((d) => ({
     ...d,
@@ -179,7 +169,7 @@ Deno.test("Form 172 retained history rejects altered missing duplicate or extra 
     }, documents)
   );
 });
-Deno.test("Form 172 retained history rejects source identity and envelope mismatches", async () => {
+test("Form 172 retained history rejects source identity and envelope mismatches", async () => {
   const { binding, documents } = await source();
   for (
     const patch of [
@@ -204,7 +194,7 @@ Deno.test("Form 172 retained history rejects source identity and envelope mismat
     }, [documents[0], { reference: "history", bytes }])
   );
 });
-Deno.test("Form 172 retained history rejects noncanonical JSON with a matching digest", async () => {
+test("Form 172 retained history rejects noncanonical JSON with a matching digest", async () => {
   const { binding, documents } = await source();
   const text = new TextDecoder().decode(documents[1].bytes);
   for (
@@ -226,7 +216,7 @@ Deno.test("Form 172 retained history rejects noncanonical JSON with a matching d
     );
   }
 });
-Deno.test("Form 172 retained history recomputes conflicting arithmetic rather than trusting digest", async () => {
+test("Form 172 retained history recomputes conflicting arithmetic rather than trusting digest", async () => {
   const { binding, documents } = await source();
   const h = history();
   h.annual_reviews[0].reported_taxable_income = 1;
@@ -247,7 +237,7 @@ Deno.test("Form 172 retained history recomputes conflicting arithmetic rather th
     }, [{ reference: o.reference, bytes: originBytes }, documents[1]])
   );
 });
-Deno.test("Form 172 retained history owns binding and all documents before first await", async () => {
+test("Form 172 retained history owns binding and all documents before first await", async () => {
   const { binding, documents } = await source();
   const pending = stageForm172CarryHistorySource(binding, documents);
   binding.taxpayer_ssn = "999887777";
@@ -259,7 +249,7 @@ Deno.test("Form 172 retained history owns binding and all documents before first
   assertEquals(r.openingLoss, 44000);
   assertEquals(r.taxpayerSsn, "111223333");
 });
-Deno.test("Form 172 retained history rejects invalid UTF-8 despite matching digest", async () => {
+test("Form 172 retained history rejects invalid UTF-8 despite matching digest", async () => {
   const { binding, documents } = await source();
   const bytes = new Uint8Array([0xff, 0xfe, 0xfd]);
   await assertRejects(async () =>

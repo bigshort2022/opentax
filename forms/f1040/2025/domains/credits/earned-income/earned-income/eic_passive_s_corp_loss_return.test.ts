@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
 import { f1040_2025 } from "../../../../index.ts";
 import {
@@ -9,7 +12,7 @@ import { buildPending } from "../../../../mef/execution/pending.ts";
 import { buildMefBundle } from "../../../../mef/builder.ts";
 import { extractFilerIdentity } from "../../../../../mef/filer.ts";
 const xsd = new URL(
-  "../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+  "../../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
   import.meta.url,
 ).pathname;
 const cases: Array<
@@ -83,7 +86,7 @@ const cases: Array<
   ),
 ];
 for (const c of cases) {
-  Deno.test(`Complete passive source native return ${c.id} retains basis/PAL/QBI copies and passes Return1040 XSD`, async () => {
+  test(`Complete passive source native return ${c.id} retains basis/PAL/QBI copies and passes Return1040 XSD`, async () => {
     const r = f1040_2025.executeReturn(c.inputs());
     assertEquals(r.diagnostics, []);
     if (c.combined) {
@@ -120,13 +123,13 @@ for (const c of cases) {
         `<ShrCarryoverAmountsGrp><OrdinaryBusinessLossAmt>${c.basis}</OrdinaryBusinessLossAmt>`,
       );
     }
-    const path = await Deno.makeTempFile({
+    const path = await sys.makeTempFile({
       prefix: `opentax-passive-return-${c.id}-`,
       suffix: ".xml",
     });
-    await Deno.writeTextFile(path, b.xml);
+    await fs.writeFile(path, b.xml);
     console.log(`Retained complete XML: ${path}`);
-    const v = await new Deno.Command("xmllint", {
+    const v = await new sys.Command("xmllint", {
       args: ["--noout", "--schema", xsd, path],
       stdout: "piped",
       stderr: "piped",
@@ -134,7 +137,7 @@ for (const c of cases) {
     assertEquals(v.code, 0, new TextDecoder().decode(v.stderr));
   });
 }
-Deno.test("Complete passive native export rejects source-copy deletion and inconsistent final joins", async () => {
+test("Complete passive native export rejects source-copy deletion and inconsistent final joins", async () => {
   for (
     const mutate of [
       (p: any) => delete p.form7203,

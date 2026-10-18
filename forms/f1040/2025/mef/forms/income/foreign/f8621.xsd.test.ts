@@ -1,7 +1,9 @@
+import * as fs from "node:fs/promises";
+import { test } from "bun:test";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { createHash } from "node:crypto";
 import { buildMefXml } from "../../../builder.ts";
-import { FilingStatus } from "../../../../../nodes/types.ts";
 import {
   calculateExcessEvents,
   calculateSection1291Interest,
@@ -14,13 +16,13 @@ import {
 } from "../../../types.ts";
 
 const XSD_PATH = new URL(
-  "../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+  "../../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
   import.meta.url,
 ).pathname;
 
 let xsdAvailable = false;
 try {
-  Deno.statSync(XSD_PATH);
+  sys.statSync(XSD_PATH);
   xsdAvailable = true;
 } catch {
   // The IRS schema bundle is local-only.
@@ -45,13 +47,7 @@ const copy = (document_id: string, content: string) => {
   };
 };
 
-Deno.test({
-  name:
-    "XSD: Form 8621 Part V links its statement, line 16 tax, and line 17p interest",
-  ignore: !xsdAvailable,
-  sanitizeOps: false,
-  sanitizeResources: false,
-}, async () => {
+test.skipIf(!xsdAvailable)("XSD: Form 8621 Part V links its statement, line 16 tax, and line 17p interest", async () => {
   const event = {
     kind: ExcessEventKind.Distribution as const,
     holding_period_start: "2024-01-01",
@@ -149,16 +145,16 @@ Deno.test({
     "<InterestOnEachNetIncrInTaxAmt referenceDocumentId=",
   );
   assertStringIncludes(xml, "<TaxationOfExcessDistriStmt documentId=");
-  const path = await Deno.makeTempFile({ suffix: ".xml" });
+  const path = await sys.makeTempFile({ suffix: ".xml" });
   try {
-    await Deno.writeTextFile(path, xml);
-    const result = await new Deno.Command("xmllint", {
+    await fs.writeFile(path, xml);
+    const result = await new sys.Command("xmllint", {
       args: ["--noout", "--schema", XSD_PATH, path],
       stdout: "piped",
       stderr: "piped",
     }).output();
     assertEquals(result.code, 0, new TextDecoder().decode(result.stderr));
   } finally {
-    await Deno.remove(path);
+    await sys.remove(path);
   }
 });

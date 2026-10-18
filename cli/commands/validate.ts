@@ -5,7 +5,7 @@
  * return and produces a diagnostics report.
  */
 
-import { join } from "@std/path";
+import { join } from "node:path";
 import type { ExecutorDiagnosticEntry } from "../../core/runtime/executor.ts";
 import { productCatalog } from "../../catalog.ts";
 import {
@@ -28,10 +28,16 @@ import type {
 } from "../../core/validation/types.ts";
 import type { StateDiagnosticsReport } from "../../core/validation/state-report.ts";
 import { FIELD_REGISTRY } from "../../forms/f1040/validation/field-registry.ts";
-import { ALL_RULES } from "../../forms/f1040/validation/rules/index.ts";
+import { rulesForReturnVersion } from "../../forms/f1040/validation/rules/ty2026.ts";
 import { normalizeAllPending } from "../../forms/f1040/2025/return-processing/pending.ts";
 import { returnHeaderNameLine1 } from "../../forms/f1040/mef/header.ts";
 import { emittedValidationScope, isTransmissionOnlyRule } from "./export.ts";
+import {
+  loadReturnSourceFiles,
+  resolveSourceBytes,
+  withMissingSourceFiles,
+} from "./return-source-files.ts";
+import { returnHints } from "./return-hints.ts";
 
 function getCatalogEntry(formType: string, year: number): ProductDefinition {
   const key = `${formType}:${year}`;
@@ -72,7 +78,10 @@ export async function validateReturnCommand(
         : formatDiagnosticsJson(report),
     };
   }
-  const engineInputs = buildEngineInputs(inputs, singletonPublicInputKeys(def));
+  const engineInputs = await resolveSourceBytes(
+    returnPath,
+    buildEngineInputs(inputs, singletonPublicInputKeys(def)),
+  );
   const result = def.executeReturn(engineInputs);
   const pending = normalizeAllPending(result.pending);
 
@@ -80,15 +89,30 @@ export async function validateReturnCommand(
   const f1040 = pending["f1040"] ?? {};
   const filerIdentity = extractFilerIdentity(f1040);
   let scope: ReturnType<typeof emittedValidationScope> | undefined;
+  let ownReport: DiagnosticsReport | undefined;
   let assemblyError: DiagnosticEntry | undefined;
+  let missing: readonly string[] = [];
   try {
-    scope = emittedValidationScope(def.buildMefXml(pending, filerIdentity));
+    const files = await loadReturnSourceFiles(returnPath, pending);
+    missing = files.missing;
+    // Assemble the filed projection export uses (Form 8949 rows, only a
+    // completed Form 8960), with source files when the return has them.
+    const xml = files.attachments.length + files.retained.length > 0
+      ? (await def.prepareReturn(
+        pending,
+        filerIdentity,
+        files.attachments,
+        files.retained,
+      )).bundle.xml
+      : def.buildMefXml(def.buildPending(result.pending), filerIdentity);
+    if (def.mefRuleReport) ownReport = def.mefRuleReport(pending, xml);
+    else scope = emittedValidationScope(xml);
   } catch (error) {
     assemblyError = {
       ruleNumber: "MEF_ASSEMBLY",
       severity: "reject",
       category: "xml_error",
-      message: error instanceof Error ? error.message : String(error),
+      message: withMissingSourceFiles(error, missing).message,
       formRef: "Return",
     };
   }
@@ -112,6 +136,7 @@ export async function validateReturnCommand(
     filerInfo,
     FIELD_REGISTRY,
     scope?.formCounts,
+    scope?.emitted,
   );
 
   // Only emitted documents have applicable return-level rules. A failed
@@ -122,8 +147,10 @@ export async function validateReturnCommand(
       summary: { total: 0, passed: 0, rejected: 0, alerts: 0, skipped: 0 },
       canFile: false,
     }
-    : evaluateRules(
-      ALL_RULES.filter((rule) => !isTransmissionOnlyRule(rule.ruleNumber)),
+    : ownReport ?? evaluateRules(
+      rulesForReturnVersion(scope?.returnVersion).filter((rule) =>
+        !isTransmissionOnlyRule(rule.ruleNumber)
+      ),
       ctx,
       scope?.rulePrefixes,
     );
@@ -139,18 +166,31 @@ export async function validateReturnCommand(
     }),
   );
 
+  // Claims the facts point to but the return does not make; they never block filing.
+  const hintEntries: DiagnosticEntry[] = returnHints(pending).map((
+    message,
+  ) => ({
+    ruleNumber: "OPENTAX_HINT",
+    severity: "alert" as const,
+    category: "information" as ErrorCategory,
+    message,
+    formRef: "Return",
+  }));
+
   const hasExecutorFailures = executorEntries.length > 0;
   const mergedEntries = [
     ...executorEntries,
     ...(assemblyError ? [assemblyError] : []),
     ...report.entries,
+    ...hintEntries,
   ];
   const mergedSummary = {
     ...report.summary,
     total: report.summary.total + executorEntries.length +
-      (assemblyError ? 1 : 0),
+      (assemblyError ? 1 : 0) + hintEntries.length,
     rejected: report.summary.rejected + executorEntries.length +
       (assemblyError ? 1 : 0),
+    alerts: report.summary.alerts + hintEntries.length,
   };
   const mergedReport: DiagnosticsReport = {
     entries: mergedEntries,

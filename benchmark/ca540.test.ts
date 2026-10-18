@@ -1,5 +1,9 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../scripts/support/sys.ts";
 import { assertEquals, assertRejects, assertThrows } from "@std/assert";
-import { dirname, fromFileUrl, join } from "@std/path";
+import { dirname, join } from "node:path";
+import { fileURLToPath as fromFileUrl } from "node:url";
 import {
   caExpectedSchema,
   caInputSchema,
@@ -7,6 +11,7 @@ import {
   inspectCaInventory,
   loadCaCase,
   runCaCase,
+  runCaBenchmark,
   validateCaSources,
 } from "./ca540.ts";
 import { inspectBenchmarkCases } from "./harness.ts";
@@ -33,7 +38,7 @@ const vector = {
   taxableIncome: 68494,
   filingStatus: "single",
 };
-Deno.test("CA kinds reject wrong product/year/fields and never default a missing expected line to zero", () => {
+test("CA kinds reject wrong product/year/fields and never default a missing expected line to zero", () => {
   for (
     const patch of [{ product: "f1040" }, { year: 2024 }, { invented: 1 }, {
       taxableIncome: undefined,
@@ -80,7 +85,7 @@ Deno.test("CA kinds reject wrong product/year/fields and never default a missing
     1,
   );
 });
-Deno.test("CA requires independent nonblank FTB citations and honest policy authority", () => {
+test("CA requires independent nonblank FTB citations and honest policy authority", () => {
   for (
     const source of [undefined, {}, { official: [] }, { official: [""] }, {
       official: ["engine output.json"],
@@ -94,53 +99,53 @@ Deno.test("CA requires independent nonblank FTB citations and honest policy auth
     ],
   });
 });
-Deno.test("canonical CA inventory rejects source absence, unknown fields, missing documents and empty inventory", async () => {
-  const temp = await Deno.makeTempDir();
+test("canonical CA inventory rejects source absence, unknown fields, missing documents and empty inventory", async () => {
+  const temp = await sys.makeTempDir();
   try {
-    await Deno.mkdir(join(temp, "ca540"), { recursive: true });
-    await Deno.copyFile(
+    await fs.mkdir(join(temp, "ca540"), { recursive: true });
+    await fs.copyFile(
       join(root, "scenarios.json"),
       join(temp, "ca540", "scenarios.json"),
     );
-    await Deno.copyFile(
+    await fs.copyFile(
       join(root, "ledger.json"),
       join(temp, "ca540", "ledger.json"),
     );
     await assertRejects(() => inspectCaInventory(join(temp, "ca540")));
     const directory = join(temp, "ca540", "workpaper-baseline");
-    await Deno.mkdir(directory);
+    await fs.mkdir(directory);
     for (const file of ["input.json", "correct.json", "sources.json"]) {
-      await Deno.copyFile(
+      await fs.copyFile(
         join(root, "workpaper-baseline", file),
         join(directory, file),
       );
     }
     const expected = JSON.parse(
-      await Deno.readTextFile(join(directory, "correct.json")),
+      await fs.readFile(join(directory, "correct.json"), "utf8"),
     );
     const missing = structuredClone(expected);
     delete missing.documents;
     assertEquals(caExpectedSchema.safeParse(missing).success, false);
     const input = JSON.parse(
-      await Deno.readTextFile(join(directory, "input.json")),
+      await fs.readFile(join(directory, "input.json"), "utf8"),
     );
     input.forms[0].data.invented = 1;
-    await Deno.writeTextFile(
+    await fs.writeFile(
       join(directory, "input.json"),
       JSON.stringify(input),
     );
     await assertRejects(() => loadCaCase(directory));
-    await Deno.copyFile(
+    await fs.copyFile(
       join(root, "workpaper-baseline", "input.json"),
       join(directory, "input.json"),
     );
-    await Deno.remove(join(directory, "sources.json"));
+    await sys.remove(join(directory, "sources.json"));
     await assertRejects(() => loadCaCase(directory));
   } finally {
-    await Deno.remove(temp, { recursive: true });
+    await sys.remove(temp, { recursive: true });
   }
 });
-Deno.test("real canonical CA cases route through the product and enforce exact typed outcomes", async () => {
+test("real canonical CA cases route through the product and enforce exact typed outcomes", async () => {
   const inventory = await inspectCaInventory(root);
   assertEquals(inventory.length, 4);
   for (const directory of inventory) {
@@ -152,7 +157,7 @@ Deno.test("real canonical CA cases route through the product and enforce exact t
   assertEquals(inspection.problems, []);
   assertEquals(inspection.found.length, 4);
 });
-Deno.test("CA typed comparisons enforce document, diagnostic and gate sets without positional ordering", async () => {
+test("CA typed comparisons enforce document, diagnostic and gate sets without positional ordering", async () => {
   const { expected } = await loadCaCase(join(root, "workpaper-baseline"));
   if (expected.kind !== CaCaseKind.Workpaper) {
     throw new Error("workpaper required");
@@ -168,11 +173,11 @@ Deno.test("CA typed comparisons enforce document, diagnostic and gate sets witho
   assertEquals(compareCaExpected(expected, actual).length, 1);
 });
 
-Deno.test("CA case check refuses numeric edits, typed weakening, source changes and scenario deletion without reviewed ledger", async () => {
-  const temp = await Deno.makeTempDir();
+test("CA case check refuses numeric edits, typed weakening, source changes and scenario deletion without reviewed ledger", async () => {
+  const temp = await sys.makeTempDir();
   try {
     for (const file of ["scenarios.json", "ledger.json"]) {
-      await Deno.copyFile(join(root, file), join(temp, file));
+      await fs.copyFile(join(root, file), join(temp, file));
     }
     for (
       const id of [
@@ -182,13 +187,13 @@ Deno.test("CA case check refuses numeric edits, typed weakening, source changes 
         "mixed-exemption-regression",
       ]
     ) {
-      await Deno.mkdir(join(temp, id));
+      await fs.mkdir(join(temp, id));
       for (const file of ["input.json", "correct.json", "sources.json"]) {
-        await Deno.copyFile(join(root, id, file), join(temp, id, file));
+        await fs.copyFile(join(root, id, file), join(temp, id, file));
       }
     }
     const path = join(temp, "workpaper-baseline", "correct.json");
-    const text = await Deno.readTextFile(path);
+    const text = await fs.readFile(path, "utf8");
     for (
       const mutate of [
         (value: Extract<CaExpected, { kind: CaCaseKind.Workpaper }>) =>
@@ -206,34 +211,34 @@ Deno.test("CA case check refuses numeric edits, typed weakening, source changes 
     ) {
       const value = JSON.parse(text);
       mutate(value);
-      await Deno.writeTextFile(path, JSON.stringify(value));
+      await fs.writeFile(path, JSON.stringify(value));
       await assertRejects(() => inspectCaInventory(temp));
     }
-    await Deno.writeTextFile(path, text);
+    await fs.writeFile(path, text);
     const sourcePath = join(temp, "workpaper-baseline", "sources.json");
-    const source = JSON.parse(await Deno.readTextFile(sourcePath));
+    const source = JSON.parse(await fs.readFile(sourcePath, "utf8"));
     source.official.pop();
-    await Deno.writeTextFile(sourcePath, JSON.stringify(source));
+    await fs.writeFile(sourcePath, JSON.stringify(source));
     await assertRejects(() => inspectCaInventory(temp));
-    await Deno.copyFile(
+    await fs.copyFile(
       join(root, "workpaper-baseline", "sources.json"),
       sourcePath,
     );
     const manifest = JSON.parse(
-      await Deno.readTextFile(join(temp, "scenarios.json")),
+      await fs.readFile(join(temp, "scenarios.json"), "utf8"),
     );
     manifest.cases[0].requirements = [];
-    await Deno.writeTextFile(
+    await fs.writeFile(
       join(temp, "scenarios.json"),
       JSON.stringify(manifest),
     );
     await assertRejects(() => inspectCaInventory(temp));
   } finally {
-    await Deno.remove(temp, { recursive: true });
+    await sys.remove(temp, { recursive: true });
   }
 });
 
-Deno.test("CA comparison catches a missing required schedule instead of accepting the documents container", async () => {
+test("CA comparison catches a missing required schedule instead of accepting the documents container", async () => {
   const { expected } = await loadCaCase(join(root, "workpaper-baseline"));
   if (expected.kind !== CaCaseKind.Workpaper) {
     throw new Error("workpaper required");
@@ -246,7 +251,7 @@ Deno.test("CA comparison catches a missing required schedule instead of acceptin
   assertEquals(compareCaExpected(syntheticExpectation, actual).length, 1);
 });
 
-Deno.test("CA ledger assertion paths and values are typed and approvedBy cannot self-approve evidence", () => {
+test("CA ledger assertion paths and values are typed and approvedBy cannot self-approve evidence", () => {
   const entry = {
     case: "mixed-exemption-regression",
     path: "correct.json.lines.line32_exemption_credits",
@@ -290,13 +295,9 @@ Deno.test("CA ledger assertion paths and values are typed and approvedBy cannot 
   );
 });
 
-Deno.test("CA benchmark JSON is a single machine-readable result with all canonical cases counted", async () => {
-  const output = await new Deno.Command("deno", {
+test("CA benchmark JSON is a single machine-readable result with all canonical cases counted", async () => {
+  const output = await new sys.Command(process.execPath, {
     args: [
-      "run",
-      "--allow-read",
-      "--allow-write",
-      "--allow-run=pdftotext",
       fromFileUrl(new URL("./run_benchmark.ts", import.meta.url)),
       "--form",
       "ca540",
@@ -317,7 +318,19 @@ Deno.test("CA benchmark JSON is a single machine-readable result with all canoni
   assertEquals(report.results.length, 4);
 });
 
-Deno.test("CA workpaper comparisons reject a wrong reported product year", async () => {
+test("CA case selection preserves the canonical evidence contract", async () => {
+  const selected = await runCaBenchmark(root, "single-tax-table-68494");
+  assertEquals(selected.total, 1);
+  assertEquals(selected.pass, 1);
+  assertEquals(selected.results[0].name, "single-tax-table-68494");
+  await assertRejects(
+    () => runCaBenchmark(root, "missing-case"),
+    Error,
+    "Unknown CA benchmark case",
+  );
+});
+
+test("CA workpaper comparisons reject a wrong reported product year", async () => {
   const { expected } = await loadCaCase(join(root, "workpaper-baseline"));
   if (expected.kind !== CaCaseKind.Workpaper) {
     throw new Error("workpaper required");
@@ -327,7 +340,7 @@ Deno.test("CA workpaper comparisons reject a wrong reported product year", async
   assertEquals(compareCaExpected(expected, actual).length, 1);
 });
 
-Deno.test("CA scenario requirement sets remain nonempty and unique with typed case IDs", () => {
+test("CA scenario requirement sets remain nonempty and unique with typed case IDs", () => {
   const scenario = {
     id: "table",
     kind: CaCaseKind.Line31,
@@ -358,7 +371,7 @@ Deno.test("CA scenario requirement sets remain nonempty and unique with typed ca
   );
 });
 
-Deno.test("CA coverage assertions reject missing and changed requirement assessments", async () => {
+test("CA coverage assertions reject missing and changed requirement assessments", async () => {
   const { expected } = await loadCaCase(join(root, "workpaper-baseline"));
   if (expected.kind !== CaCaseKind.Workpaper) {
     throw new Error("workpaper required");
@@ -375,7 +388,7 @@ Deno.test("CA coverage assertions reject missing and changed requirement assessm
   assertEquals(compareCaExpected(weakened, expected).length, 1);
 });
 
-Deno.test("CA workpaper expectations reuse readiness coherence and never authorize filing", async () => {
+test("CA workpaper expectations reuse readiness coherence and never authorize filing", async () => {
   const { expected } = await loadCaCase(join(root, "workpaper-baseline"));
   if (expected.kind !== CaCaseKind.Workpaper) {
     throw new Error("workpaper required");

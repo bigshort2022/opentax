@@ -4,7 +4,15 @@ on:
   push:
     branches: [main]
     paths:
-      - "docs/**"
+      - "docs/index.html"
+      - "docs/build/**"
+      - "docs/CNAME"
+      - "docs/robots.txt"
+      - "docs/sitemap.xml"
+      - "docs/*.png"
+      - "docs/icon.svg"
+      - "docs/fonts/**"
+      - ".github/workflows/pages.yml"
       - "forms/**"
       - "catalog.ts"
       - "scripts/site/site-stats.ts"
@@ -28,13 +36,29 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Setup Deno
-        uses: denoland/setup-deno@v2
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          deno-version: v2.x
+          bun-version: 1.4.2
+
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
 
       - name: Update node and input counts on the site
-        run: deno run --allow-read --allow-write scripts/site/site-stats.ts
+        run: bun scripts/site/site-stats.ts
+
+      # Only the public site is published, not the rest of docs/.
+      - name: Stage the site
+        run: |
+          site="$RUNNER_TEMP/site"
+          mkdir -p "$site/build" "$site/fonts"
+          cp docs/index.html docs/CNAME docs/robots.txt docs/sitemap.xml \
+            docs/favicon.png docs/filed-logo.png docs/icon.svg docs/opentax-og.png "$site/"
+          cp docs/build/index.html "$site/build/"
+          cp docs/fonts/FreightDispProBook-Regular.woff2 \
+            docs/fonts/FreightDispProLight-Regular.woff2 \
+            docs/fonts/FreightDispProMedium-Regular.woff2 "$site/fonts/"
+          echo "SITE_DIR=$site" >> "$GITHUB_ENV"
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -42,7 +66,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/
+          path: ${{ env.SITE_DIR }}
 
       - name: Deploy to GitHub Pages
         id: deployment

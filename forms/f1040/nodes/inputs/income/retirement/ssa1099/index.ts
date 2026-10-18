@@ -3,11 +3,7 @@ import type {
   NodeOutput,
   NodeResult,
 } from "../../../../../../../core/types/tax-node.ts";
-import {
-  type AtLeastOne,
-  output,
-  TaxNode,
-} from "../../../../../../../core/types/tax-node.ts";
+import { output, TaxNode } from "../../../../../../../core/types/tax-node.ts";
 import { OutputNodes } from "../../../../../../../core/types/output-nodes.ts";
 import { f1040 } from "../../../../outputs/general/return-assembly/f1040/index.ts";
 import { agi_aggregator } from "../../../../intermediate/aggregation/general/return-assembly/agi_aggregator/index.ts";
@@ -21,17 +17,17 @@ export const itemSchema = z.object({
   recipient_tin: z.string().regex(/^\d{9}$/).optional(),
   source_document_reference: z.string().trim().min(1).optional(),
 
-  // Box 3 — Total social security benefits paid in 2025
+  // Box 3 — Total social security benefits paid in the tax year
   box3_gross_benefits: z.number().nonnegative(),
 
-  // Box 4 — Total benefits repaid to SSA/RRB in 2025
+  // Box 4 — Total benefits repaid to SSA/RRB in the tax year
   box4_repaid: z.number().nonnegative().optional(),
 
-  // Box 5 — Net benefits for 2025 (Box 3 minus Box 4, as precomputed by SSA)
+  // Box 5 — Net benefits for the year (Box 3 minus Box 4, as precomputed by SSA)
   // When provided, used directly instead of computing box3 - box4.
   // IRS Form 1040 instructions, Line 6a: "box 5 of all your Forms SSA-1099 and RRB-1099"
   box5_net_benefits: z.number().optional().describe(
-    "Net benefits for 2025 (Box 3 minus Box 4)",
+    "Net benefits for the tax year (Box 3 minus Box 4)",
   ),
 
   // Box 6 — Voluntary federal income tax withheld (W-4V)

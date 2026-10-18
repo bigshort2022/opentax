@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { stageForm172ProjectedReturn } from "./form172_projected_return.ts";
 import { passiveK1Inputs, passiveK1Item } from "../../../credits/earned-income/earned-income/eic_passive_k1.fixture.ts";
@@ -39,47 +40,6 @@ function origin() {
     capital_gains: [],
     capital_losses: [],
     prior_nol_deductions: [],
-  };
-}
-
-function legacy() {
-  const {
-    noncapital_income,
-    noncapital_deductions,
-    capital_gains,
-    capital_losses,
-    prior_nol_deductions,
-  } = origin();
-  noncapital_deductions[1].amount = 6350;
-  return {
-    source_format: "reviewed_legacy_loss_year",
-    reference: "legacy-origin",
-    tax_year: 2017,
-    taxpayer_ssn: "111223333",
-    filing_status: "single",
-    inventory: {
-      noncapital_income,
-      noncapital_deductions,
-      capital_gains,
-      capital_losses,
-      prior_nol_deductions,
-    },
-    reviewed_form1040: {
-      reference: "return-2017",
-      tax_year: 2017,
-      taxpayer_ssn: "111223333",
-      filing_status: "single",
-      agi: -103000,
-      standard_or_itemized_deduction: 6350,
-      personal_exemptions: 4050,
-      reported_taxable_income: 0,
-    },
-    section199_deduction: { reference: "dpad-review", amount: 3000 },
-    limitations_review: {
-      reference: "historic-limit-review",
-      at_risk_and_passive_limits_applied: true,
-      itemized_phaseout_applied: true,
-    },
   };
 }
 
@@ -240,7 +200,7 @@ async function fixture(mixedKind = false) {
   };
   return { inputs, binding, documents, currentReview };
 }
-Deno.test("Form172 projection sends retained deduction through Schedule1 AGI and regular tax graph", async () => {
+test("Form172 projection sends retained deduction through Schedule1 AGI and regular tax graph", async () => {
   for (const mixedKind of [false, true]) {
     const f = await fixture(mixedKind);
     const r = await stageForm172ProjectedReturn(
@@ -276,7 +236,7 @@ Deno.test("Form172 projection sends retained deduction through Schedule1 AGI and
     }
   }
 });
-Deno.test("Form172 projection rejects detached NOL shortcuts", async () => {
+test("Form172 projection rejects detached NOL shortcuts", async () => {
   const f = await fixture();
   await assertRejects(() =>
     stageForm172ProjectedReturn(
@@ -332,7 +292,7 @@ async function seniorFixture(amount = 6000, seniorAmount = amount) {
   f.binding.current_review.sha256 = await sha(bytes);
   return f;
 }
-Deno.test("Form172 retained senior Schedule1-A joins public deduction and lowers current NOL capacity", async () => {
+test("Form172 retained senior Schedule1-A joins public deduction and lowers current NOL capacity", async () => {
   const f = await seniorFixture();
   const r = await stageForm172ProjectedReturn(f.inputs, f.binding, f.documents);
   assertEquals(r.current_form1040_before_nol.line12c_deduction_total, 17750);
@@ -357,7 +317,7 @@ Deno.test("Form172 retained senior Schedule1-A joins public deduction and lowers
   assertEquals(r.projected_pending.form6251?.amti, 50000);
   assertEquals(r.filingReady, false);
 });
-Deno.test("Form172 current source rejects an internally consistent wrong senior deduction", async () => {
+test("Form172 current source rejects an internally consistent wrong senior deduction", async () => {
   for (const f of [await seniorFixture(5000), await seniorFixture(6000, 0)]) {
     await assertRejects(
       () => stageForm172ProjectedReturn(f.inputs, f.binding, f.documents),
@@ -366,7 +326,7 @@ Deno.test("Form172 current source rejects an internally consistent wrong senior 
     );
   }
 });
-Deno.test("Form172 NOL projection reruns education MAGI and credit limitation through actual sources", async () => {
+test("Form172 NOL projection reruns education MAGI and credit limitation through actual sources", async () => {
   const f = await fixture();
   const inputs = structuredClone(educationSource.inputs);
   const review = {
@@ -502,7 +462,7 @@ const syntheticAdoptionSource = {
     sha256: "a".repeat(64),
   })),
 };
-Deno.test("Form172 NOL projection preserves source-dependent adoption finalizer and refund", async () => {
+test("Form172 NOL projection preserves source-dependent adoption finalizer and refund", async () => {
   const f = await fixture();
   const template = passiveK1Inputs();
   const inputs = {
@@ -617,7 +577,7 @@ async function amtSource(
   };
   return { documents, binding, annual };
 }
-Deno.test("Form172 retained independent AMT review matches ordinary mixed and senior tentative graph", async () => {
+test("Form172 retained independent AMT review matches ordinary mixed and senior tentative graph", async () => {
   for (
     const [f, senior] of [[await fixture(), false], [
       await fixture(true),
@@ -648,7 +608,7 @@ Deno.test("Form172 retained independent AMT review matches ordinary mixed and se
     }
   }
 });
-Deno.test("Form172 AMT graph rejects offsetting component substitutions despite an unchanged total", async () => {
+test("Form172 AMT graph rejects offsetting component substitutions despite an unchanged total", async () => {
   const f = await fixture();
   const a = await amtSource(f);
   a.annual.components.find((c) => c.line === "2g")!.amount = 100;
@@ -669,7 +629,7 @@ Deno.test("Form172 AMT graph rejects offsetting component substitutions despite 
     "line2g differs",
   );
 });
-Deno.test("Form172 AMT graph rejects internally consistent Form1040 operands differing from actual replay", async () => {
+test("Form172 AMT graph rejects internally consistent Form1040 operands differing from actual replay", async () => {
   const f = await fixture();
   const a = await amtSource(f);
   a.annual.reviewed_form1040.line11b_agi++;
@@ -690,7 +650,7 @@ Deno.test("Form172 AMT graph rejects internally consistent Form1040 operands dif
     "AGI differs",
   );
 });
-Deno.test("Form172 AMT graph requires the identical retained regular origin in both package sets", async () => {
+test("Form172 AMT graph requires the identical retained regular origin in both package sets", async () => {
   const f = await fixture();
   const a = await amtSource(f);
   const changed = JSON.parse(new TextDecoder().decode(a.documents[0].bytes));
@@ -711,7 +671,7 @@ Deno.test("Form172 AMT graph requires the identical retained regular origin in b
     "identical loss-year source",
   );
 });
-Deno.test("Form172 AMT composition owns both bindings all source bytes and public inputs before await", async () => {
+test("Form172 AMT composition owns both bindings all source bytes and public inputs before await", async () => {
   const f = await fixture();
   const a = await amtSource(f);
   const pending = stageForm172AmtProjectedReturn(
@@ -731,7 +691,7 @@ Deno.test("Form172 AMT composition owns both bindings all source bytes and publi
   assertEquals(r.currentAmtTentativeGraphReconciled, true);
 });
 
-Deno.test("Form172 post-NOL senior phaseout reruns before the retained finalizer", async () => {
+test("Form172 post-NOL senior phaseout reruns before the retained finalizer", async () => {
   const f = await seniorFixture(1500);
   f.inputs.w2 = [{ ...passiveK1Inputs().w2[0], box1_wages: 150000 }];
   const review = JSON.parse(new TextDecoder().decode(f.documents[2].bytes));
@@ -755,7 +715,7 @@ Deno.test("Form172 post-NOL senior phaseout reruns before the retained finalizer
   assertEquals(r.currentAgiDependentRefiguresVerified, false);
   assertEquals(r.filingReady, false);
 });
-Deno.test("Form172 full graph refigures source student-loan interest before finalized AGI", async () => {
+test("Form172 full graph refigures source student-loan interest before finalized AGI", async () => {
   const f = await fixture();
   f.inputs.w2 = [{ ...passiveK1Inputs().w2[0], box1_wages: 95000 }];
   f.inputs.f1098e = [{
@@ -784,7 +744,7 @@ Deno.test("Form172 full graph refigures source student-loan interest before fina
   assertEquals(r.filingReady, false);
 });
 
-Deno.test("Form172 ordinary NOL refigures QBI taxable-income limit without reducing current business QBI", async () => {
+test("Form172 ordinary NOL refigures QBI taxable-income limit without reducing current business QBI", async () => {
   const f = await fixture();
   f.inputs.w2 = [{ ...passiveK1Inputs().w2[0], box1_wages: 20000 }];
   const business = passiveK1Item("partnership", "box1", 30000);
@@ -899,7 +859,7 @@ async function interestFixture() {
   f.binding.current_review.sha256 = await sha(bytes);
   return { ...f, before };
 }
-Deno.test("Form172 retained NOL composes both sourced interest passes with ATI line9 restoration", async () => {
+test("Form172 retained NOL composes both sourced interest passes with ATI line9 restoration", async () => {
   const f = await interestFixture();
   const r = await stageForm172ProjectedReturn(f.inputs, f.binding, f.documents);
   const composed = r.form8990_nol_composition!;
@@ -968,7 +928,7 @@ Deno.test("Form172 retained NOL composes both sourced interest passes with ATI l
     true,
   );
 });
-Deno.test("Form172 interest composition rejects changed current workpaper and source tracing", async () => {
+test("Form172 interest composition rejects changed current workpaper and source tracing", async () => {
   const f = await interestFixture();
   f.currentReview.annual_review.agi += 1;
   f.currentReview.annual_review.reported_taxable_income += 1;
@@ -990,7 +950,7 @@ Deno.test("Form172 interest composition rejects changed current workpaper and so
   );
 });
 
-Deno.test("Form172 sourced interest and retained AMT review reconcile raw tentative total and filed components", async () => {
+test("Form172 sourced interest and retained AMT review reconcile raw tentative total and filed components", async () => {
   const f = await interestFixture();
   const a = await amtSource(f);
   a.annual.reviewed_form1040.line11b_agi = 80011;
@@ -1017,7 +977,8 @@ Deno.test("Form172 sourced interest and retained AMT review reconcile raw tentat
   assertEquals(r.form8990NolOrderingReconciled, true);
   assertEquals(r.currentAmtTentativeTotalReconciled, true);
   assertEquals(r.currentAmtTentativeGraphReconciled, true);
-  assertEquals(r.calculated_tentative_amt_unrounded, 111158.8);
+  // Line 1b comes from whole-dollar Form 1040 line 15.
+  assertEquals(r.calculated_tentative_amt_unrounded, 111159);
   assertEquals(r.projected_pending.form6251.amti_before_mfs_addition, 111159);
   assertEquals(r.independent_amt_review.tentativeAmtiBeforeAtnold, 111159);
   assertEquals(r.independent_amt_review.ordinary90PercentLimit, 100043);
@@ -1025,7 +986,7 @@ Deno.test("Form172 sourced interest and retained AMT review reconcile raw tentat
   assertEquals(r.filingReady, false);
 });
 
-Deno.test("Form172 modified carry income replays capital-loss and student-interest AGI adjustments", async () => {
+test("Form172 modified carry income replays capital-loss and student-interest AGI adjustments", async () => {
   const f = await fixture();
   f.inputs.w2 = [{ ...passiveK1Inputs().w2[0], box1_wages: 95000 }];
   f.inputs.f1099b = [{
@@ -1085,7 +1046,7 @@ Deno.test("Form172 modified carry income replays capital-loss and student-intere
   );
 });
 
-Deno.test("Form172 modified carry income refigures SSA independently of post-NOL tax", async () => {
+test("Form172 modified carry income refigures SSA independently of post-NOL tax", async () => {
   const f = await fixture();
   f.inputs.w2 = [{ ...passiveK1Inputs().w2[0], box1_wages: 22000 }];
   f.inputs.ssa1099 = [{
@@ -1150,7 +1111,7 @@ Deno.test("Form172 modified carry income refigures SSA independently of post-NOL
   );
 });
 
-Deno.test("Form172 carry-use medical deduction stays distinct from post-NOL itemized deduction", async () => {
+test("Form172 carry-use medical deduction stays distinct from post-NOL itemized deduction", async () => {
   const f = await fixture();
   f.inputs.f1099b = [{
     recipient_ssn: "111223333",
@@ -1191,10 +1152,9 @@ Deno.test("Form172 carry-use medical deduction stays distinct from post-NOL item
   assertEquals(r.deduction, 24420);
   assertEquals(r.currentAnnualCalculation.absorbed, 27645);
   assertEquals(r.projected_form1040.line11_agi, 22580);
-  assertEquals(
-    Math.round(Number(r.projected_form1040.line12c_deduction_total)),
-    18307,
-  );
+  // Schedule A line 3 files 7.5% of $22,580 AGI as $1,694, so line 4 is
+  // $20,000 - $1,694.
+  assertEquals(r.projected_form1040.line12c_deduction_total, 18306);
   assertEquals(r.currentModifiedIncomeGraphReconciled, true);
   assertEquals(r.filingReady, false);
   a.refigured_itemized_deduction.amount = 16475;

@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { canonicalForm1098CopyDocument } from "../../../../pdf/reviews/deductions/mortgage/review-1098-copy.fixture.ts";
 import { assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { PDFDocument } from "pdf-lib";
@@ -10,7 +13,7 @@ import { pdfReviewFixtures } from "../../../../pdf/review-fixtures.ts";
 
 const base = pdfReviewFixtures.find((item) => item.id === "single-w2-refund")!;
 const xsdPath = new URL(
-  "../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+  "../../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
   import.meta.url,
 ).pathname;
 
@@ -43,7 +46,7 @@ async function sha256(bytes: Uint8Array): Promise<string> {
   ).join("");
 }
 
-Deno.test("taxable Form 1098 box 4 recovery binds exact issuer copy through Schedule 1 native and PDF", async () => {
+test("taxable Form 1098 box 4 recovery binds exact issuer copy through Schedule 1 native and PDF", async () => {
   const bytes = await issuerCopy("2000");
   const mortgage = {
     lender_name: "Example Home Lender",
@@ -69,17 +72,17 @@ Deno.test("taxable Form 1098 box 4 recovery binds exact issuer copy through Sche
   const filer = extractFilerIdentity(result.pending.f1040)!;
   const bundle = await buildMefBundle(pending, { filer, attachments: [] });
   assertEquals(bundle.xml.includes("Form 1098 mortgage interest refund"), true);
-  const xmlPath = await Deno.makeTempFile({ suffix: ".xml" });
+  const xmlPath = await sys.makeTempFile({ suffix: ".xml" });
   try {
-    await Deno.writeTextFile(xmlPath, bundle.xml);
-    const checked = await new Deno.Command("xmllint", {
+    await fs.writeFile(xmlPath, bundle.xml);
+    const checked = await new sys.Command("xmllint", {
       args: ["--noout", "--schema", xsdPath, xmlPath],
       stdout: "piped",
       stderr: "piped",
     }).output();
     assertEquals(checked.code, 0, new TextDecoder().decode(checked.stderr));
   } finally {
-    await Deno.remove(xmlPath);
+    await sys.remove(xmlPath);
   }
   const filled = await buildPdfBytes(
     bundle.pending,
@@ -88,10 +91,10 @@ Deno.test("taxable Form 1098 box 4 recovery binds exact issuer copy through Sche
     bundle,
   );
   assertEquals((await PDFDocument.load(filled)).getPageCount(), 5);
-  const pdfPath = await Deno.makeTempFile({ suffix: ".pdf" });
+  const pdfPath = await sys.makeTempFile({ suffix: ".pdf" });
   try {
-    await Deno.writeFile(pdfPath, filled);
-    const extracted = await new Deno.Command("pdftotext", {
+    await fs.writeFile(pdfPath, filled);
+    const extracted = await new sys.Command("pdftotext", {
       args: ["-layout", pdfPath, "-"],
       stdout: "piped",
       stderr: "piped",
@@ -101,7 +104,7 @@ Deno.test("taxable Form 1098 box 4 recovery binds exact issuer copy through Sche
     assertEquals(rendered.includes("Form 1098 mortgage interest refund"), true);
     assertEquals(rendered.includes("1200"), true);
   } finally {
-    await Deno.remove(pdfPath);
+    await sys.remove(pdfPath);
   }
 
   const withoutCopy = {

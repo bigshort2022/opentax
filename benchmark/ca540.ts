@@ -1,4 +1,6 @@
-import { basename, join } from "@std/path";
+import * as fs from "node:fs/promises";
+import * as sys from "../scripts/support/sys.ts";
+import { basename, join } from "node:path";
 import { z } from "zod";
 import { productCatalog } from "../catalog.ts";
 import { isStateFormDefinition } from "../core/types/form-definition.ts";
@@ -321,7 +323,7 @@ function caAssertionSchema(path: string): z.ZodTypeAny | undefined {
 
 export async function loadCaCase(directory: string) {
   const inputRaw = JSON.parse(
-    await Deno.readTextFile(join(directory, "input.json")),
+    await fs.readFile(join(directory, "input.json"), "utf8"),
   );
   if (inputRaw.kind === CaCaseKind.CompleteReturn) {
     throw new Error(
@@ -330,10 +332,10 @@ export async function loadCaCase(directory: string) {
   }
   const input = caInputSchema.parse(inputRaw);
   const expected = caExpectedSchema.parse(
-    JSON.parse(await Deno.readTextFile(join(directory, "correct.json"))),
+    JSON.parse(await fs.readFile(join(directory, "correct.json"), "utf8")),
   );
   const sources = caSourcesSchema.parse(
-    JSON.parse(await Deno.readTextFile(join(directory, "sources.json"))),
+    JSON.parse(await fs.readFile(join(directory, "sources.json"), "utf8")),
   );
   if (input.kind === CaCaseKind.Workpaper && !sources.policy) {
     throw new Error(
@@ -354,13 +356,13 @@ export async function loadCaCase(directory: string) {
 }
 export async function inspectCaInventory(root: string): Promise<string[]> {
   const manifest = caScenarioSchema.parse(
-    JSON.parse(await Deno.readTextFile(join(root, "scenarios.json"))),
+    JSON.parse(await fs.readFile(join(root, "scenarios.json"), "utf8")),
   );
   const ledger = caLedgerSchema.parse(
-    JSON.parse(await Deno.readTextFile(join(root, "ledger.json"))),
+    JSON.parse(await fs.readFile(join(root, "ledger.json"), "utf8")),
   );
   const directories: string[] = [];
-  for await (const entry of Deno.readDir(root)) {
+  for await (const entry of sys.readDir(root)) {
     if (entry.isDirectory) directories.push(entry.name);
   }
   if (
@@ -538,7 +540,7 @@ export async function runCaCase(directory: string): Promise<CaCaseResult> {
       },
     };
   } else {
-    const baseDir = await Deno.makeTempDir({ prefix: "opentax-ca-benchmark-" });
+    const baseDir = await sys.makeTempDir({ prefix: "opentax-ca-benchmark-" });
     try {
       const { returnId } = await createReturnCommand({
         year: input.year,
@@ -610,7 +612,7 @@ export async function runCaCase(directory: string): Promise<CaCaseResult> {
         new Set(typed.gates.map((gate) => gate.id)).size !== typed.gates.length
       ) throw new Error("Duplicate CA gate IDs");
       const pdf = await exportPdfCommand({ returnId, baseDir });
-      const text = await new Deno.Command("pdftotext", {
+      const text = await new sys.Command("pdftotext", {
         args: [pdf, "-"],
         stdout: "piped",
         stderr: "piped",
@@ -637,7 +639,7 @@ export async function runCaCase(directory: string): Promise<CaCaseResult> {
         }
       }
     } finally {
-      await Deno.remove(baseDir, { recursive: true });
+      await sys.remove(baseDir, { recursive: true });
     }
   }
   const errors = compareCaExpected(expected, actual);
@@ -649,8 +651,13 @@ export async function runCaCase(directory: string): Promise<CaCaseResult> {
     actual,
   };
 }
-export async function runCaBenchmark(root: string) {
-  const cases = await inspectCaInventory(root);
+export async function runCaBenchmark(root: string, caseName?: string) {
+  // Selection never bypasses the canonical inventory and evidence checks.
+  const inventory = await inspectCaInventory(root);
+  const cases = caseName === undefined
+    ? inventory
+    : inventory.filter((directory) => basename(directory) === caseName);
+  if (cases.length === 0) throw new Error(`Unknown CA benchmark case: ${caseName}`);
   const results: CaCaseResult[] = [];
   for (const directory of cases) {
     try {

@@ -1,3 +1,5 @@
+import { test } from "bun:test";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { pdfReviewFixtures } from "../../../../pdf/review-fixtures.ts";
 import { f1040_2025 } from "../../../../index.ts";
@@ -13,21 +15,21 @@ const fixtures = pdfReviewFixtures.filter((f) =>
   f.id.startsWith("owned-mixed-cf-health-")
 );
 const expected = [
-  [15600, 300430.86, 14086, 2400, 53770],
-  [86030, 230000.86, 0, 2400, 40411],
-  [10900, 305130.86, 15026, 2400, 54672],
-  [0, 316030.86, 17206, 2400, 56765],
-  [15600, 482524.37, 30278, 2400, 123056],
-  [15600, 1232114.8599999999, 166423, 236285, 111536],
-  [15600, 298131.86, 13626, 0, 55507],
+  [15600, 300431, 14086, 2400, 53770],
+  [86030, 230001, 0, 2400, 40411],
+  [10900, 305131, 15026, 2400, 54672],
+  [0, 316031, 17206, 2400, 56765],
+  [15600, 482524, 30278, 2400, 123056],
+  [15600, 1232115, 166423, 236285, 111536],
+  [15600, 298132, 13626, 0, 55507],
 ];
-Deno.test("independent actual C/F health full limited excluded phase and current-use packets validate full XSD and PDF", async () => {
+test("independent actual C/F health full limited excluded phase and current-use packets validate full XSD and PDF", async () => {
   assertEquals(fixtures.length, 7);
   for (const [index, fixture] of fixtures.entries()) {
     const r = f1040_2025.executeReturn(fixture.inputs),
       p = normalizeAllPending(r.pending);
     assertEquals(r.diagnostics, []);
-    const health = assertIndependentOwnerHealth(p, fixture.filer);
+    const health = assertIndependentOwnerHealth(p, 2025, fixture.filer);
     assertEquals([
       health.deduction,
       p.f1040.line11_agi,
@@ -68,11 +70,11 @@ Deno.test("independent actual C/F health full limited excluded phase and current
       }),
     );
     const prepared = await f1040_2025.prepareReturn(r.pending, fixture.filer);
-    const child = new Deno.Command("xmllint", {
+    const child = new sys.Command("xmllint", {
       args: [
         "--noout",
         "--schema",
-        ".state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+        "irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
         "-",
       ],
       stdin: "piped",
@@ -88,7 +90,7 @@ Deno.test("independent actual C/F health full limited excluded phase and current
     assertEquals((await prepared.renderPdf()).length > 0, true);
   }
 });
-Deno.test("mixed C/F health rejects actual owner issuer month business payroll and prepared source conflicts", async () => {
+test("mixed C/F health rejects actual owner issuer month business payroll and prepared source conflicts", async () => {
   const fixture = fixtures[0];
   for (
     const mutate of [
@@ -155,7 +157,7 @@ Deno.test("mixed C/F health rejects actual owner issuer month business payroll a
       const p = structuredClone(original);
       mutate(p);
       await assertRejects(() => f1040_2025.prepareReturn(p, fixture.filer));
-      assertThrows(() => assertIndependentOwnerHealth(p, fixture.filer));
+      assertThrows(() => assertIndependentOwnerHealth(p, 2025, fixture.filer));
       assertThrows(() =>
         form7206.build(p.form7206 as any, { pending: p, filer: fixture.filer })
       );

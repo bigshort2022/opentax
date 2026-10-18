@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import {
   calculateForm8611,
@@ -65,7 +66,7 @@ function flowThrough(overrides: Record<string, unknown> = {}) {
   });
 }
 
-Deno.test("Form 8611 uses the IRS printed recapture-percentage table", () => {
+test("Form 8611 uses the IRS printed recapture-percentage table", () => {
   for (const year of [2, 3, 10, 11]) {
     assertEquals(recapturePercentage(year), 0.333);
   }
@@ -77,7 +78,7 @@ Deno.test("Form 8611 uses the IRS printed recapture-percentage table", () => {
   assertThrows(() => recapturePercentage(16));
 });
 
-Deno.test("Form 8611 owner lines include the unused-credit and interest adjustments", () => {
+test("Form 8611 owner lines include the unused-credit and interest adjustments", () => {
   const lines = calculateForm8611(owner());
   assertEquals(lines.line1, 30_000);
   assertEquals(lines.line3, 30_000);
@@ -90,7 +91,7 @@ Deno.test("Form 8611 owner lines include the unused-credit and interest adjustme
   assertEquals(lines.line14, 9_090);
 });
 
-Deno.test("Form 8611 line 2 follows the prior-year Form 8609-A worksheet", () => {
+test("Form 8611 line 2 follows the prior-year Form 8609-A worksheet", () => {
   const worksheet = {
     source_form8609a_reference: "2023 filed Form 8609-A",
     prior_tax_year: 2023,
@@ -106,7 +107,7 @@ Deno.test("Form 8611 line 2 follows the prior-year Form 8609-A worksheet", () =>
   assertEquals(lines.line3, 27_000);
 });
 
-Deno.test("Form 8611 pass-through amount starts on line 8", () => {
+test("Form 8611 pass-through amount starts on line 8", () => {
   const lines = calculateForm8611(flowThrough());
   assertEquals(lines.line1, undefined);
   assertEquals(lines.line8, 2_000);
@@ -116,7 +117,7 @@ Deno.test("Form 8611 pass-through amount starts on line 8", () => {
   assertEquals(lines.line14, 1_650);
 });
 
-Deno.test("Form 8611 combines building line 14 amounts on Schedule 2 line 16", () => {
+test("Form 8611 combines building line 14 amounts on Schedule 2 line 16", () => {
   const result = f8611.compute(
     { taxYear: 2025, formType: "f1040" },
     { f8611s: [owner(), flowThrough()] },
@@ -127,7 +128,7 @@ Deno.test("Form 8611 combines building line 14 amounts on Schedule 2 line 16", (
   );
 });
 
-Deno.test("Form 8611 rejects missing source facts and inconsistent prior credits", () => {
+test("Form 8611 rejects missing source facts and inconsistent prior credits", () => {
   assertThrows(() =>
     itemSchema.parse({
       ...owner(),
@@ -171,5 +172,27 @@ Deno.test("Form 8611 rejects missing source facts and inconsistent prior credits
         recapture_required_after_exceptions: false,
       },
     })
+  );
+});
+
+// Form 8611 line 4: the compliance-period year of a 2026 recapture for a
+// credit period beginning in 2015 is year 12, so 26.7% (the form's table).
+// Lines 3 $30,000 × 26.7% = $8,010 = line 10; line 12 adds $100 interest;
+// line 14 subtracts $1,000 of unused credits.
+test("2026 recapture uses the 2026 compliance-period year", () => {
+  const item = owner({ credit_period_start_year: 2015 });
+  const recapture = { ...item, recapture_year: 2026 };
+  const result = f8611.compute({ taxYear: 2026, formType: "f1040" }, {
+    f8611s: [recapture],
+  });
+  assertEquals(
+    fieldsOf(result.outputs, schedule2)?.line16_lihtc_recapture,
+    7_110,
+  );
+  assertThrows(
+    () =>
+      f8611.compute({ taxYear: 2026, formType: "f1040" }, { f8611s: [item] }),
+    Error,
+    "recapture year must match",
   );
 });

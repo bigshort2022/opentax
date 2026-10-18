@@ -1,3 +1,5 @@
+import { test } from "bun:test";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
 import { PDFDocument } from "pdf-lib";
 import { f1040_2025 } from "../../../../index.ts";
@@ -6,9 +8,9 @@ import { pdfReviewFixtures } from "../../../../pdf/review-fixtures.ts";
 import { withReviewedForm8874RecaptureEvidence } from "../../../../../nodes/inputs/credits/business/f8874/recapture_fixture.ts";
 
 const schema =
-  ".state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd";
+  "irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd";
 async function validate(xml: string) {
-  const p = new Deno.Command("xmllint", {
+  const p = new sys.Command("xmllint", {
     args: ["--noout", "--schema", schema, "-"],
     stdin: "piped",
     stderr: "piped",
@@ -26,16 +28,15 @@ for (
     { id: "single-seven-new-markets-investments", credit: 3500 },
   ]
 ) {
-  Deno.test(`Form8874 public investment inventory retains source-authentication export block: ${c.id}`, async () => {
+  test(`Form8874 public investment inventory exports only with retained CDE status: ${c.id}`, async () => {
     const fixture = pdfReviewFixtures.find((f) => f.id === c.id)!;
     const r = f1040_2025.executeReturn(fixture.inputs);
     assertEquals(r.diagnostics, []);
     assertEquals(r.pending.schedule3.line6a_total, c.credit);
     assertEquals(r.pending.f1040.line20_nonrefundable_credits, c.credit);
     assertEquals(r.pending.f1040.line24_total_tax, 25067 - c.credit);
-    // Older rendered packets predate the current authenticated-status gate.
     const reason =
-      "Form 8874 direct QEI needs authenticated CDE status and recapture history";
+      "Form 8874 CDE status needs exactly one retained copy of each statement and notice";
     await assertRejects(
       () => f1040_2025.prepareReturn(r.pending, fixture.filer),
       Error,
@@ -46,6 +47,14 @@ for (
       Error,
       reason,
     );
+    const prepared = await f1040_2025.prepareReturn(
+      r.pending,
+      fixture.filer,
+      [],
+      fixture.retainedSourceDocuments,
+    );
+    assertStringIncludes(prepared.bundle.xml, "<IRS8874");
+    await validate(prepared.bundle.xml);
   });
 }
 const base = pdfReviewFixtures.find((f) => f.id === "single-w2-refund")!;
@@ -83,7 +92,7 @@ function recapture(id: number) {
   }, "Alex Example");
 }
 for (const count of [1, 2]) {
-  Deno.test(`Form8874 public reported recapture through final tax and exports: ${count} investments`, async () => {
+  test(`Form8874 public reported recapture through final tax and exports: ${count} investments`, async () => {
     const r = f1040_2025.executeReturn({
       ...base.inputs,
       f8874_recapture: {

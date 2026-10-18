@@ -1,74 +1,37 @@
-import { w2gPayerCopyFixture } from "../../../../domains/income/other/w2g_payer_copy.fixture.ts";
+import * as fs from "node:fs/promises";
+import { test } from "bun:test";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import {
   assertEquals,
   assertRejects,
   assertStringIncludes,
   assertThrows,
 } from "@std/assert";
-import { PDFDocument } from "pdf-lib";
 import { execute } from "../../../../../../../core/runtime/executor.ts";
 import { buildExecutionPlan } from "../../../../../../../core/runtime/planner.ts";
 import { registry } from "../../../../registry.ts";
 import { buildMefBundle, buildMefXml } from "../../../../mef/builder.ts";
 import { buildPending } from "../../../../mef/execution/pending.ts";
-import { sha256Hex } from "../../../../return-processing/prepared-source.ts";
 import { buildPdfBytes } from "../../../builder.ts";
 import { f1040_2025 } from "../../../../index.ts";
-import { inputSchema as w2gInputSchema } from "../../../../../nodes/inputs/income/gambling/w2g/index.ts";
 import { pdfReviewFixtures } from "../../../review-fixtures.ts";
 import { irs1040Pdf } from "../../../forms/general/return-assembly/f1040.ts";
 import { form8911Pdf } from "../../../forms/credits/business/f8911.ts";
 import { form8911ScheduleAPdf } from "../../../forms/credits/business/f8911_schedule_a.ts";
-import { w2gPdf } from "../../../forms/income/other/w2g.ts";
 
 const xsd = new URL(
-  "../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+  "../../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
   import.meta.url,
 ).pathname;
 const xsdAvailable = (() => {
   try {
-    Deno.statSync(xsd);
+    sys.statSync(xsd);
     return true;
   } catch {
     return false;
   }
 })();
 const plan = buildExecutionPlan(registry);
-
-async function withheldW2GXml(
-  pending: ReturnType<typeof buildPending>,
-  filer: (typeof pdfReviewFixtures)[number]["filer"],
-): Promise<string> {
-  const [issued] = w2gInputSchema.parse(pending.w2g).w2gs;
-  if (!issued) throw new Error("Missing W-2G source");
-  const projected = w2gPdf.instances?.(
-    { w2gs: [issued] },
-    filer,
-    { f1040: { line25c_total: pending.f1040?.line25c_total } },
-  )?.[0];
-  if (!projected) throw new Error("Missing W-2G recipient copy projection");
-  const bytes = await w2gPayerCopyFixture(projected);
-  const hash = await sha256Hex(bytes);
-  const fileName = "IssuedW2G.pdf";
-  const bundle = await buildMefBundle({
-    ...pending,
-    w2g: {
-      w2gs: [{
-        ...issued,
-        issued_copy_attachment_file_name: fileName,
-        issued_copy_pdf_sha256: hash,
-      }],
-    },
-  }, {
-    filer,
-    attachments: [{
-      fileName,
-      description: "Payer-issued Form W-2G recipient copy",
-      bytes,
-    }],
-  });
-  return bundle.xml;
-}
 
 async function section1231ExchangeXml(
   pending: ReturnType<typeof buildPending>,
@@ -112,27 +75,17 @@ const directNewMarketsReviewIds = new Set([
 ]);
 
 for (const fixture of pdfReviewFixtures) {
-  Deno.test({
-    name: fixture.id === "single-form461-schedule-c-excess-business-loss"
-      ? `filled-PDF source ${fixture.id} keeps the sourced loss and blocks unsupported QBI carryforward export`
-      : directNewMarketsReviewIds.has(fixture.id)
-      ? `filled-PDF source ${fixture.id} blocks unauthenticated direct Form 8874 export`
-      : `filled-PDF source ${fixture.id} also exports TY2025 v5.4 XML`,
-    ignore: !xsdAvailable,
-    async fn() {
+  test.skipIf(!xsdAvailable)(directNewMarketsReviewIds.has(fixture.id)
+      ? `filled-PDF source ${fixture.id} exports direct Form 8874 only with retained CDE status`
+      : `filled-PDF source ${fixture.id} also exports TY2025 v5.4 XML`, async () => {
       const result = f1040_2025.executeReturn({ ...fixture.inputs });
       if (fixture.id === "single-form461-schedule-c-excess-business-loss") {
-        assertEquals(result.diagnostics.length, 1);
-        assertStringIncludes(
-          result.diagnostics[0].message,
-          "Form 8995 net QBI loss needs a sourced carryforward filing route",
-        );
-        assertEquals(
-          (result.pending.form461 as Record<string, unknown>)
-            .line16_excess_business_loss,
-          -87_000,
-        );
-        return;
+        // Form 8995 instructions: losses disallowed by section 461(l) are not
+        // QBI until allowed, so line 1 is -400,000 + 87,000.
+        const qbi = result.pending.form8995 as Record<string, unknown>;
+        assertEquals(qbi.line2, -313_000);
+        assertEquals(qbi.line15, 0);
+        assertEquals(qbi.line16, 313_000);
       }
       assertEquals(result.diagnostics, []);
       if (fixture.id === "single-8862-ctc-reinstatement") {
@@ -140,7 +93,7 @@ for (const fixture of pdfReviewFixtures) {
         assertThrows(
           () => buildMefXml(buildPending(result.pending), fixture.filer),
           Error,
-          "executor-owned authentication of prior IRS notice issuance and contents",
+          "retained prior IRS notice copy with matching SHA-256",
         );
         return;
       }
@@ -153,9 +106,32 @@ for (const fixture of pdfReviewFixtures) {
         assertThrows(
           () => buildMefXml(pending, fixture.filer),
           Error,
-          "Form 8874 direct QEI needs authenticated CDE status",
+          "retained CDE status and notice copies with matching SHA-256",
         );
-        return;
+        const [statement, ...others] = fixture.retainedSourceDocuments ?? [];
+        await assertRejects(
+          () =>
+            buildMefBundle(pending, {
+              filer: fixture.filer,
+              attachments: [],
+              retainedSourceDocuments: [
+                { ...statement, bytes: new TextEncoder().encode("altered") },
+                ...others,
+              ],
+            }),
+          Error,
+          "bytes differ",
+        );
+        await assertRejects(
+          () =>
+            buildMefBundle(pending, {
+              filer: fixture.filer,
+              attachments: [],
+              retainedSourceDocuments: others,
+            }),
+          Error,
+          "exactly one retained copy",
+        );
       }
       if (
         fixture.id === "single-two-employers-excess-social-security" ||
@@ -191,9 +167,6 @@ for (const fixture of pdfReviewFixtures) {
           attachments: fixture.attachments ?? [],
           retainedSourceDocuments: fixture.retainedSourceDocuments,
         })).xml
-        : fixture.id === "single-withheld-w2g" ||
-            fixture.id === "single-partnership-code-k-and-w2g"
-        ? await withheldW2GXml(pending, fixture.filer)
         : fixture.id === "single-form8824-section1231-exchange"
         ? await section1231ExchangeXml(pending, fixture.filer)
         : fixture.id === "single-form8995a-two-business-aggregation"
@@ -1602,10 +1575,10 @@ for (const fixture of pdfReviewFixtures) {
       if (fixture.id.startsWith("single-ira-late-")) {
         assertEquals(xml.includes("synthetic-"), false);
       }
-      const path = await Deno.makeTempFile({ suffix: ".xml" });
+      const path = await sys.makeTempFile({ suffix: ".xml" });
       try {
-        await Deno.writeTextFile(path, xml);
-        const checked = await new Deno.Command("xmllint", {
+        await fs.writeFile(path, xml);
+        const checked = await new sys.Command("xmllint", {
           args: ["--noout", "--schema", xsd, path],
           stdout: "piped",
           stderr: "piped",
@@ -1616,17 +1589,12 @@ for (const fixture of pdfReviewFixtures) {
           `${fixture.id}: ${new TextDecoder().decode(checked.stderr)}`,
         );
       } finally {
-        await Deno.remove(path);
+        await sys.remove(path);
       }
-    },
-  });
+    });
 }
 
-Deno.test({
-  name:
-    "two Form 8814 child gains retain two native copies and one TY2025 Schedule D total",
-  ignore: !xsdAvailable,
-  async fn() {
+test.skipIf(!xsdAvailable)("two Form 8814 child gains retain two native copies and one TY2025 Schedule D total", async () => {
     const fixture = pdfReviewFixtures.find((item) =>
       item.id === "single-form8814-child-gain-with-schedule-d"
     );
@@ -1657,17 +1625,16 @@ Deno.test({
       xml,
       "<CapitalGainDistributionsAmt>358</CapitalGainDistributionsAmt>",
     );
-    const path = await Deno.makeTempFile({ suffix: ".xml" });
+    const path = await sys.makeTempFile({ suffix: ".xml" });
     try {
-      await Deno.writeTextFile(path, xml);
-      const checked = await new Deno.Command("xmllint", {
+      await fs.writeFile(path, xml);
+      const checked = await new sys.Command("xmllint", {
         args: ["--noout", "--schema", xsd, path],
         stdout: "piped",
         stderr: "piped",
       }).output();
       assertEquals(checked.code, 0, new TextDecoder().decode(checked.stderr));
     } finally {
-      await Deno.remove(path);
+      await sys.remove(path);
     }
-  },
-});
+  });

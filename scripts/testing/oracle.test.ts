@@ -1,5 +1,8 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../support/sys.ts";
 import { assert, assertEquals } from "@std/assert";
-import { join } from "@std/path";
+import { join } from "node:path";
 import {
   caseChanges,
   caseKey,
@@ -34,7 +37,7 @@ const entry = (source: string): Ledger[number] => ({
   on: "2026-10-16",
 });
 
-Deno.test("a case is identified by its product and directory", () => {
+test("a case is identified by its product and directory", () => {
   assertEquals(
     caseKey("benchmark/cases/f1040/2025/01-single/correct.json"),
     { product: "f1040/2025", case: "01-single" },
@@ -46,7 +49,7 @@ Deno.test("a case is identified by its product and directory", () => {
   assertEquals(caseKey("benchmark/reference/2025/x.json"), undefined);
 });
 
-Deno.test("changes are the scored lines that differ, plus added and removed cases", () => {
+test("changes are the scored lines that differ, plus added and removed cases", () => {
   assertEquals(
     caseChanges(product, name, expected(31000), expected(31000)),
     [],
@@ -76,7 +79,7 @@ Deno.test("changes are the scored lines that differ, plus added and removed case
   }]);
 });
 
-Deno.test("an expected value changed to what the engine computes is refused unless a publication is cited", () => {
+test("an expected value changed to what the engine computes is refused unless a publication is cited", () => {
   const change = caseChanges(product, name, expected(31000), expected(31500));
   const uncited = ledgerProblems(change, new Map());
   assertEquals(uncited.map((p) => [p.kind, p.line]), [[
@@ -107,7 +110,7 @@ Deno.test("an expected value changed to what the engine computes is refused unle
   );
 });
 
-Deno.test("a new case needs a source and a removed case needs a ledger entry", () => {
+test("a new case needs a source and a removed case needs a ledger entry", () => {
   assertEquals(
     ledgerProblems(
       [{ kind: "added", product, case: name, cited: false }],
@@ -142,16 +145,16 @@ Deno.test("a new case needs a source and a removed case needs a ledger entry", (
 });
 
 async function run(root: string, args: string[]) {
-  const result = await new Deno.Command("git", { args, cwd: root }).output();
+  const result = await new sys.Command("git", { args, cwd: root }).output();
   assert(result.success, args.join(" "));
 }
 
-Deno.test("against a git base, an uncommitted edit to an expected value is caught until the ledger cites it", async () => {
-  const root = await Deno.makeTempDir();
+test("against a git base, an uncommitted edit to an expected value is caught until the ledger cites it", async () => {
+  const root = await sys.makeTempDir();
   const dir = join(root, "benchmark/cases", product, name);
-  await Deno.mkdir(dir, { recursive: true });
-  await Deno.writeTextFile(join(dir, "input.json"), "{}");
-  await Deno.writeTextFile(
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(join(dir, "input.json"), "{}");
+  await fs.writeFile(
     join(dir, "correct.json"),
     JSON.stringify(expected(31000)),
   );
@@ -169,7 +172,7 @@ Deno.test("against a git base, an uncommitted edit to an expected value is caugh
   ]);
   assertEquals((await oracleReport(root, "HEAD")).problems, []);
 
-  await Deno.writeTextFile(
+  await fs.writeFile(
     join(dir, "correct.json"),
     JSON.stringify(expected(31500)),
   );
@@ -177,14 +180,14 @@ Deno.test("against a git base, an uncommitted edit to an expected value is caugh
   assertEquals(caught.changes.length, 1);
   assertEquals(caught.problems.map((p) => p.kind), ["uncited-change"]);
 
-  await Deno.writeTextFile(
+  await fs.writeFile(
     join(root, "benchmark/cases", product, "ledger.json"),
     JSON.stringify([entry("IRS Pub 915 worksheet 1, p. 16")]),
   );
   assertEquals((await oracleReport(root, "HEAD")).problems, []);
 });
 
-Deno.test("CA typed outcome and evidence deletions need reviewed typed ledger evidence", () => {
+test("CA typed outcome and evidence deletions need reviewed typed ledger evidence", () => {
   const before = { kind: CaCaseKind.Line31, lines: { line31_tax: 2864 } };
   const after = { kind: CaCaseKind.Line31, lines: { line31_tax: 2863 } };
   const changes = caseChanges("ca540/2025", "table", before, after);
@@ -214,7 +217,7 @@ Deno.test("CA typed outcome and evidence deletions need reviewed typed ledger ev
   }
 });
 
-Deno.test("CA evidence rejects self-approval and policy-only numeric authority", () => {
+test("CA evidence rejects self-approval and policy-only numeric authority", () => {
   const changes = caseChanges("ca540/2025", "mixed", {
     lines: { line32_exemption_credits: 268 },
   }, { lines: { line32_exemption_credits: 295 } });
@@ -266,14 +269,14 @@ Deno.test("CA evidence rejects self-approval and policy-only numeric authority",
   );
 });
 
-Deno.test("isolated CA oracle covers source and manifest weakening and an entirely removed inventory", async () => {
-  const root = await Deno.makeTempDir();
+test("isolated CA oracle covers source and manifest weakening and an entirely removed inventory", async () => {
+  const root = await sys.makeTempDir();
   const target = join(root, "benchmark/cases/ca540/2025");
   const source = new URL("../../benchmark/cases/ca540/2025/", import.meta.url);
   try {
-    await Deno.mkdir(target, { recursive: true });
+    await fs.mkdir(target, { recursive: true });
     for (const file of ["scenarios.json", "ledger.json"]) {
-      await Deno.copyFile(new URL(file, source), join(target, file));
+      await fs.copyFile(new URL(file, source), join(target, file));
     }
     for (
       const id of [
@@ -283,9 +286,9 @@ Deno.test("isolated CA oracle covers source and manifest weakening and an entire
         "mixed-exemption-regression",
       ]
     ) {
-      await Deno.mkdir(join(target, id));
+      await fs.mkdir(join(target, id));
       for (const file of ["input.json", "correct.json", "sources.json"]) {
-        await Deno.copyFile(
+        await fs.copyFile(
           new URL(`${id}/${file}`, source),
           join(target, id, file),
         );
@@ -308,21 +311,21 @@ Deno.test("isolated CA oracle covers source and manifest weakening and an entire
       [],
     );
     const sources = join(target, "workpaper-baseline/sources.json");
-    const oldSources = await Deno.readTextFile(sources);
+    const oldSources = await fs.readFile(sources, "utf8");
     const altered = JSON.parse(oldSources);
     altered.official.pop();
-    await Deno.writeTextFile(sources, JSON.stringify(altered));
+    await fs.writeFile(sources, JSON.stringify(altered));
     assert(
       (await oracleReport(root, "HEAD")).problems.some((problem) =>
         problem.line?.startsWith("sources.json")
       ),
     );
-    await Deno.writeTextFile(sources, oldSources);
+    await fs.writeFile(sources, oldSources);
     const manifest = JSON.parse(
-      await Deno.readTextFile(join(target, "scenarios.json")),
+      await fs.readFile(join(target, "scenarios.json"), "utf8"),
     );
     manifest.cases[0].requirements.pop();
-    await Deno.writeTextFile(
+    await fs.writeFile(
       join(target, "scenarios.json"),
       JSON.stringify(manifest),
     );
@@ -331,14 +334,14 @@ Deno.test("isolated CA oracle covers source and manifest weakening and an entire
         problem.case === "@manifest"
       ),
     );
-    await Deno.remove(target, { recursive: true });
+    await sys.remove(target, { recursive: true });
     assert((await oracleReport(root, "HEAD")).problems.length > 0);
   } finally {
-    await Deno.remove(root, { recursive: true });
+    await sys.remove(root, { recursive: true });
   }
 });
 
-Deno.test("CA project gate, readiness, diagnostics and coverage policy cannot cite FTB as policy authority", () => {
+test("CA project gate, readiness, diagnostics and coverage policy cannot cite FTB as policy authority", () => {
   for (
     const [path, before, after] of [
       ["gates.scope", "unsupported", "passed"],
@@ -389,14 +392,14 @@ Deno.test("CA project gate, readiness, diagnostics and coverage policy cannot ci
   }
 });
 
-Deno.test("CA migration compares against legacy vector amounts instead of treating them as uncited new values", async () => {
-  const root = await Deno.makeTempDir();
+test("CA migration compares against legacy vector amounts instead of treating them as uncited new values", async () => {
+  const root = await sys.makeTempDir();
   try {
     const legacy = join(root, "benchmark/ca540/2025");
-    await Deno.mkdir(legacy, { recursive: true });
+    await fs.mkdir(legacy, { recursive: true });
     const source =
       "FTB 2025 tax table https://www.ftb.ca.gov/forms/2025/2025-540-taxtable.pdf";
-    await Deno.writeTextFile(
+    await fs.writeFile(
       join(legacy, "cases.json"),
       JSON.stringify([{
         name: "single-tax-table-68494",
@@ -422,8 +425,8 @@ Deno.test("CA migration compares against legacy vector amounts instead of treati
       root,
       "benchmark/cases/ca540/2025/single-tax-table-68494",
     );
-    await Deno.mkdir(canonical, { recursive: true });
-    await Deno.writeTextFile(
+    await fs.mkdir(canonical, { recursive: true });
+    await fs.writeFile(
       join(canonical, "input.json"),
       JSON.stringify({
         product: "ca540",
@@ -433,17 +436,17 @@ Deno.test("CA migration compares against legacy vector amounts instead of treati
         filingStatus: "single",
       }),
     );
-    await Deno.writeTextFile(
+    await fs.writeFile(
       join(canonical, "correct.json"),
       JSON.stringify({ kind: CaCaseKind.Line31, lines: { line31_tax: 2864 } }),
     );
-    await Deno.writeTextFile(
+    await fs.writeFile(
       join(canonical, "sources.json"),
       JSON.stringify({ official: [source] }),
     );
     const retained = await oracleReport(root, "HEAD");
     assertEquals(retained.changes, []);
-    await Deno.writeTextFile(
+    await fs.writeFile(
       join(canonical, "correct.json"),
       JSON.stringify({ kind: CaCaseKind.Line31, lines: { line31_tax: 2865 } }),
     );
@@ -460,7 +463,7 @@ Deno.test("CA migration compares against legacy vector amounts instead of treati
         problem.line === "correct.json.lines.line31_tax"
       ),
     );
-    await Deno.writeTextFile(
+    await fs.writeFile(
       join(root, "benchmark/cases/ca540/2025/ledger.json"),
       JSON.stringify([{
         case: "single-tax-table-68494",
@@ -478,11 +481,11 @@ Deno.test("CA migration compares against legacy vector amounts instead of treati
         problem.line === "correct.json.lines.line31_tax"
       ),
     );
-    await Deno.writeTextFile(
+    await fs.writeFile(
       join(canonical, "correct.json"),
       JSON.stringify({ kind: CaCaseKind.Line31, lines: { line31_tax: 2864 } }),
     );
-    await Deno.writeTextFile(
+    await fs.writeFile(
       join(canonical, "sources.json"),
       JSON.stringify({ official: [source + " altered citation"] }),
     );
@@ -492,17 +495,18 @@ Deno.test("CA migration compares against legacy vector amounts instead of treati
       ),
     );
   } finally {
-    await Deno.remove(root, { recursive: true });
+    await sys.remove(root, { recursive: true });
   }
 });
 
-Deno.test("CA coverage policy and technical source assertions require their respective authority owners", async () => {
+test("CA coverage policy and technical source assertions require their respective authority owners", async () => {
   const fixture = JSON.parse(
-    await Deno.readTextFile(
+    await fs.readFile(
       new URL(
         "../../benchmark/cases/ca540/2025/workpaper-baseline/correct.json",
         import.meta.url,
       ),
+      "utf8",
     ),
   );
   const { source, ...policy } =

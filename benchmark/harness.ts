@@ -1,4 +1,6 @@
-import { basename, dirname, join, relative } from "@std/path";
+import * as fs from "node:fs/promises";
+import * as sys from "../scripts/support/sys.ts";
+import { basename, dirname, join, relative } from "node:path";
 import { z } from "zod";
 import { productCatalog } from "../catalog.ts";
 import {
@@ -167,7 +169,7 @@ async function parseFile<T>(
   name: string,
   schema: z.ZodType<T>,
 ): Promise<{ raw: unknown; parsed: T }> {
-  const raw = JSON.parse(await Deno.readTextFile(join(directory, name)));
+  const raw = JSON.parse(await fs.readFile(join(directory, name), "utf8"));
   try {
     return { raw, parsed: schema.parse(raw) };
   } catch (error) {
@@ -251,7 +253,7 @@ export async function inspectBenchmarkCases(
         problems.push({ directory, message: describe(error) });
       }
     }
-    for await (const entry of Deno.readDir(directory)) entries.push(entry);
+    for await (const entry of sys.readDir(directory)) entries.push(entry);
     entries.sort((a, b) => a.name.localeCompare(b.name));
     if (
       entries.some((entry) =>
@@ -276,11 +278,34 @@ export async function inspectBenchmarkCases(
   return { found, problems };
 }
 
+/** Baselined invalid cases the runners skip; `casesRoot` is what entry names are relative to. */
+export type KnownInvalidCases = {
+  readonly casesRoot: string;
+  readonly baseline: CaseBaseline;
+  readonly today: string;
+};
+
+function isKnownInvalid(
+  known: KnownInvalidCases | undefined,
+  problem: CaseProblem,
+): boolean {
+  if (!known) return false;
+  const name = relative(known.casesRoot, problem.directory);
+  return known.baseline.some((entry) =>
+    entry.case === name && entry.expires >= known.today
+  );
+}
+
 export async function discoverBenchmarkCases(
   root: string,
   products: Readonly<Record<string, ProductDefinition>> = productCatalog,
+  known?: KnownInvalidCases,
 ): Promise<string[]> {
-  const { found, problems } = await inspectBenchmarkCases(root, products);
+  const inspection = await inspectBenchmarkCases(root, products);
+  const found = inspection.found;
+  const problems = inspection.problems.filter((problem) =>
+    !isKnownInvalid(known, problem)
+  );
   if (problems.length > 0) {
     throw new Error(
       `${problems.length} invalid benchmark case${
@@ -306,10 +331,10 @@ export type CaseBaseline = z.infer<typeof caseBaselineSchema>;
 export async function readCaseBaseline(repo: string): Promise<CaseBaseline> {
   try {
     return caseBaselineSchema.parse(
-      JSON.parse(await Deno.readTextFile(join(repo, CASE_BASELINE_PATH))),
+      JSON.parse(await fs.readFile(join(repo, CASE_BASELINE_PATH), "utf8")),
     );
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) return [];
+    if (sys.isNotFound(error)) return [];
     throw error;
   }
 }
@@ -349,7 +374,7 @@ export function applyCaseBaseline(
 }
 
 export function checkedCommandOutput(
-  result: Deno.CommandOutput,
+  result: sys.CommandOutput,
   label: string,
 ): string {
   if (!result.success || result.code !== 0) {
@@ -366,11 +391,8 @@ export async function benchmarkTax(
   taxDirectory: string,
   args: string[],
 ): Promise<string> {
-  const result = await new Deno.Command("deno", {
+  const result = await new sys.Command(process.execPath, {
     args: [
-      "run",
-      "--allow-read",
-      "--allow-write",
       join(taxDirectory, "cli/main.ts"),
       ...args,
     ],

@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../../scripts/support/sys.ts";
 import {
   assertEquals,
   assertRejects,
@@ -20,7 +23,7 @@ import { buildMefBundle, buildMefXml } from "../../../../builder.ts";
 import { testFiler } from "../../../../execution/test-filer.ts";
 import { form8283 } from "./f8283.ts";
 
-Deno.test("Form 8283 emits the sourced ATS Scenario 2 Section A donation", () => {
+test("Form 8283 emits the sourced ATS Scenario 2 Section A donation", () => {
   const donation = SCENARIO_1040_02_FACTS.form8283;
   const xml = buildMefXml({
     f8283: {
@@ -54,7 +57,36 @@ Deno.test("Form 8283 emits the sourced ATS Scenario 2 Section A donation", () =>
   assertStringIncludes(xml, "<FairMarketValueAmt>700</FairMarketValueAmt>");
 });
 
-Deno.test("Form 8283 preserves multiple Section A rows and month-only acquisition dates", () => {
+test("Form 8283 files a Various acquisition date for a group of similar items", () => {
+  const donation = SCENARIO_1040_02_FACTS.form8283;
+  const item = {
+    donee_organization_name: donation.donee,
+    property_description: donation.propertyDescription,
+    date_contributed: donation.donationDate,
+    date_acquired_various: true,
+    donor_acquisition_description: donation.howAcquired,
+    cost_or_adjusted_basis: donation.costBasis,
+    fmv: donation.fairMarketValue,
+    charitable_limit_category: "noncash_50",
+    is_capital_gain_property: false,
+  } as const;
+  assertStringIncludes(
+    buildMefXml({ f8283: { section_a_items: [item] } }, testFiler()),
+    "<DonorAcquiredDt>VARIOUS</DonorAcquiredDt><DonorAcquisitionDesc>Purchase</DonorAcquisitionDesc>",
+  );
+  assertThrows(
+    () =>
+      buildMefXml({
+        f8283: {
+          section_a_items: [{ ...item, date_acquired: "2020-01-01" }],
+        },
+      }, testFiler()),
+    Error,
+    "both a date and Various",
+  );
+});
+
+test("Form 8283 preserves multiple Section A rows and month-only acquisition dates", () => {
   const [xml] = form8283.build({
     section_a_items: [
       {
@@ -130,25 +162,25 @@ async function withSignedForm<T extends object>(item: T, bytes: Uint8Array) {
 
 async function assertVehicleBundleXsd(xml: string): Promise<void> {
   const xsdPath = new URL(
-    "../../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+    "../../../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
     import.meta.url,
   ).pathname;
   try {
-    await Deno.stat(xsdPath);
+    await sys.stat(xsdPath);
   } catch {
     throw new Error(`Missing verification prerequisite: ${xsdPath}`);
   }
-  const path = await Deno.makeTempFile({ suffix: ".xml" });
+  const path = await sys.makeTempFile({ suffix: ".xml" });
   try {
-    await Deno.writeTextFile(path, xml);
-    const checked = await new Deno.Command("xmllint", {
+    await fs.writeFile(path, xml);
+    const checked = await new sys.Command("xmllint", {
       args: ["--noout", "--schema", xsdPath, path],
       stdout: "piped",
       stderr: "piped",
     }).output();
     assertEquals(checked.code, 0, new TextDecoder().decode(checked.stderr));
   } finally {
-    await Deno.remove(path);
+    await sys.remove(path);
   }
 }
 
@@ -328,7 +360,7 @@ function sectionBHighValueEquipmentGift() {
   } as const;
 }
 
-Deno.test("Form 8283 Section B does not file an unexplained reduction below appraised FMV", () => {
+test("Form 8283 Section B does not file an unexplained reduction below appraised FMV", () => {
   const gift = sectionBHighValueEquipmentGift();
   assertThrows(
     () =>
@@ -343,7 +375,7 @@ Deno.test("Form 8283 Section B does not file an unexplained reduction below appr
   );
 });
 
-Deno.test("Form 8283 partial similar-book group without owned signed-source packets is rejected", () => {
+test("Form 8283 partial similar-book group without owned signed-source packets is rejected", () => {
   const base = sectionBHighValueEquipmentGift();
   const gifts = [
     ["City College", "111111111", 2_000],
@@ -388,7 +420,7 @@ Deno.test("Form 8283 partial similar-book group without owned signed-source pack
   );
 });
 
-Deno.test("Form 8283 unreduced equipment group needs separately supported Section B sources", () => {
+test("Form 8283 unreduced equipment group needs separately supported Section B sources", () => {
   const base = sectionBHighValueEquipmentGift();
   const sectionB = [1, 2].map((index) => ({
     ...base,
@@ -432,7 +464,7 @@ Deno.test("Form 8283 unreduced equipment group needs separately supported Sectio
   );
 });
 
-Deno.test("Form 8283 combined $500,000 group threshold rejects missing full appraisal even when each item is below it", () => {
+test("Form 8283 combined $500,000 group threshold rejects missing full appraisal even when each item is below it", () => {
   const base = sectionBHighValueEquipmentGift();
   const items = [1, 2].map(() => ({
     ...base,
@@ -454,7 +486,7 @@ Deno.test("Form 8283 combined $500,000 group threshold rejects missing full appr
   );
 });
 
-Deno.test("Form 8283 Section A includes VIN without a donee PDF for a vehicle claimed at $500 or less", async () => {
+test("Form 8283 Section A includes VIN without a donee PDF for a vehicle claimed at $500 or less", async () => {
   const bundle = await buildMefBundle({
     f8283: {
       section_a_items: [{
@@ -480,7 +512,7 @@ Deno.test("Form 8283 Section A includes VIN without a donee PDF for a vehicle cl
   assertEquals(bundle.attachments.length, 0);
 });
 
-Deno.test("Form 8283 vehicle rejects missing or misdescribed donee PDF", async () => {
+test("Form 8283 vehicle rejects missing or misdescribed donee PDF", async () => {
   const vehicle = needyTransferVehicle(
     "1HGBH41JXMN109186",
     "Form1098C-Sedan.pdf",
@@ -531,7 +563,7 @@ Deno.test("Form 8283 vehicle rejects missing or misdescribed donee PDF", async (
   );
 });
 
-Deno.test("Form 8283 links a separate donee PDF for each Section A vehicle over $500", async () => {
+test("Form 8283 links a separate donee PDF for each Section A vehicle over $500", async () => {
   const bytes = await acknowledgmentPdf();
   const xml = (await buildMefBundle({
     f8283: {
@@ -582,7 +614,7 @@ Deno.test("Form 8283 links a separate donee PDF for each Section A vehicle over 
   await assertVehicleBundleXsd(xml);
 });
 
-Deno.test("Form 8283 accepts a donee-issued written acknowledgment PDF instead of Form 1098-C", async () => {
+test("Form 8283 accepts a donee-issued written acknowledgment PDF instead of Form 1098-C", async () => {
   const fileName = "DoneeAcknowledgment-Civic.pdf";
   const bytes = await acknowledgmentPdf();
   const xml = (await buildMefBundle({
@@ -614,7 +646,7 @@ Deno.test("Form 8283 accepts a donee-issued written acknowledgment PDF instead o
   );
 });
 
-Deno.test("Form 8283 Section B emits separate signed appraisal and donee documents", () => {
+test("Form 8283 Section B emits separate signed appraisal and donee documents", () => {
   const gift = {
     property_description: "Antique desk",
     property_type: SectionBPropertyType.Collectibles,
@@ -719,7 +751,7 @@ Deno.test("Form 8283 Section B emits separate signed appraisal and donee documen
   );
 });
 
-Deno.test("Form 8283 Section B return validates against TY2025 IRS XSD", async () => {
+test("Form 8283 Section B return validates against TY2025 IRS XSD", async () => {
   const signedBytes = await acknowledgmentPdf();
   const bundle = await buildMefBundle({
     f8283: {
@@ -803,29 +835,29 @@ Deno.test("Form 8283 Section B return validates against TY2025 IRS XSD", async (
     "<Desc>Form 8283 Donee signature document</Desc>",
   );
   const xsdPath = new URL(
-    "../../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+    "../../../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
     import.meta.url,
   ).pathname;
   try {
-    await Deno.stat(xsdPath);
+    await sys.stat(xsdPath);
   } catch {
     throw new Error(`Missing verification prerequisite: ${xsdPath}`);
   }
-  const path = await Deno.makeTempFile({ suffix: ".xml" });
+  const path = await sys.makeTempFile({ suffix: ".xml" });
   try {
-    await Deno.writeTextFile(path, xml);
-    const checked = await new Deno.Command("xmllint", {
+    await fs.writeFile(path, xml);
+    const checked = await new sys.Command("xmllint", {
       args: ["--noout", "--schema", xsdPath, path],
       stdout: "piped",
       stderr: "piped",
     }).output();
     assertEquals(checked.code, 0, new TextDecoder().decode(checked.stderr));
   } finally {
-    await Deno.remove(path);
+    await sys.remove(path);
   }
 });
 
-Deno.test("Form 8283 Section B material-improvement vehicle links appraisal, donee, and 1098-C evidence", async () => {
+test("Form 8283 Section B material-improvement vehicle links appraisal, donee, and 1098-C evidence", async () => {
   const vehicle = sectionBMaterialImprovementVehicle();
   const bytes = await acknowledgmentPdf();
   const bundle = await buildMefBundle({
@@ -884,7 +916,7 @@ Deno.test("Form 8283 Section B material-improvement vehicle links appraisal, don
 });
 
 for (const certification of ["significant use", "needy transfer"] as const) {
-  Deno.test(`Form 8283 Section B ${certification} vehicle emits its exception certification`, async () => {
+  test(`Form 8283 Section B ${certification} vehicle emits its exception certification`, async () => {
     const vehicle = sectionBMaterialImprovementVehicle();
     const shared = {
       copy_received_from_donee: true,
@@ -969,7 +1001,7 @@ for (const certification of ["significant use", "needy transfer"] as const) {
   });
 }
 
-Deno.test("Form 8283 Section B vehicle refuses missing or mismatched exception evidence", async () => {
+test("Form 8283 Section B vehicle refuses missing or mismatched exception evidence", async () => {
   const vehicle = sectionBMaterialImprovementVehicle();
   const bytes = await acknowledgmentPdf();
   const attachments = [
@@ -1062,7 +1094,7 @@ Deno.test("Form 8283 Section B vehicle refuses missing or mismatched exception e
   );
 });
 
-Deno.test("Form 8283 Section B over $500,000 attaches the complete qualified appraisal separately from signatures", async () => {
+test("Form 8283 Section B over $500,000 attaches the complete qualified appraisal separately from signatures", async () => {
   const gift = sectionBHighValueEquipmentGift();
   const bytes = await acknowledgmentPdf();
   const bundle = await buildMefBundle({
@@ -1106,7 +1138,7 @@ Deno.test("Form 8283 Section B over $500,000 attaches the complete qualified app
   await assertVehicleBundleXsd(xml);
 });
 
-Deno.test("Form 8283 Section B high-value vehicle requires both its donee copy and full appraisal", async () => {
+test("Form 8283 Section B high-value vehicle requires both its donee copy and full appraisal", async () => {
   const vehicle = sectionBMaterialImprovementVehicle();
   const gift = {
     ...vehicle,
@@ -1175,7 +1207,7 @@ Deno.test("Form 8283 Section B high-value vehicle requires both its donee copy a
   await assertVehicleBundleXsd(bundle.xml);
 });
 
-Deno.test("Form 8283 high-value gift rejects absent or misdescribed appraisal PDF", async () => {
+test("Form 8283 high-value gift rejects absent or misdescribed appraisal PDF", async () => {
   const gift = sectionBHighValueEquipmentGift();
   assertThrows(
     () =>
@@ -1219,7 +1251,7 @@ Deno.test("Form 8283 high-value gift rejects absent or misdescribed appraisal PD
   );
 });
 
-Deno.test("Form 8283 $500,000 boundary does not require a full appraisal attachment", async () => {
+test("Form 8283 $500,000 boundary does not require a full appraisal attachment", async () => {
   const highValue = sectionBHighValueEquipmentGift();
   const gift = {
     ...highValue,
@@ -1257,7 +1289,7 @@ Deno.test("Form 8283 $500,000 boundary does not require a full appraisal attachm
   );
 });
 
-Deno.test("Form 8283 Section B requires both correctly described signature PDFs", async () => {
+test("Form 8283 Section B requires both correctly described signature PDFs", async () => {
   const gift = {
     property_description: "Antique desk",
     property_type: SectionBPropertyType.Collectibles,
@@ -1350,7 +1382,7 @@ Deno.test("Form 8283 Section B requires both correctly described signature PDFs"
   );
 });
 
-Deno.test("Form 8283 still rejects gifts needing unlinked evidence", () => {
+test("Form 8283 still rejects gifts needing unlinked evidence", () => {
   assertThrows(
     () =>
       form8283.build({
@@ -1384,7 +1416,7 @@ Deno.test("Form 8283 still rejects gifts needing unlinked evidence", () => {
   assertEquals(form8283.build({}), []);
 });
 
-Deno.test("Form 8283 needy-transfer vehicle links Form 1098-C and emits native box 5b certification", async () => {
+test("Form 8283 needy-transfer vehicle links Form 1098-C and emits native box 5b certification", async () => {
   const bytes = await acknowledgmentPdf();
   const bundle = await buildMefBundle({
     f8283: {
@@ -1433,7 +1465,7 @@ Deno.test("Form 8283 needy-transfer vehicle links Form 1098-C and emits native b
   assertEquals(bundle.attachments.length, 1);
 });
 
-Deno.test("Form 8283 significant-use vehicle links donee PDF and emits boxes 5a and 5c", async () => {
+test("Form 8283 significant-use vehicle links donee PDF and emits boxes 5a and 5c", async () => {
   const bytes = await acknowledgmentPdf();
   const pdfSha256 = Array.from(
     new Uint8Array(
@@ -1517,7 +1549,7 @@ Deno.test("Form 8283 significant-use vehicle links donee PDF and emits boxes 5a 
   await assertVehicleBundleXsd(bundle.xml);
 });
 
-Deno.test("Form 8283 material-improvement vehicle emits donee's box 5c detail", async () => {
+test("Form 8283 material-improvement vehicle emits donee's box 5c detail", async () => {
   const bytes = await acknowledgmentPdf();
   const pdfSha256 = Array.from(
     new Uint8Array(
@@ -1594,7 +1626,7 @@ Deno.test("Form 8283 material-improvement vehicle emits donee's box 5c detail", 
   await assertVehicleBundleXsd(bundle.xml);
 });
 
-Deno.test("Form 8283 links both native vehicle statement and donee-issued PDF", async () => {
+test("Form 8283 links both native vehicle statement and donee-issued PDF", async () => {
   const vehiclePdfBytes = await acknowledgmentPdf();
   const vehiclePdfSha256 = Array.from(
     new Uint8Array(

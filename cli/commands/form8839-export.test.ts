@@ -1,6 +1,8 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../scripts/support/sys.ts";
 import { assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
-import { copy, ensureDir } from "@std/fs";
-import { join } from "@std/path";
+import { join } from "node:path";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { sha256Hex } from "../../forms/f1040/2025/return-processing/prepared-source.ts";
 import { appendInput } from "../store/store.ts";
@@ -31,13 +33,13 @@ for (
     },
   ] as const
 ) {
-  Deno.test(`CLI Form 8839 ${scenario.name} credit survives saved-return reload and exact-byte export`, async () => {
-    const baseDir = await Deno.makeTempDir();
+  test(`CLI Form 8839 ${scenario.name} credit survives saved-return reload and exact-byte export`, async () => {
+    const baseDir = await sys.makeTempDir();
     try {
       const { returnId } = await createReturnCommand({ year: 2025, baseDir });
       const returnPath = join(baseDir, returnId);
       const attachmentPath = join(returnPath, "attachments");
-      await ensureDir(attachmentPath);
+      await fs.mkdir(attachmentPath, { recursive: true });
       const ids = ["decree-1", "birth-1", "invoice-1", "payment-1"];
       const documents = await Promise.all(ids.map(async (id) => {
         const pdf = await PDFDocument.create();
@@ -49,7 +51,7 @@ for (
         });
         const bytes = await pdf.save();
         const fileName = `${id}.pdf`;
-        await Deno.writeFile(join(attachmentPath, fileName), bytes);
+        await fs.writeFile(join(attachmentPath, fileName), bytes);
         return {
           source_document_id: id,
           file_name: fileName,
@@ -183,10 +185,14 @@ for (
       });
       const original = await runReturnPipeline({ returnId, baseDir });
       const reloadedBaseDir = join(baseDir, "reloaded");
-      await ensureDir(reloadedBaseDir);
+      await fs.mkdir(reloadedBaseDir, { recursive: true });
       const reloadedPath = join(reloadedBaseDir, returnId);
-      await copy(returnPath, reloadedPath);
-      await Deno.remove(returnPath, { recursive: true });
+      await fs.cp(returnPath, reloadedPath, {
+        recursive: true,
+        errorOnExist: true,
+        force: false,
+      });
+      await sys.remove(returnPath, { recursive: true });
       const args = { returnId, baseDir: reloadedBaseDir, force: true };
       const reopened = await runReturnPipeline(args);
       assertEquals(
@@ -215,22 +221,26 @@ for (
       assertStringIncludes(xml, "<IRS8839");
       assertStringIncludes(xml, "<BinaryAttachment");
       const pdfPath = await exportPdfCommand(args);
-      const pdfBytes = await Deno.readFile(pdfPath);
+      const pdfBytes = await sys.readBytes(pdfPath);
       assertStringIncludes(
         new TextDecoder().decode(pdfBytes.subarray(0, 5)),
         "%PDF-",
       );
-      const evidenceRoot = Deno.env.get("FORM8839_CLI_CARRY_EVIDENCE");
+      const evidenceRoot = process.env.FORM8839_CLI_CARRY_EVIDENCE;
       if (evidenceRoot && scenario.carry !== undefined) {
         const evidencePath = join(evidenceRoot, scenario.name);
-        await ensureDir(evidencePath);
-        await copy(reloadedPath, join(evidencePath, "saved-return"));
-        await Deno.writeTextFile(join(evidencePath, "return.xml"), xml);
-        await Deno.writeTextFile(
+        await fs.mkdir(evidencePath, { recursive: true });
+        await fs.cp(reloadedPath, join(evidencePath, "saved-return"), {
+          recursive: true,
+          errorOnExist: true,
+          force: false,
+        });
+        await fs.writeFile(join(evidencePath, "return.xml"), xml);
+        await fs.writeFile(
           join(evidencePath, "summary.json"),
           JSON.stringify(summary, null, 2),
         );
-        await Deno.writeTextFile(
+        await fs.writeFile(
           join(evidencePath, "pending.json"),
           JSON.stringify(reopened.pending, null, 2),
         );
@@ -260,14 +270,14 @@ for (
         await exportMefCommand(args);
         await exportPdfCommand(args);
       }
-      await Deno.writeFile(
+      await fs.writeFile(
         join(reloadedPath, "attachments", "decree-1.pdf"),
         new TextEncoder().encode("%PDF-1.7 altered decree"),
       );
       await assertRejects(() => exportMefCommand(args));
       await assertRejects(() => exportPdfCommand(args));
     } finally {
-      await Deno.remove(baseDir, { recursive: true });
+      await sys.remove(baseDir, { recursive: true });
     }
   });
 }

@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../scripts/support/sys.ts";
 import { assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { PDFDocument } from "pdf-lib";
 import { buildExecutionPlan } from "../../../../../../core/runtime/planner.ts";
@@ -26,32 +29,32 @@ const filer = {
 
 async function assertLocalReturnXsd(xml: string): Promise<void> {
   const schema = new URL(
-    "../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+    "../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
     import.meta.url,
   ).pathname;
   try {
-    await Deno.stat(schema);
+    await sys.stat(schema);
   } catch (error) {
-    if (error instanceof Deno.errors.NotFound) {
+    if (sys.isNotFound(error)) {
       throw new Error(`Missing verification prerequisite: ${schema}`);
     }
     throw error;
   }
-  const path = await Deno.makeTempFile({ suffix: ".xml" });
+  const path = await sys.makeTempFile({ suffix: ".xml" });
   try {
-    await Deno.writeTextFile(path, xml);
-    const result = await new Deno.Command("xmllint", {
+    await fs.writeFile(path, xml);
+    const result = await new sys.Command("xmllint", {
       args: ["--noout", "--schema", schema, path],
       stdout: "piped",
       stderr: "piped",
     }).output();
     assertEquals(result.success, true, new TextDecoder().decode(result.stderr));
   } finally {
-    await Deno.remove(path);
+    await sys.remove(path);
   }
 }
 
-Deno.test("two 1099-MISC box 3 payments retain descriptions through Form 1040 and exports", async () => {
+test("two 1099-MISC box 3 payments retain descriptions through Form 1040 and exports", async () => {
   const result = execute(buildExecutionPlan(registry), registry, {
     general: {
       filing_status: "single",
@@ -101,7 +104,7 @@ Deno.test("two 1099-MISC box 3 payments retain descriptions through Form 1040 an
   assertEquals(pdf.getPageCount() >= 4, true);
 });
 
-Deno.test("1099-MISC box 3 other-income recipient must belong to the filer", async () => {
+test("1099-MISC box 3 other-income recipient must belong to the filer", async () => {
   const pending = buildPending({
     f1099m: {
       f1099ms: [{

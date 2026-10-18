@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { assertEquals, assertRejects } from "@std/assert";
 import { PDFDocument } from "pdf-lib";
 import { f1040_2025 } from "../../../../index.ts";
@@ -14,11 +17,12 @@ import expected from "./form4972_participant_collection.expected.json" with {
 };
 import { appendInput, createReturn } from "../../../../../../../cli/store/store.ts";
 import { exportForm4972PaperCommand } from "../../../../../../../cli/commands/export.ts";
-import { fromFileUrl, join } from "@std/path";
+import { join } from "node:path";
+import { fileURLToPath as fromFileUrl } from "node:url";
 
-Deno.test("three and five sourced Form 4972 participants print as paper packets only", async () => {
-  const evidenceDir = Deno.args[0];
-  if (evidenceDir) await Deno.mkdir(evidenceDir, { recursive: true });
+test("three and five sourced Form 4972 participants print as paper packets only", async () => {
+  const evidenceDir = process.argv.slice(2)[0];
+  if (evidenceDir) await fs.mkdir(evidenceDir, { recursive: true });
   for (
     const id of ["own-plus-parents", "joint-three", "five-inherited"] as const
   ) {
@@ -61,8 +65,8 @@ Deno.test("three and five sourced Form 4972 participants print as paper packets 
       "at most two participant documents",
     );
     if (evidenceDir) {
-      await Deno.writeFile(`${evidenceDir}/${id}.pdf`, bytes);
-      await Deno.writeTextFile(
+      await fs.writeFile(`${evidenceDir}/${id}.pdf`, bytes);
+      await fs.writeFile(
         `${evidenceDir}/${id}.json`,
         JSON.stringify(
           { input, pending, filer, carry: result.carryforwards, origins },
@@ -74,7 +78,7 @@ Deno.test("three and five sourced Form 4972 participants print as paper packets 
   }
 });
 
-Deno.test("paper Form 4972 collection rejects altered source and final tax", async () => {
+test("paper Form 4972 collection rejects altered source and final tax", async () => {
   const input = participantCollectionInputs("own-plus-parents");
   const result = f1040_2025.executeReturn(input);
   assertEquals(result.diagnostics, []);
@@ -94,8 +98,8 @@ Deno.test("paper Form 4972 collection rejects altered source and final tax", asy
   );
 });
 
-Deno.test("CLI paper export emits no XML and ordinary MeF still rejects the same stored return", async () => {
-  const cwd = await Deno.makeTempDir();
+test("CLI paper export emits no XML and ordinary MeF still rejects the same stored return", async () => {
+  const cwd = await sys.makeTempDir();
   const baseDir = join(cwd, ".state/returns");
   try {
     const { returnId, returnPath } = await createReturn(2025, baseDir);
@@ -107,12 +111,12 @@ Deno.test("CLI paper export emits no XML and ordinary MeF still rejects the same
       await appendInput(returnPath, "f1099r", source);
     }
     const path = await exportForm4972PaperCommand({ returnId, baseDir });
-    const bytes = await Deno.readFile(path);
+    const bytes = await sys.readBytes(path);
     const pdf = await PDFDocument.load(bytes);
     assertEquals(pdf.getPageCount() >= 5, true);
     assertEquals(pdf.getForm().getFields().length, 0);
     const manifest = JSON.parse(
-      await Deno.readTextFile(`${path}.source-manifest.json`),
+      await fs.readFile(`${path}.source-manifest.json`, "utf8"),
     );
     assertEquals(manifest.filingChannel, "paper_only");
     assertEquals(manifest.electronicSubmissionAuthorized, false);
@@ -138,11 +142,8 @@ Deno.test("CLI paper export emits no XML and ordinary MeF still rejects the same
     );
     const main = fromFileUrl(new URL("../../../../../../../cli/main.ts", import.meta.url));
     const command = (type: string) =>
-      new Deno.Command("deno", {
+      new sys.Command(process.execPath, {
         args: [
-          "run",
-          "-A",
-          "--no-check",
           main,
           "return",
           "export",
@@ -174,6 +175,6 @@ Deno.test("CLI paper export emits no XML and ordinary MeF still rejects the same
       true,
     );
   } finally {
-    await Deno.remove(cwd, { recursive: true });
+    await sys.remove(cwd, { recursive: true });
   }
 });

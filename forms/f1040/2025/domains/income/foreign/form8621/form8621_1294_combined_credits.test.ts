@@ -1,3 +1,5 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
 import { assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { executePreQefSourceReturn } from "../../../../return-processing/staged_source_return.ts";
 import { f1040_2025 } from "../../../../index.ts";
@@ -56,7 +58,7 @@ for (
     },
   ]
 ) {
-  Deno.test(`QEF refigure settles education before adoption: ${testCase.id}`, async () => {
+  test(`QEF refigure settles education before adoption: ${testCase.id}`, async () => {
     const input = source(testCase.wages, testCase.magi, testCase.tax);
     const result = f1040_2025.executeReturn(input);
     assertEquals(result.diagnostics, []);
@@ -87,7 +89,7 @@ for (
     withoutHolding.qef_ordinary_income = 0;
     delete withoutHolding.qef_1294_election;
     const shadow = buildPending(
-      executePreQefSourceReturn(withoutInput, true).pending,
+      executePreQefSourceReturn(withoutInput, { taxYear: 2025, formType: "f1040" }, true).pending,
     );
     assertEquals(shadow.f1040?.line11_agi, testCase.magi - 2000);
     assertEquals(
@@ -119,22 +121,16 @@ for (
       ".pdf-cache",
       packet.bundle,
     );
-    const permission = await Deno.permissions.query({
-      name: "env",
-      variable: "FORM8621_COMBINED_EVIDENCE_DIR",
-    });
-    const out = permission.state === "granted"
-      ? Deno.env.get("FORM8621_COMBINED_EVIDENCE_DIR")
-      : undefined;
+    const out = process.env.FORM8621_COMBINED_EVIDENCE_DIR;
     if (out) {
       const dir = `${out}/${testCase.id}`;
-      await Deno.mkdir(dir, { recursive: true });
-      await Deno.writeTextFile(
+      await fs.mkdir(dir, { recursive: true });
+      await fs.writeFile(
         `${dir}/source-pending.json`,
         JSON.stringify({ input, pending }, null, 2),
       );
-      await Deno.writeTextFile(`${dir}/return.xml`, packet.bundle.xml);
-      await Deno.writeFile(`${dir}/return.pdf`, pdf);
+      await fs.writeFile(`${dir}/return.xml`, packet.bundle.xml);
+      await fs.writeFile(`${dir}/return.pdf`, pdf);
     }
     for (const field of ["line3_education_credit", "line6c_adoption_credit"]) {
       const changed = structuredClone(pending);
@@ -155,7 +151,7 @@ for (
   });
 }
 
-Deno.test("QEF without Election B retains actual adoption carryforward", () => {
+test("QEF without Election B retains actual adoption carryforward", () => {
   const input = source(64500, 72500, 7405);
   delete (input.f8621[0] as Record<string, unknown>).qef_1294_election;
   const result = f1040_2025.executeReturn(input);

@@ -14,9 +14,6 @@ import type {
   RuleDef,
 } from "./types.ts";
 
-/** Categories that require server-side validation (can't check client-side). */
-const SERVER_SIDE_CATEGORIES = new Set(["database", "duplicate"]);
-
 /**
  * Evaluate all rules against a return context.
  * Returns a diagnostics report with all violations, alerts, and summary stats.
@@ -46,20 +43,11 @@ export function evaluateRules(
       continue;
     }
 
-    // Skip server-side-only rules
-    if (SERVER_SIDE_CATEGORIES.has(rule.category)) {
-      skipped++;
-      continue;
-    }
-
-    // Skip stub rules (not yet implemented)
-    if (rule.check === null) {
-      skipped++;
-      continue;
-    }
-
     // Evaluate the rule
-    const passes = rule.check(ctx);
+    // A rule for a repeated document applies to each emitted copy.
+    const check = rule.check;
+    const scopes = ctx.forRulePrefix?.(prefix) ?? [ctx];
+    const passes = scopes.every((scope) => check(scope));
 
     if (passes) {
       passed++;

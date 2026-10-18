@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { assertEquals, assertRejects } from "@std/assert";
 import {
   annualTraditionalCases,
@@ -17,52 +20,46 @@ for (
     [9, "roth-phaseout", 24500, 13066, 31204, 1],
   ] as const
 ) {
-  Deno.test(`Form 8606 ${id} rebuilds both filing formats from disk-retained sources`, async () => {
-    const permission = await Deno.permissions.query({
-      name: "env",
-      variable: "FORM8606_REPLAY_DIR",
-    });
-    const evidence = permission.state === "granted"
-      ? Deno.env.get("FORM8606_REPLAY_DIR")
-      : undefined;
+  test(`Form 8606 ${id} rebuilds both filing formats from disk-retained sources`, async () => {
+    const evidence = process.env.FORM8606_REPLAY_DIR;
     const root = evidence
       ? `${evidence}/${id}`
-      : await Deno.makeTempDir({ prefix: "form8606-replay-" });
-    await Deno.mkdir(root, { recursive: true });
+      : await sys.makeTempDir({ prefix: "form8606-replay-" });
+    await fs.mkdir(root, { recursive: true });
     try {
       const source = await annualTraditionalReturnSource(
         annualTraditionalCases[index],
         8100 + index,
       );
-      await Deno.writeTextFile(
+      await fs.writeFile(
         `${root}/input.json`,
         JSON.stringify(source.inputs),
       );
-      await Deno.writeTextFile(
+      await fs.writeFile(
         `${root}/filer.json`,
         JSON.stringify(source.filer),
       );
       const manifest = [];
       for (const [n, document] of source.retained.documents.entries()) {
         const path = `document-${n}.bin`;
-        await Deno.writeFile(`${root}/${path}`, document.bytes);
+        await fs.writeFile(`${root}/${path}`, document.bytes);
         manifest.push({
           document_reference: document.document_reference,
           path,
           sha256: await sha256Hex(document.bytes),
         });
       }
-      await Deno.writeTextFile(
+      await fs.writeFile(
         `${root}/documents.json`,
         JSON.stringify(manifest, null, 2),
       );
-      const inputs = JSON.parse(await Deno.readTextFile(`${root}/input.json`));
-      const filer = JSON.parse(await Deno.readTextFile(`${root}/filer.json`));
+      const inputs = JSON.parse(await fs.readFile(`${root}/input.json`, "utf8"));
+      const filer = JSON.parse(await fs.readFile(`${root}/filer.json`, "utf8"));
       const records: typeof manifest = JSON.parse(
-        await Deno.readTextFile(`${root}/documents.json`),
+        await fs.readFile(`${root}/documents.json`, "utf8"),
       );
       const documents = await Promise.all(records.map(async (record) => {
-        const bytes = await Deno.readFile(`${root}/${record.path}`);
+        const bytes = await sys.readBytes(`${root}/${record.path}`);
         assertEquals(await sha256Hex(bytes), record.sha256);
         return { document_reference: record.document_reference, bytes };
       }));
@@ -74,7 +71,6 @@ for (
         pending.f1040.line4b_ira_taxable,
         pending.f1040.line24_total_tax,
       ], [gross, taxable, tax]);
-      // deno-lint-ignore no-explicit-any -- normalized pending owner-form fixture
       const forms = pending.form8606.owner_forms as Record<string, any>[];
       assertEquals(forms.length, owners);
       assertEquals(
@@ -100,13 +96,13 @@ for (
         prepared.bundle,
         origins,
       );
-      await Deno.writeTextFile(`${root}/return.xml`, prepared.bundle.xml);
-      await Deno.writeFile(`${root}/return.pdf`, pdf);
-      await Deno.writeTextFile(
+      await fs.writeFile(`${root}/return.xml`, prepared.bundle.xml);
+      await fs.writeFile(`${root}/return.pdf`, pdf);
+      await fs.writeFile(
         `${root}/origins.json`,
         JSON.stringify(origins, null, 2),
       );
-      await Deno.writeTextFile(
+      await fs.writeFile(
         `${root}/pending.json`,
         JSON.stringify(pending, null, 2),
       );
@@ -121,7 +117,6 @@ for (
           ]
         ) {
           const changed = structuredClone(pending);
-          // deno-lint-ignore no-explicit-any -- mutable normalized owner-form fixture
           (changed.form8606.owner_forms as Record<string, any>[])[owner][
             field
           ] += 1;
@@ -138,7 +133,7 @@ for (
         Error,
       );
     } finally {
-      if (!evidence) await Deno.remove(root, { recursive: true });
+      if (!evidence) await sys.remove(root, { recursive: true });
     }
   });
 }

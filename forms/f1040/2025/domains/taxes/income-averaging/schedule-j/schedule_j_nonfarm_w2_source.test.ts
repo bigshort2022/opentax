@@ -1,4 +1,6 @@
-// deno-lint-ignore-file no-explicit-any
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { PDFDocument } from "pdf-lib";
 import { createHash } from "node:crypto";
@@ -10,10 +12,10 @@ import { scheduleJNonfarmW2Inputs } from "./schedule_j_nonfarm_w2.fixture.ts";
 import { assertScheduleJSourceReturn } from "./schedule_j_source_return.ts";
 import { assertSingleFarmQbiReturn } from "../../../deductions/business/form8995a/form8995a_single_farm_reconciliation.ts";
 
-const outputDir = Deno.env.get("SCHEDULE_J_NONFARM_W2_EVIDENCE_DIR") ??
+const outputDir = process.env.SCHEDULE_J_NONFARM_W2_EVIDENCE_DIR ??
   ".state/research/schedulej-nonfarm-w2-source";
 
-Deno.test("issued nonfarm W-2 joins high-income farm Schedule J, SE, zero-limited QBI and no-J AMT", async () => {
+test("issued nonfarm W-2 joins high-income farm Schedule J, SE, zero-limited QBI and no-J AMT", async () => {
   const input = scheduleJNonfarmW2Inputs();
   const without = structuredClone(input);
   delete without.schedule_j;
@@ -67,7 +69,7 @@ Deno.test("issued nonfarm W-2 joins high-income farm Schedule J, SE, zero-limite
   assertEquals(pending.f1040.line24_total_tax, 139_786);
   assertEquals(pending.f1040.line37_amount_owed, 119_786);
   assertScheduleJSourceReturn(actual.pending);
-  assertSingleFarmQbiReturn(pending);
+  assertSingleFarmQbiReturn(pending, 2025);
   const filer = extractFilerIdentity(pending.f1040)!;
   const prepared = await f1040_2025.prepareReturn(actual.pending, filer);
   const origins: PdfPageOrigin[] = [];
@@ -79,20 +81,20 @@ Deno.test("issued nonfarm W-2 joins high-income farm Schedule J, SE, zero-limite
     origins,
   );
   const dir = `${outputDir}/elected`;
-  await Deno.mkdir(dir, { recursive: true });
-  await Deno.writeTextFile(
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(
     `${dir}/source-pending.json`,
     JSON.stringify({ input, pending }, null, 2),
   );
-  await Deno.writeTextFile(`${dir}/return.xml`, prepared.bundle.xml);
-  await Deno.writeFile(`${dir}/return.pdf`, pdf);
-  await Deno.writeTextFile(
+  await fs.writeFile(`${dir}/return.xml`, prepared.bundle.xml);
+  await fs.writeFile(`${dir}/return.pdf`, pdf);
+  await fs.writeFile(
     `${dir}/origins.json`,
     JSON.stringify(origins, null, 2),
   );
   const xsd =
-    ".state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd";
-  const validation = await new Deno.Command("xmllint", {
+    "irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd";
+  const validation = await new sys.Command("xmllint", {
     args: ["--noout", "--schema", xsd, `${dir}/return.xml`],
     stderr: "piped",
   }).output();
@@ -113,18 +115,18 @@ Deno.test("issued nonfarm W-2 joins high-income farm Schedule J, SE, zero-limite
     noJOrigins,
   );
   const noJDir = `${outputDir}/without-j`;
-  await Deno.mkdir(noJDir, { recursive: true });
-  await Deno.writeTextFile(
+  await fs.mkdir(noJDir, { recursive: true });
+  await fs.writeFile(
     `${noJDir}/source-pending.json`,
     JSON.stringify({ input: without, pending: noJ }, null, 2),
   );
-  await Deno.writeTextFile(`${noJDir}/return.xml`, noJPrepared.bundle.xml);
-  await Deno.writeFile(`${noJDir}/return.pdf`, noJPdf);
-  await Deno.writeTextFile(
+  await fs.writeFile(`${noJDir}/return.xml`, noJPrepared.bundle.xml);
+  await fs.writeFile(`${noJDir}/return.pdf`, noJPdf);
+  await fs.writeFile(
     `${noJDir}/origins.json`,
     JSON.stringify(noJOrigins, null, 2),
   );
-  const noJValidation = await new Deno.Command("xmllint", {
+  const noJValidation = await new sys.Command("xmllint", {
     args: ["--noout", "--schema", xsd, `${noJDir}/return.xml`],
     stderr: "piped",
   }).output();
@@ -139,7 +141,7 @@ Deno.test("issued nonfarm W-2 joins high-income farm Schedule J, SE, zero-limite
   );
 });
 
-Deno.test("Schedule J nonfarm W-2 source and complete filed return reject conflicting wage attribution", async () => {
+test("Schedule J nonfarm W-2 source and complete filed return reject conflicting wage attribution", async () => {
   const good = scheduleJNonfarmW2Inputs() as any;
   const rehash = (input: any, mutate: (record: any) => void) => {
     const proof = input.schedule_j.nonfarm_wage_source;
@@ -193,7 +195,7 @@ Deno.test("Schedule J nonfarm W-2 source and complete filed return reject confli
   }
 });
 
-Deno.test("explicit empty W-2 inventory preserves the original no-wage farm return and rejects orphan proof", () => {
+test("explicit empty W-2 inventory preserves the original no-wage farm return and rejects orphan proof", () => {
   const source: any = scheduleJNonfarmW2Inputs();
   delete source.w2;
   delete source.schedule_j.nonfarm_wage_source;

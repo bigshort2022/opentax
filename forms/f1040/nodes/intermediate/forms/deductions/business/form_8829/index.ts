@@ -1,4 +1,5 @@
 import {
+  assertRentedHomeEvidenceYear,
   reconcileRentedHomeEvidence,
   rentedHomeEvidenceSchema,
 } from "./source.ts";
@@ -140,9 +141,10 @@ class Form8829Node extends TaxNode<typeof inputSchema> {
   readonly outputNodes = new OutputNodes([scheduleC]);
 
   compute(ctx: NodeContext, rawInput: z.infer<typeof inputSchema>): NodeResult {
-    if (ctx.taxYear !== 2025) throw new Error("Form 8829 route is TY2025 only");
     const input = inputSchema.parse(rawInput);
     if (!input.rented_home) return { outputs: [] };
+    // Draft 2026 Form 8829 keeps the 2025 Part II lines 23-36.
+    assertRentedHomeEvidenceYear(input.rented_home, ctx.taxYear);
     const lines = calculateRentedHomeForm8829(input.rented_home);
     return {
       outputs: [

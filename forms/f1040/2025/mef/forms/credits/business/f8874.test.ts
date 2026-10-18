@@ -1,38 +1,55 @@
+import { test } from "bun:test";
 import { assertStringIncludes, assertThrows } from "@std/assert";
 import { buildForm8874Document, form8874 } from "./f8874.ts";
 import { withReviewedForm8874A } from "../../../../../nodes/inputs/credits/business/f8874/issuance_fixture.ts";
+import { withSyntheticCdeYearEndStatus } from "../../../../../nodes/inputs/credits/business/f8874/cde_status_fixture.ts";
+import { sha256Hex } from "../../../../return-processing/prepared-source.ts";
 
-const source = {
-  investments: [withReviewedForm8874A(
+const baseInvestment = {
+  cde_name: "Community Development Entity",
+  cde_ein: "123456789",
+  cde_address: {
+    line1: "10 Main Street",
+    city: "Wilmington",
+    state: "DE",
+    zip: "19801",
+  },
+  initial_investment_date: "2023-04-15",
+  credit_allowance_date: "2025-04-15",
+  qualified_equity_investment_amount: 1_000_000,
+  designation_notice_reference: "2023 QEI notice",
+  held_on_credit_allowance_date: true,
+  qualified_on_credit_allowance_date: true,
+  recapture_notice_received: false,
+  subject_to_passive_activity_limit: false,
+};
+const statused = await withSyntheticCdeYearEndStatus([
+  withReviewedForm8874A(baseInvestment, "Alex Owner", "111223333"),
+  withReviewedForm8874A(
     {
-      cde_name: "Community Development Entity",
-      cde_ein: "123456789",
-      cde_address: {
-        line1: "10 Main Street",
-        city: "Wilmington",
-        state: "DE",
-        zip: "19801",
-      },
-      initial_investment_date: "2023-04-15",
-      credit_allowance_date: "2025-04-15",
-      qualified_equity_investment_amount: 1_000_000,
-      designation_notice_reference: "2023 QEI notice",
-      held_on_credit_allowance_date: true,
-      qualified_on_credit_allowance_date: true,
-      recapture_notice_received: false,
-      subject_to_passive_activity_limit: false,
+      ...baseInvestment,
+      initial_investment_date: "2022-04-15",
+      designation_notice_reference: "2022 QEI notice",
     },
     "Alex Owner",
     "111223333",
-  )],
-};
+  ),
+]);
+const source = { investments: [statused.investments[0]] };
+const retainedSourceSha256ByReference = Object.fromEntries(
+  await Promise.all(
+    statused.retainedSourceDocuments.map(async (document) =>
+      [document.document_reference, await sha256Hex(document.bytes)] as const
+    ),
+  ),
+);
 const filer = {
   taxpayer_first_name: "Alex",
   taxpayer_last_name: "Owner",
   taxpayer_ssn: "111223333",
 };
 
-Deno.test("Form 8874 MeF records an identified investment and 5 percent credit", () => {
+test("Form 8874 MeF records an identified investment and 5 percent credit", () => {
   const xml = buildForm8874Document(source, 0);
   assertStringIncludes(xml, "<IRS8874>");
   assertStringIncludes(
@@ -52,9 +69,13 @@ Deno.test("Form 8874 MeF records an identified investment and 5 percent credit",
   assertStringIncludes(xml, "<TotalCreditAmt>50000</TotalCreditAmt>");
 });
 
-Deno.test("Form 8874 MeF requires matching linked Form 3800", () => {
+test("Form 8874 MeF requires matching linked Form 3800", () => {
   assertThrows(
-    () => form8874.build(source, { pending: { f8874: source, f1040: filer } }),
+    () =>
+      form8874.build(source, {
+        pending: { f8874: source, f1040: filer },
+        retainedSourceSha256ByReference,
+      }),
     Error,
     "does not reconcile",
   );
@@ -66,17 +87,20 @@ Deno.test("Form 8874 MeF requires matching linked Form 3800", () => {
           f3800: { f8874_credit: { credit_amount: 50_000 } },
         },
         documentIdsByPendingKey: {},
+        retainedSourceSha256ByReference,
       }),
     Error,
     "needs attached Form 3800",
   );
-  const xml = form8874.build(source, {
+  const context = {
     pending: {
       f1040: filer,
       f3800: { f8874_credit: { credit_amount: 50_000 } },
     },
     documentIdsByPendingKey: { f3800: ["IRS3800_1"] },
-  });
+    retainedSourceSha256ByReference,
+  };
+  const xml = form8874.build(source, context);
   assertStringIncludes(xml, "<CDETotalCreditAmt>50000</CDETotalCreditAmt>");
   assertThrows(
     () =>
@@ -86,33 +110,40 @@ Deno.test("Form 8874 MeF requires matching linked Form 3800", () => {
           f3800: { f8874_credit: { credit_amount: 50_000 } },
         },
         documentIdsByPendingKey: { f3800: ["IRS3800_1"] },
+        retainedSourceSha256ByReference,
       }),
     Error,
     "investor differs",
   );
+  // A QEI's CDE status counts only with its retained statement and notice.
+  assertThrows(
+    () =>
+      form8874.build(source, {
+        ...context,
+        retainedSourceSha256ByReference: {
+          ...retainedSourceSha256ByReference,
+          [source.investments[0].cde_year_end_status.status_statement_document_reference]:
+            "0".repeat(64),
+        },
+      }),
+    Error,
+    "retained CDE status and notice copies with matching SHA-256",
+  );
+  assertThrows(
+    () => form8874.build(source, { ...context, taxYear: 2026 }),
+    Error,
+    "through December 31, 2026",
+  );
 });
 
-Deno.test("Form 8874 MeF reconciles passive and direct investments separately", () => {
+test("Form 8874 MeF reconciles passive and direct investments separately", () => {
   const passive = {
     ...source.investments[0],
     subject_to_passive_activity_limit: true,
     passive_activity_reference: "Community venture",
     passive_source_document_reference: "2025 community venture QEI",
   };
-  const mixed = {
-    investments: [
-      passive,
-      withReviewedForm8874A(
-        {
-          ...source.investments[0],
-          initial_investment_date: "2022-04-15",
-          designation_notice_reference: "2022 QEI notice",
-        },
-        "Alex Owner",
-        "111223333",
-      ),
-    ],
-  };
+  const mixed = { investments: [passive, statused.investments[1]] };
   const activity = {
     activity_reference: "Community venture",
     source_form: "Form 8874",
@@ -140,6 +171,7 @@ Deno.test("Form 8874 MeF reconciles passive and direct investments separately", 
       f3800: ["IRS3800_1"],
       form8582cr: ["IRS8582CR_1"],
     },
+    retainedSourceSha256ByReference,
   };
   assertStringIncludes(
     form8874.build(mixed, context),
@@ -171,7 +203,7 @@ Deno.test("Form 8874 MeF reconciles passive and direct investments separately", 
   );
 });
 
-Deno.test("Form 8874 line 2 includes filed partnership and S-corporation credits", () => {
+test("Form 8874 line 2 includes filed partnership and S-corporation credits", () => {
   const pending = {
     f1040: filer,
     f3800: {
@@ -215,6 +247,7 @@ Deno.test("Form 8874 line 2 includes filed partnership and S-corporation credits
   const context = {
     pending,
     documentIdsByPendingKey: { f3800: ["IRS3800_1"] },
+    retainedSourceSha256ByReference,
   };
   const xml = form8874.build(source, context);
   assertStringIncludes(xml, "<NewMarketsCreditAmt>2000</NewMarketsCreditAmt>");
@@ -237,7 +270,7 @@ Deno.test("Form 8874 line 2 includes filed partnership and S-corporation credits
   );
 });
 
-Deno.test("Form 8874 line 2 reconciles a passive partnership credit", () => {
+test("Form 8874 line 2 reconciles a passive partnership credit", () => {
   const activity = {
     activity_reference: "Community partnership activity",
     source_form: "Form 8874",
@@ -282,6 +315,7 @@ Deno.test("Form 8874 line 2 reconciles a passive partnership credit", () => {
       f3800: ["IRS3800_1"],
       form8582cr: ["IRS8582CR_1"],
     },
+    retainedSourceSha256ByReference,
   };
   const xml = form8874.build(source, context);
   assertStringIncludes(xml, "<NewMarketsCreditAmt>1250</NewMarketsCreditAmt>");

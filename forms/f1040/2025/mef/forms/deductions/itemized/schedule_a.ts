@@ -33,7 +33,11 @@ import { itemizeBelowStandardElection } from "../../../../domains/deductions/ite
 import { reviewedHomeMortgageNonqualifyingUse } from "../../../../../nodes/inputs/deductions/itemized/schedule_a/index.ts";
 import { scheduleAOtherTaxRows } from "../../../../domains/deductions/itemized/schedule-a/schedule_a_other_tax_source.ts";
 import { sellerFinancedLine8b } from "../../../../domains/deductions/itemized/schedule-a/schedule_a_line8b_source.ts";
-import { scheduleALine16Rows } from "../../../../domains/deductions/itemized/schedule-a/schedule_a_line16_estate_source.ts";
+import {
+  scheduleADisasterLine16,
+  scheduleALine16AllRows,
+} from "../../../../domains/deductions/itemized/schedule-a/schedule_a_line16_disaster_source.ts";
+import { mefTaxYear } from "../../../support/year-config.ts";
 
 export interface Fields {
   force_itemized?: boolean;
@@ -51,16 +55,20 @@ export interface Fields {
   home_mortgage_nonqualifying_use_review?: unknown;
   line_8b_mortgage_interest_no_1098?: number | null;
   line_8c_points_no_1098?: number | null;
+  // TY2026 line 8d after the AGI phaseout, finalized by the schedule_a node.
+  line_8d_mortgage_insurance_allowed?: number | null;
   form8396_interest_credit_reduction?: number | null;
   form8396_interest_reporting_line?: "8a" | "8b" | null;
   line_9_investment_interest?: number | null;
   line_11_cash_contributions?: number | null;
+  line_11_qualified_contributions?: number | null;
   line_12_noncash_contributions?: number | null;
   line_13_contribution_carryover?: number | null;
   charitable_limits_finalized?: boolean;
   capital_gain_election_finalized?: boolean;
   line_15_casualty_theft_loss?: number | null;
   line_16_other_deductions?: number | null;
+  net_qualified_disaster_loss?: number | null;
 }
 
 type Input = Partial<Fields> & Record<string, unknown>;
@@ -85,13 +93,50 @@ export const FIELD_MAP: ReadonlyArray<readonly [keyof Fields, string]> = [
   ["line_8a_mortgage_interest_1098", "RptHomeMortgIntAndPointsAmt"],
   ["line_8b_mortgage_interest_no_1098", "Form1098HomeMortgIntNotRptAmt"],
   ["line_8c_points_no_1098", "Form1098PointsNotReportedAmt"],
+  ["line_8d_mortgage_insurance_allowed", "MortgageInsurancePremiumsAmt"],
   ["line_9_investment_interest", "InvestmentInterestAmt"],
   ["line_11_cash_contributions", "GiftsByCashOrCheckAmt"],
   ["line_12_noncash_contributions", "OtherThanByCashOrCheckAmt"],
   ["line_13_contribution_carryover", "CarryoverFromPriorYearAmt"],
-  ["line_15_casualty_theft_loss", "CasualtyAndTheftLossesAmt"],
+  ["line_15_casualty_theft_loss", "CalcAdjGroIncmMnsTotNetLossAmt"],
   ["line_16_other_deductions", "OtherMiscellaneousDedAmt"],
 ];
+
+function line16Statement(
+  context: MefBuildContext | undefined,
+  rowCount: number,
+): Record<string, string> | undefined {
+  const ids = context?.documentIdsByPendingKey
+    ?.schedule_a_line16_estate_statement ?? [];
+  if (rowCount > 0 && context?.documentIdsByPendingKey && ids.length !== 1) {
+    throw new Error("Schedule A line 16 needs its linked deduction statement");
+  }
+  return ids.length === 1
+    ? {
+      referenceDocumentId: ids[0],
+      referenceDocumentName: "OtherMiscellaneousDeductionsStatement",
+    }
+    : undefined;
+}
+
+/** Schedule A filed only for the increased standard deduction: line 16
+ * holds the net qualified disaster loss and the standard deduction, and
+ * line 17 their total (2025 Instructions for Form 4684, Increased standard
+ * deduction reporting, steps 1 through 3). */
+function increasedStandardScheduleA(
+  rows: readonly { amount: number }[],
+  context: MefBuildContext | undefined,
+): string {
+  const total = rows.reduce((sum, row) => sum + row.amount, 0);
+  return elements("IRS1040ScheduleA", [
+    element(
+      "OtherMiscellaneousDedAmt",
+      total,
+      line16Statement(context, rows.length),
+    ),
+    element("TotalItemizedDeductionsAmt", total),
+  ]);
+}
 
 function buildIRS1040ScheduleA(
   fields: Input,
@@ -105,7 +150,10 @@ function buildIRS1040ScheduleA(
     returnFields?.line12a_standard_deduction !== undefined &&
     returnFields.line12e_itemized_deductions === undefined
   ) {
-    return "";
+    const disaster = scheduleADisasterLine16(context?.pending);
+    return disaster?.increasedStandard
+      ? increasedStandardScheduleA(disaster.rows, context)
+      : "";
   }
   assertForm1098Line8aSourcePresence(
     context?.pending?.f1098,
@@ -142,6 +190,7 @@ function buildIRS1040ScheduleA(
         | { cashout_source?: unknown }
         | undefined)?.cashout_source !== undefined,
       filer.spouse?.ssn,
+      mefTaxYear(context),
     );
     assertPurchasePointsCrossLoanSources(
       context.pending.f1098,
@@ -322,21 +371,27 @@ function buildIRS1040ScheduleA(
   const hasDeduction =
     FIELD_MAP.some(([key]) =>
       key !== "agi" && typeof fields[key] === "number" && fields[key] !== 0
-    ) || line5a !== 0;
+    ) || line5a !== 0 || (fields.net_qualified_disaster_loss ?? 0) > 0;
   if (!hasDeduction && fields.force_itemized !== true) return "";
   const otherTaxRows = scheduleAOtherTaxRows(fields);
   const line8bSeller = sellerFinancedLine8b(fields);
-  const line16Rows = scheduleALine16Rows(
+  const line16Rows = scheduleALine16AllRows(
     context?.pending,
     fields.line_16_other_deductions,
   );
-  const line16StatementIds = context?.documentIdsByPendingKey
-    ?.schedule_a_line16_estate_statement ?? [];
+  const line16Reference = line16Statement(context, line16Rows.length);
+  const line16 = typeof fields.line_16_other_deductions === "number" ||
+      typeof fields.net_qualified_disaster_loss === "number"
+    ? (fields.line_16_other_deductions ?? 0) +
+      (fields.net_qualified_disaster_loss ?? 0)
+    : undefined;
+  const line15 = fields.line_15_casualty_theft_loss ?? 0;
+  const form4684Ids = context?.documentIdsByPendingKey?.form4684 ?? [];
   if (
-    line16Rows.length > 0 && context?.documentIdsByPendingKey &&
-    line16StatementIds.length !== 1
+    line15 > 0 &&
+    context?.documentIdsByPendingKey && form4684Ids.length === 0
   ) {
-    throw new Error("Schedule A line 16 needs its linked deduction statement");
+    throw new Error("Schedule A line 15 needs its Form 4684");
   }
   const line8bStatementIds = context?.documentIdsByPendingKey
     ?.schedule_a_line8b_seller_statement ?? [];
@@ -360,6 +415,15 @@ function buildIRS1040ScheduleA(
     returnFields?.line12e_itemized_deductions,
   );
   const filedItemized = returnFields?.line12e_itemized_deductions;
+  // Line 14 adds lines 11 through 13.
+  const charitable = [
+    fields.line_11_cash_contributions,
+    fields.line_12_noncash_contributions,
+    fields.line_13_contribution_carryover,
+  ].filter((value): value is number => typeof value === "number");
+  const charitableTotal = charitable.length > 0
+    ? charitable.reduce((sum, value) => sum + value, 0)
+    : undefined;
 
   // Elements must follow the XSD sequence order defined in IRS1040ScheduleA.xsd:
   //   MedicalAndDentalExpensesAmt → TaxReturnAGIAmt → ... → StateAndLocalTaxAmt → RealEstateTaxesAmt → ...
@@ -407,24 +471,45 @@ function buildIRS1040ScheduleA(
       )
       : "",
     mapField(["line_8c_points_no_1098", "Form1098PointsNotReportedAmt"]),
+    mapField([
+      "line_8d_mortgage_insurance_allowed",
+      "MortgageInsurancePremiumsAmt",
+    ]),
     mapField(["line_9_investment_interest", "InvestmentInterestAmt"]),
-    mapField(["line_11_cash_contributions", "GiftsByCashOrCheckAmt"]),
-    mapField(["line_12_noncash_contributions", "OtherThanByCashOrCheckAmt"]),
-    mapField(["line_13_contribution_carryover", "CarryoverFromPriorYearAmt"]),
-    mapField(["line_15_casualty_theft_loss", "CasualtyAndTheftLossesAmt"]),
-    typeof fields.line_16_other_deductions === "number"
+    typeof fields.line_11_cash_contributions === "number"
       ? element(
-        "OtherMiscellaneousDedAmt",
-        fields.line_16_other_deductions,
-        line16StatementIds.length === 1
+        "GiftsByCashOrCheckAmt",
+        fields.line_11_cash_contributions,
+        typeof fields.line_11_qualified_contributions === "number"
           ? {
-            referenceDocumentId: line16StatementIds[0],
-            referenceDocumentName: "OtherMiscellaneousDeductionsStatement",
+            qualifiedContributionsAmt: String(
+              Math.round(fields.line_11_qualified_contributions),
+            ),
           }
           : undefined,
       )
       : "",
-    fields.force_itemized === true && typeof filedItemized === "number"
+    mapField(["line_12_noncash_contributions", "OtherThanByCashOrCheckAmt"]),
+    mapField(["line_13_contribution_carryover", "CarryoverFromPriorYearAmt"]),
+    charitableTotal === undefined
+      ? ""
+      : element("TotalCharitableContriAmt", charitableTotal),
+    line15 > 0
+      ? element(
+        "CalcAdjGroIncmMnsTotNetLossAmt",
+        line15,
+        form4684Ids.length > 0
+          ? {
+            referenceDocumentId: form4684Ids[0],
+            referenceDocumentName: "IRS4684",
+          }
+          : undefined,
+      )
+      : "",
+    line16 === undefined
+      ? ""
+      : element("OtherMiscellaneousDedAmt", line16, line16Reference),
+    typeof filedItemized === "number"
       ? element("TotalItemizedDeductionsAmt", filedItemized)
       : "",
     itemizeBelowStandard ? element("ItmzdDedLessThanStdDedInd", "X") : "",

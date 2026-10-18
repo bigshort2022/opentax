@@ -1,9 +1,9 @@
 #!/bin/sh
 # Install or update OpenTax.
-# Usage: curl -fsSL https://raw.githubusercontent.com/filedcom/opentax/main/install.sh | sh
+# Usage: curl -fsSL https://raw.githubusercontent.com/bigshort2022/opentax/main/install.sh | sh
 set -e
 
-REPO="filedcom/opentax"
+REPO="bigshort2022/opentax"
 INSTALL_DIR="/usr/local/bin"
 BIN_NAME="opentax"
 
@@ -28,7 +28,8 @@ else
   ASSET="opentax-${OS}-${ARCH}"
 fi
 
-URL="https://github.com/${REPO}/releases/latest/download/${ASSET}"
+VERSION="${OPENTAX_VERSION:-v2.2.0-ca540.1}"
+URL="https://github.com/${REPO}/releases/download/${VERSION}/${ASSET}"
 
 echo "Downloading ${ASSET}..."
 if command -v curl >/dev/null 2>&1; then

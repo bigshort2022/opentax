@@ -1,11 +1,33 @@
 /**
  * MeF Business Rules: SH
  * Auto-generated from 1040_Business_Rules_2025v3.0.csv
- * 21 rules (21 implemented, 0 stubs)
+ * 21 rules (21 implemented)
  */
 
 import type { RuleDef } from "../../../../../../core/validation/types.ts";
-import { rule, all, allDistinct, alwaysPass, any, eqField, eqStr, gte, hasNonZero, hasValue, ifThen, matchesHeaderSSN, not, notGtField, notMatchesHeaderSSN, noValue, } from "../../../../../../core/validation/mod.ts";
+import {
+  all,
+  allDistinct,
+  allMatch,
+  any,
+  eqField,
+  eqStr,
+  gte,
+  hasNonZero,
+  hasValue,
+  ifThen,
+  inOwnDocument,
+  matchesHeaderSSN,
+  noValue,
+  not,
+  notGtField,
+  notMatchesHeaderSSN,
+  rule,
+  validEIN,
+} from "../../../../../../core/validation/mod.ts";
+import {
+  scheduleReferencedOnce,
+} from "../../../../../../core/validation/predicates.ts";
 
 export const SH_RULES: readonly RuleDef[] = [
   rule(
@@ -135,14 +157,20 @@ export const SH_RULES: readonly RuleDef[] = [
     "SH-F1040-520-01",
     "reject",
     "database",
-    alwaysPass,
+    // Offline: a valid EIN with a well-formed business name control.
+    inOwnDocument(
+      all(
+        validEIN("EmployerEIN"),
+        allMatch("EmployerNameControlTxt", /^([A-Z0-9\-]|&){1,4}$/),
+      ),
+    ),
     "Schedule H (Form 1040), 'EmployerEIN' and 'EmployerNameControlTxt' must match data in the e-File database.",
   ),
   rule(
     "SH-F5471-001",
     "reject",
     "incorrect_data",
-    alwaysPass,
+    scheduleReferencedOnce("F5471ScheduleH", "F5471"),
     "If Schedule H (Form 5471) is present in the return, then it must be referenced from one and only one Form 5471.",
   ),
   rule(
@@ -156,7 +184,7 @@ export const SH_RULES: readonly RuleDef[] = [
     "SH-F8865-001",
     "reject",
     "incorrect_data",
-    alwaysPass,
+    scheduleReferencedOnce("F8865ScheduleH", "F8865"),
     "If Schedule H (Form 8865) is present in the return, then it must be referenced from one and only one Form 8865.",
   ),
 ];

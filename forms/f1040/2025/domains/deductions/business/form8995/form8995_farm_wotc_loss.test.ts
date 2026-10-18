@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertRejects, assertThrows } from "@std/assert";
 import {
   calculateForm5884,
@@ -16,7 +17,7 @@ import { form8995Pdf } from "../../../../pdf/forms/deductions/business/f8995/f89
 const fixtures = pdfReviewFixtures.filter((f) =>
   f.id.startsWith("owned-farm-wotc-loss")
 );
-Deno.test("actual loss farm full reduction owner SE QBI carryforward and current-use amounts", () => {
+test("actual loss farm full reduction owner SE QBI carryforward and current-use amounts", () => {
   assertEquals(fixtures.length, 6);
   const expected = [
     [-10000, 30001, 1413, 3718, 0, 2400, 19595],
@@ -30,9 +31,9 @@ Deno.test("actual loss farm full reduction owner SE QBI carryforward and current
     const r = f1040_2025.executeReturn(f.inputs),
       p = normalizeAllPending(r.pending);
     assertEquals(r.diagnostics, []);
-    assertFarmWotcReturn(p.form8995a ?? p.form8995, p, f.filer);
+    assertFarmWotcReturn(p.form8995a ?? p.form8995, p, 2025, f.filer);
     const a = p.form8995a
-      ? calculateFarmWotcLines(inputSchema.parse(p.form8995a))
+      ? calculateFarmWotcLines(inputSchema.parse(p.form8995a), 2025)
       : undefined;
     assertEquals([
       p.schedule1.line6_schedule_f,
@@ -68,7 +69,7 @@ Deno.test("actual loss farm full reduction owner SE QBI carryforward and current
       );}
   }
 });
-Deno.test("loss farm public rejects wage-credit source omission and resolved-loss scope conflicts", async () => {
+test("loss farm public rejects wage-credit source omission and resolved-loss scope conflicts", async () => {
   const f = fixtures[0];
   for (
     const change of [
@@ -92,7 +93,7 @@ Deno.test("loss farm public rejects wage-credit source omission and resolved-los
     }
   }
 });
-Deno.test("loss netting companion and zero-deduction loss rows reject native PDF tampering", () => {
+test("loss netting companion and zero-deduction loss rows reject native PDF tampering", () => {
   for (const f of fixtures) {
     const original = normalizeAllPending(
       f1040_2025.executeReturn(f.inputs).pending,
@@ -109,7 +110,7 @@ Deno.test("loss netting companion and zero-deduction loss rows reject native PDF
       const p = structuredClone(original);
       change(p);
       assertThrows(() =>
-        assertFarmWotcReturn(p.form8995a ?? p.form8995, p, f.filer)
+        assertFarmWotcReturn(p.form8995a ?? p.form8995, p, 2025, f.filer)
       );
     }
     if (original.form8995a) {
@@ -124,7 +125,7 @@ Deno.test("loss netting companion and zero-deduction loss rows reject native PDF
       ) {
         const p = structuredClone(original);
         change(p);
-        assertThrows(() => assertFarmWotcReturn(p.form8995a, p, f.filer));
+        assertThrows(() => assertFarmWotcReturn(p.form8995a, p, 2025, f.filer));
         assertThrows(() =>
           form8995aScheduleC.build((p.form8995a_schedule_c ?? {}) as any, {
             pending: p,

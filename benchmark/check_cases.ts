@@ -1,11 +1,12 @@
-#!/usr/bin/env -S deno run --allow-read
+#!/usr/bin/env bun
 /**
  * Validate every benchmark case without running the engine: files parse, the
  * product exists, each input fits its node schema, and sources cite a
  * publication. Known-invalid cases listed in benchmark/cases/baseline.json are
  * allowed until their entry expires; every other problem fails.
  */
-import { dirname, fromFileUrl, join } from "@std/path";
+import { dirname, join } from "node:path";
+import { fileURLToPath as fromFileUrl } from "node:url";
 import {
   applyCaseBaseline,
   inspectBenchmarkCases,
@@ -15,7 +16,7 @@ import { inspectCaInventory } from "./ca540.ts";
 
 const repo = dirname(dirname(fromFileUrl(import.meta.url)));
 const root = join(repo, "benchmark", "cases");
-const json = Deno.args.includes("--json");
+const json = process.argv.slice(2).includes("--json");
 const today = new Date().toISOString().slice(0, 10);
 
 let report;
@@ -34,7 +35,7 @@ try {
   report = { valid: found.length, allowed, problems: open };
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
-  Deno.exit(2);
+  process.exit(2);
 }
 
 const summary =
@@ -46,4 +47,4 @@ console.log(
       "\n",
     ),
 );
-Deno.exit(report.problems.length === 0 ? 0 : 1);
+process.exit(report.problems.length === 0 ? 0 : 1);

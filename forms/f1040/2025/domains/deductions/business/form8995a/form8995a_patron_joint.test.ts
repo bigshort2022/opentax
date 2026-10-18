@@ -1,3 +1,5 @@
+import { test } from "bun:test";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { patronSpouseW2 } from "../../../../pdf/reviews/general/composed-returns/review-8995a-patron-joint.fixture.ts";
 import {
   assert,
@@ -16,14 +18,8 @@ import {
   calculatePatronScheduleDLines,
   inputSchema,
 } from "../../../../../nodes/intermediate/forms/deductions/business/form8995a/index.ts";
-import { scheduleSELines } from "../../../../../nodes/intermediate/forms/taxes/self-employment/schedule_se/calculation.ts";
-import { CONFIG_BY_YEAR } from "../../../../../nodes/config/index.ts";
-const seLinesForProfit = (profit: number) =>
-  scheduleSELines(
-    { net_profit_schedule_f: profit },
-    CONFIG_BY_YEAR[2025].ssWageBase,
-  )!.line13;
 import { patronSourceAmounts } from "../../../../../nodes/inputs/deductions/business/qbi_patron/calculation.ts";
+import { roundWholeDollars } from "../../../../../whole-dollars.ts";
 
 function prepared(kind: string) {
   const fixture = pdfReviewFixtures.find((f) =>
@@ -48,10 +44,10 @@ const options = (filer: typeof pdfReviewFixtures[number]["filer"]) => ({
 });
 async function assertSchema(xml: string) {
   const xsd = new URL(
-    "../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+    "../../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
     import.meta.url,
   ).pathname;
-  const process = new Deno.Command("xmllint", {
+  const process = new sys.Command("xmllint", {
     args: ["--noout", "--schema", xsd, "-"],
     stdin: "piped",
     stdout: "piped",
@@ -64,7 +60,7 @@ async function assertSchema(xml: string) {
   assertEquals(result.code, 0, new TextDecoder().decode(result.stderr));
 }
 
-Deno.test("owned MFJ patron C/F sources and spouse wages phase in with actual SE/health and full XSD/PDF", async () => {
+test("owned MFJ patron C/F sources and spouse wages phase in with actual SE/health and full XSD/PDF", async () => {
   const cases = [
     ["farm", 424367, .29767, 4516, 40657, 13552, 10000, 37105, 108716],
     ["c-health", 443031, .48431, 9156, 39750, 15720, 10000, 34030, 115962],
@@ -76,7 +72,7 @@ Deno.test("owned MFJ patron C/F sources and spouse wages phase in with actual SE
   ) {
     const { fixture, pending } = prepared(kind);
     const input = inputSchema.parse(pending.form8995a);
-    const lines = calculateOneBusiness8995ALines(input);
+    const lines = calculateOneBusiness8995ALines(input, 2025);
     const amounts = patronSourceAmounts(input.patron_business_source!);
     assertEquals(amounts.filed_gross - amounts.filed_expenses, amounts.profit);
     assertEquals(lines.patronThreshold, 394600);
@@ -98,10 +94,11 @@ Deno.test("owned MFJ patron C/F sources and spouse wages phase in with actual SE
       input.patron_business_source!.se_tax_deduction,
     );
     assertEquals(pending.f1040.line1a_wages, 230000.49);
+    // Line 9 adds whole-dollar lines 1z and 8 before line 10 is subtracted.
     assertEquals(
       pending.f1040.line11_agi,
-      amounts.profit + 230000.49 -
-        input.patron_business_source!.se_tax_deduction -
+      roundWholeDollars(amounts.profit) + roundWholeDollars(230000.49) -
+        roundWholeDollars(input.patron_business_source!.se_tax_deduction) -
         (kind === "c-health" ? 6000 : 0),
     );
     if (kind === "c-health") {
@@ -139,7 +136,7 @@ Deno.test("owned MFJ patron C/F sources and spouse wages phase in with actual SE
   }
 });
 
-Deno.test("joint patron source wages cross both actual MFJ threshold boundaries", async () => {
+test("joint patron source wages cross both actual MFJ threshold boundaries", async () => {
   for (const target of [394600, 394601, 494599, 494600, 494601]) {
     const { fixture } = prepared("farm");
     const inputs = structuredClone(fixture.inputs) as any;
@@ -151,6 +148,7 @@ Deno.test("joint patron source wages cross both actual MFJ threshold boundaries"
     const pending = buildPending(result.pending) as any;
     const lines = calculateOneBusiness8995ALines(
       inputSchema.parse(pending.form8995a),
+      2025,
     );
     assertEquals(lines.line33, target);
     assertEquals(lines.phaseInRequired, target > 394600 && target <= 494600);
@@ -172,7 +170,7 @@ Deno.test("joint patron source wages cross both actual MFJ threshold boundaries"
   }
 });
 
-Deno.test("joint patron rejects wrong owners, detached spouse wages, health and final native/PDF joins", async () => {
+test("joint patron rejects wrong owners, detached spouse wages, health and final native/PDF joins", async () => {
   for (const kind of ["farm", "c-health", "income-cap"]) {
     const { fixture, pending: base } = prepared(kind);
     const paths = [
@@ -242,7 +240,7 @@ Deno.test("joint patron rejects wrong owners, detached spouse wages, health and 
   }
 });
 
-Deno.test("valid primary W2 owner substituted in both public and reviewed spouse copies rejects export", async () => {
+test("valid primary W2 owner substituted in both public and reviewed spouse copies rejects export", async () => {
   const { fixture } = prepared("farm");
   const inputs = structuredClone(fixture.inputs) as any;
   inputs.w2[0].employee_ssn = "111223333";

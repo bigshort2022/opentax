@@ -1,3 +1,5 @@
+import { test } from "bun:test";
+import * as sys from "../../scripts/support/sys.ts";
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import {
   decodePDFRawStream,
@@ -6,14 +8,14 @@ import {
   PDFRawStream,
   StandardFonts,
 } from "pdf-lib";
-import { catalog } from "../../catalog.ts";
+import { catalog, productCatalog } from "../../catalog.ts";
 import { appendInput } from "../store/store.ts";
 import { createReturnCommand } from "./return.ts";
 import { exportMefCommand, exportPdfCommand } from "./export.ts";
 import { FilingStatus } from "../../forms/f1040/nodes/types.ts";
 
-Deno.test("explicit draft XML remains labeled after clean calculation", async () => {
-  const baseDir = await Deno.makeTempDir();
+test("explicit draft XML remains labeled after clean calculation", async () => {
+  const baseDir = await sys.makeTempDir();
   try {
     const { returnId } = await createReturnCommand({ year: 2025, baseDir });
     await appendInput(`${baseDir}/${returnId}`, "general", {
@@ -47,20 +49,21 @@ Deno.test("explicit draft XML remains labeled after clean calculation", async ()
     });
     assertStringIncludes(xml, "DRAFT");
   } finally {
-    await Deno.remove(baseDir, { recursive: true });
+    await sys.remove(baseDir, { recursive: true });
   }
 });
 
-Deno.test("draft PDF visibly labels every page using a synthetic PDF template", async () => {
-  const baseDir = await Deno.makeTempDir();
+test("draft PDF visibly labels every page using a synthetic PDF template", async () => {
+  const baseDir = await sys.makeTempDir();
   const original = catalog["f1040:2025"];
+  const originalProduct = productCatalog["f1040:2025"];
   try {
     const template = await PDFDocument.create();
     template.addPage();
     template.addPage();
     const bytes = await template.save();
     // Replace only IRS template fetching/rendering; exercise the real export pipeline.
-    catalog["f1040:2025"] = {
+    productCatalog["f1040:2025"] = {
       ...original,
       buildPdfBytes: () => Promise.resolve(bytes),
     };
@@ -71,7 +74,7 @@ Deno.test("draft PDF visibly labels every page using a synthetic PDF template", 
       force: true,
       draft: true,
     });
-    const pdf = await PDFDocument.load(await Deno.readFile(path));
+    const pdf = await PDFDocument.load(await sys.readBytes(path));
     assertEquals(pdf.getPageCount(), 2);
     const font = await pdf.embedFont(StandardFonts.HelveticaBold);
     const label = font.encodeText("DRAFT / INCOMPLETE").toString();
@@ -86,7 +89,7 @@ Deno.test("draft PDF visibly labels every page using a synthetic PDF template", 
       assertStringIncludes(text, label);
     }
   } finally {
-    catalog["f1040:2025"] = original;
-    await Deno.remove(baseDir, { recursive: true });
+    productCatalog["f1040:2025"] = originalProduct;
+    await sys.remove(baseDir, { recursive: true });
   }
 });

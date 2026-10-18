@@ -15,11 +15,17 @@ Track four separate statuses: source documents available; calculation completed 
 
 First ask the tax year, jurisdiction(s), whether each return was filed, and whether the user moved or had income in another state. Keep every year and jurisdiction separate.
 
-The supported full-return review scope is federal Form 1040 TY2025. A separate California Form 540 TY2025 workpaper supports selected arithmetic for full-year residents; it is not a complete California return review, filing-readiness determination, or e-fileable return. Do not claim review support for federal TY2022–TY2024, California TY2022–TY2024, Form 540NR, Form 540 2EZ, or amended returns. See `docs/ca540-ty2025.md` for the workpaper boundary.
+Federal Form 1040 TY2025 is the established preparation/recalculation path, subject to feature-specific diagnostics and review. This `2.2.0-ca540.1` fork also integrates developing federal Form 1040 TY2026 and Form 4868 TY2026 products from upstream v2.2.0. Form 1040 TY2026 reuses the TY2025 input catalog with year-aware execution, but known calculation, rule, and 2026v1.0 schema gaps remain; accepted input is not evidence of complete TY2026 support. Neither TY2026 product has PDF export. Before collecting values for a TY2026 request, verify the exact product, inputs, and year-specific coverage; use only the supported calculation or extension workflow and keep unresolved limitations explicit. Do not imply general TY2026 filing readiness.
+
+A separate California Form 540 TY2025 workpaper supports selected calculations for full-year residents only. It is not a complete California return, filing-readiness review, or e-fileable return. Federal TY2022–TY2024, California years other than TY2025, Form 540NR, Form 540 2EZ, and amended-return support are not claimed. See `docs/ca540-ty2025.md` for exact supported lines, reviewed inputs, and exclusions.
 
 For unsupported or unverified full-return review scope, do not request source documents for an OpenTax recalculation and do not create a return. For a CA workpaper request, use only independently reviewed California adjustments and supporting amounts for the specified selected-line calculation; do not call it a review or verification of the complete state return. A previously filed return needing correction requires verified amendment support; otherwise leave it unchanged and stop.
 
 For CA workpapers, review the structured coverage/applicability and per-gate outcomes rather than the command exit code or absence of arithmetic errors. Unknown required schedules, unsupported features, unavailable official validators, and unverified external checks remain limitations. Stable findings identify specific gaps; neither supplied zero totals nor affirmative review flags prove complete-return correctness. Do not characterize the workpaper's `canFile: false` as an FTB rejection, or bypass it with force/draft.
+
+Use the binary and skills from `bigshort2022/opentax` for this integration, not an upstream `filedcom/opentax` binary without the California workpaper. The intended release is `2.2.0-ca540.1`; choose its exact tag once published or a reviewed source build (which reports `dev`). Follow this fork's README for installation. Never substitute an upstream or `releases/latest` download for the prerelease, and never install or update without the user's permission. Automatic checks and self-update are disabled in this fork; `opentax update` only prints the fork's release guidance and leaves the executable unchanged. With the user's permission, manually install an explicitly pinned fork tag to preserve the California code and release channel, then verify `opentax version`.
+
+Verify the executable with `opentax version` before recalculation. The worked review below is for federal Form 1040 TY2025; do not reuse its figures or assumptions for TY2026. The federal A2A client is mock-tested only; actual filing status requires the corresponding live transmission and acknowledgement evidence.
 
 ## Phase 1: Collect sources (verified scope only)
 
@@ -103,7 +109,8 @@ Use `opentax node inspect --node_type <type> --json` to see what fields each for
 Add every document:
 
 ```bash
-opentax form add --returnId <id> --node_type general '{"filing_status": "mfj"}'
+# Filing status, identity and dependents: the `general` object of a start entry
+opentax form add --returnId <id> --node_type start '{"general": {"filing_status": "mfj", "dependents": [...]}}'
 opentax form add --returnId <id> --node_type w2 '{"box1_wages": 105000, "box2_fed_withheld": 15000}'
 # ... add all documents
 ```

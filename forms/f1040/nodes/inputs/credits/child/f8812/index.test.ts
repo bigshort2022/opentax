@@ -1,3 +1,5 @@
+import { test } from "bun:test";
+import { CONFIG_BY_YEAR } from "../../../../config/index.ts";
 import { assertEquals, assertThrows } from "@std/assert";
 import {
   calculateCreditLimitWorksheetALine5,
@@ -81,19 +83,19 @@ function findOutput(result: ReturnType<typeof compute>, nodeType: string) {
 // 1. Input Schema Validation
 // ============================================================
 
-Deno.test("schema: empty array produces no outputs", () => {
+test("schema: empty array produces no outputs", () => {
   const result = f8812.compute({ taxYear: 2025, formType: "f1040" }, {
     f8812s: [],
   });
   assertEquals(result.outputs.length, 0);
 });
 
-Deno.test("schema: zero children and zero dependents produces no outputs", () => {
+test("schema: zero children and zero dependents produces no outputs", () => {
   const result = compute([minimalItem()]);
   assertEquals(result.outputs.length, 0);
 });
 
-Deno.test("explicit Schedule 8812 counts must match Form 1040 dependent counts", () => {
+test("explicit Schedule 8812 counts must match Form 1040 dependent counts", () => {
   assertThrows(
     () =>
       calculateSchedule8812Lines(2025, {
@@ -116,19 +118,19 @@ Deno.test("explicit Schedule 8812 counts must match Form 1040 dependent counts",
   );
 });
 
-Deno.test("schema: negative qualifying_children_count throws", () => {
+test("schema: negative qualifying_children_count throws", () => {
   assertThrows(() => compute([minimalItem({ qualifying_children_count: -1 })]));
 });
 
-Deno.test("schema: negative other_dependents_count throws", () => {
+test("schema: negative other_dependents_count throws", () => {
   assertThrows(() => compute([minimalItem({ other_dependents_count: -1 })]));
 });
 
-Deno.test("schema: negative AGI is accepted as a signed return amount", () => {
+test("schema: negative AGI is accepted as a signed return amount", () => {
   assertEquals(compute([minimalItem({ agi: -1 })]).outputs.length, 0);
 });
 
-Deno.test("schema: negative earned_income throws", () => {
+test("schema: negative earned_income throws", () => {
   assertThrows(() =>
     compute([minimalItem({ qualifying_children_count: 1, earned_income: -1 })])
   );
@@ -138,19 +140,19 @@ Deno.test("schema: negative earned_income throws", () => {
 // 2. Per-Box Routing — CTC (qualifying_children_count → f1040)
 // ============================================================
 
-Deno.test("routing: 1 qualifying child routes CTC to f1040", () => {
+test("routing: 1 qualifying child routes CTC to f1040", () => {
   const result = compute([minimalItem({ qualifying_children_count: 1 })]);
   const input = fieldsOf(result.outputs, f1040)!;
   assertEquals(input.line19_child_tax_credit, 2200);
 });
 
-Deno.test("routing: 2 qualifying children routes $4400 CTC to f1040", () => {
+test("routing: 2 qualifying children routes $4400 CTC to f1040", () => {
   const result = compute([minimalItem({ qualifying_children_count: 2 })]);
   const input = fieldsOf(result.outputs, f1040)!;
   assertEquals(input.line19_child_tax_credit, 4400);
 });
 
-Deno.test("routing: zero qualifying_children_count produces no f1040 output (CTC)", () => {
+test("routing: zero qualifying_children_count produces no f1040 output (CTC)", () => {
   const result = compute([
     minimalItem({ qualifying_children_count: 0, other_dependents_count: 0 }),
   ]);
@@ -159,26 +161,26 @@ Deno.test("routing: zero qualifying_children_count produces no f1040 output (CTC
 
 // Per-Box Routing — ODC (other_dependents_count → f1040)
 
-Deno.test("routing: 1 other dependent routes $500 ODC to f1040", () => {
+test("routing: 1 other dependent routes $500 ODC to f1040", () => {
   const result = compute([minimalItem({ other_dependents_count: 1 })]);
   const input = fieldsOf(result.outputs, f1040)!;
   assertEquals(input.line19_child_tax_credit, 500);
 });
 
-Deno.test("routing: 3 other dependents routes $1500 ODC to f1040", () => {
+test("routing: 3 other dependents routes $1500 ODC to f1040", () => {
   const result = compute([minimalItem({ other_dependents_count: 3 })]);
   const input = fieldsOf(result.outputs, f1040)!;
   assertEquals(input.line19_child_tax_credit, 1500);
 });
 
-Deno.test("routing: zero other_dependents_count produces no ODC output", () => {
+test("routing: zero other_dependents_count produces no ODC output", () => {
   const result = compute([minimalItem({ other_dependents_count: 0 })]);
   assertEquals(findOutput(result, "f1040"), undefined);
 });
 
 // CTC + ODC combined on f1040
 
-Deno.test("routing: CTC and ODC combined route total to f1040", () => {
+test("routing: CTC and ODC combined route total to f1040", () => {
   // 1 child ($2200) + 2 other deps ($1000) = $3200
   const result = compute([
     minimalItem({ qualifying_children_count: 1, other_dependents_count: 2 }),
@@ -191,7 +193,7 @@ Deno.test("routing: CTC and ODC combined route total to f1040", () => {
 // 3. Aggregation — Multiple Items
 // ============================================================
 
-Deno.test("aggregation: multiple f8812 items are aggregated (children sum)", () => {
+test("aggregation: multiple f8812 items are aggregated (children sum)", () => {
   // Two items each contributing 1 qualifying child → total 2 children → $4400
   const result = compute([
     minimalItem({ qualifying_children_count: 1 }),
@@ -201,7 +203,7 @@ Deno.test("aggregation: multiple f8812 items are aggregated (children sum)", () 
   assertEquals(input.line19_child_tax_credit, 4400);
 });
 
-Deno.test("aggregation: multiple f8812 items with dependents aggregate ODC", () => {
+test("aggregation: multiple f8812 items with dependents aggregate ODC", () => {
   // Two items: 1 child + 1 dep and 1 child + 2 deps → 2 children ($4400) + 3 deps ($1500) = $5900
   const result = compute([
     minimalItem({ qualifying_children_count: 1, other_dependents_count: 1 }),
@@ -217,13 +219,13 @@ Deno.test("aggregation: multiple f8812 items with dependents aggregate ODC", () 
 
 // TY2025 CTC = $2,200 per qualifying child (not $2,000)
 
-Deno.test("threshold: TY2025 CTC is $2200 per qualifying child (not $2000)", () => {
+test("threshold: TY2025 CTC is $2200 per qualifying child (not $2000)", () => {
   const result = compute([minimalItem({ qualifying_children_count: 1 })]);
   const input = fieldsOf(result.outputs, f1040)!;
   assertEquals(input.line19_child_tax_credit, 2200);
 });
 
-Deno.test("threshold: TY2025 ACTC cap is $1700 per qualifying child (not $2000)", () => {
+test("threshold: TY2025 ACTC cap is $1700 per qualifying child (not $2000)", () => {
   // 1 child, large earned income, zero tax liability → ACTC capped at $1700
   const result = compute([minimalItem({
     qualifying_children_count: 1,
@@ -235,7 +237,7 @@ Deno.test("threshold: TY2025 ACTC cap is $1700 per qualifying child (not $2000)"
   assertEquals(input.line28_actc, 1700);
 });
 
-Deno.test("threshold: ODC is $500 per other dependent", () => {
+test("threshold: ODC is $500 per other dependent", () => {
   const result = compute([minimalItem({ other_dependents_count: 1 })]);
   const input = fieldsOf(result.outputs, f1040)!;
   assertEquals(input.line19_child_tax_credit, 500);
@@ -243,7 +245,7 @@ Deno.test("threshold: ODC is $500 per other dependent", () => {
 
 // Phase-out threshold — MFJ = $400,000
 
-Deno.test("threshold: MFJ phase-out starts at $400,000 — at threshold no reduction", () => {
+test("threshold: MFJ phase-out starts at $400,000 — at threshold no reduction", () => {
   const result = compute([minimalItem({
     qualifying_children_count: 1,
     agi: 400000,
@@ -254,7 +256,7 @@ Deno.test("threshold: MFJ phase-out starts at $400,000 — at threshold no reduc
   assertEquals(input.line19_child_tax_credit, 2200);
 });
 
-Deno.test("threshold: MFJ AGI just above $400,000 triggers phase-out", () => {
+test("threshold: MFJ AGI just above $400,000 triggers phase-out", () => {
   const result = compute([minimalItem({
     qualifying_children_count: 1,
     agi: 400001,
@@ -265,7 +267,7 @@ Deno.test("threshold: MFJ AGI just above $400,000 triggers phase-out", () => {
   assertEquals(input.line19_child_tax_credit, 2150);
 });
 
-Deno.test("threshold: MFJ AGI $401,000 above threshold gives $50 reduction", () => {
+test("threshold: MFJ AGI $401,000 above threshold gives $50 reduction", () => {
   const result = compute([minimalItem({
     qualifying_children_count: 1,
     agi: 401000,
@@ -278,7 +280,7 @@ Deno.test("threshold: MFJ AGI $401,000 above threshold gives $50 reduction", () 
 
 // Phase-out threshold — all other filing statuses = $200,000
 
-Deno.test("threshold: single filer phase-out starts at $200,000 — at threshold no reduction", () => {
+test("threshold: single filer phase-out starts at $200,000 — at threshold no reduction", () => {
   const result = compute([minimalItem({
     qualifying_children_count: 1,
     agi: 200000,
@@ -289,7 +291,7 @@ Deno.test("threshold: single filer phase-out starts at $200,000 — at threshold
   assertEquals(input.line19_child_tax_credit, 2200);
 });
 
-Deno.test("threshold: single filer AGI just above $200,000 triggers phase-out", () => {
+test("threshold: single filer AGI just above $200,000 triggers phase-out", () => {
   const result = compute([minimalItem({
     qualifying_children_count: 1,
     agi: 200001,
@@ -300,7 +302,7 @@ Deno.test("threshold: single filer AGI just above $200,000 triggers phase-out", 
   assertEquals(input.line19_child_tax_credit, 2150);
 });
 
-Deno.test("threshold: MFS filer uses $200,000 phase-out threshold (not $400,000)", () => {
+test("threshold: MFS filer uses $200,000 phase-out threshold (not $400,000)", () => {
   // MFS uses same $200K threshold as single
   const mfsResult = compute([minimalItem({
     qualifying_children_count: 1,
@@ -312,7 +314,7 @@ Deno.test("threshold: MFS filer uses $200,000 phase-out threshold (not $400,000)
   assertEquals(mfsInput.line19_child_tax_credit, 2150);
 });
 
-Deno.test("threshold: HOH filer uses $200,000 phase-out threshold", () => {
+test("threshold: HOH filer uses $200,000 phase-out threshold", () => {
   const result = compute([minimalItem({
     qualifying_children_count: 1,
     agi: 201000,
@@ -325,7 +327,7 @@ Deno.test("threshold: HOH filer uses $200,000 phase-out threshold", () => {
 
 // Phase-out ceiling rounding trap
 
-Deno.test("threshold: phase-out uses ceiling rounding (excess $425 → $1000 → $50 reduction)", () => {
+test("threshold: phase-out uses ceiling rounding (excess $425 → $1000 → $50 reduction)", () => {
   const result = compute([minimalItem({
     qualifying_children_count: 1,
     agi: 200425,
@@ -336,7 +338,7 @@ Deno.test("threshold: phase-out uses ceiling rounding (excess $425 → $1000 →
   assertEquals(input.line19_child_tax_credit, 2150);
 });
 
-Deno.test("threshold: phase-out ceiling — excess $1001 → $2000 → $100 reduction", () => {
+test("threshold: phase-out ceiling — excess $1001 → $2000 → $100 reduction", () => {
   const result = compute([minimalItem({
     qualifying_children_count: 1,
     agi: 201001,
@@ -347,7 +349,7 @@ Deno.test("threshold: phase-out ceiling — excess $1001 → $2000 → $100 redu
   assertEquals(input.line19_child_tax_credit, 2100);
 });
 
-Deno.test("threshold: phase-out exact multiple — excess $1000 → $1000 → $50 reduction (no double rounding)", () => {
+test("threshold: phase-out exact multiple — excess $1000 → $1000 → $50 reduction (no double rounding)", () => {
   const result = compute([minimalItem({
     qualifying_children_count: 1,
     agi: 201000,
@@ -360,7 +362,7 @@ Deno.test("threshold: phase-out exact multiple — excess $1000 → $1000 → $5
 
 // ACTC earned income floor = $2,500
 
-Deno.test("threshold: ACTC zero when earned income at $2500 floor", () => {
+test("threshold: ACTC zero when earned income at $2500 floor", () => {
   // earned income = $2500 → excess = $0 → ACTC = $0
   const result = compute([minimalItem({
     qualifying_children_count: 1,
@@ -372,7 +374,7 @@ Deno.test("threshold: ACTC zero when earned income at $2500 floor", () => {
   assertEquals(fieldsOf(result.outputs, f1040)?.line28_actc ?? 0, 0);
 });
 
-Deno.test("threshold: ACTC computed when earned income exceeds $2500 floor", () => {
+test("threshold: ACTC computed when earned income exceeds $2500 floor", () => {
   // earned income = $10000, excess over $2500 = $7500, 15% = $1125
   // CTC = 2200, nonrefundable = 0, ctcUnused = 2200
   // actcCap = 1 × $1700 = $1700
@@ -387,7 +389,7 @@ Deno.test("threshold: ACTC computed when earned income exceeds $2500 floor", () 
   assertEquals(input.line28_actc, 1125);
 });
 
-Deno.test("threshold: ACTC is 15% of earned income above $2500", () => {
+test("threshold: ACTC is 15% of earned income above $2500", () => {
   // earned income = $20000, (20000 - 2500) × 0.15 = $2625
   // CTC = 4400, nonrefundable = 0, ctcUnused = 4400
   // actcCap = 2 × $1700 = $3400
@@ -404,7 +406,7 @@ Deno.test("threshold: ACTC is 15% of earned income above $2500", () => {
 
 // Part II-B threshold (3+ children triggers higher method)
 
-Deno.test("threshold: 3 qualifying children (Line 16b = $5100) enables Part II-B comparison", () => {
+test("threshold: 3 qualifying children (Line 16b = $5100) enables Part II-B comparison", () => {
   // 3 children: actcCap = 3 × $1700 = $5100 (≥ $5100, Part II-B threshold)
   // With payroll taxes provided, Part II-B may yield higher ACTC
   // Minimal test: ensure 3 children route correctly
@@ -420,7 +422,7 @@ Deno.test("threshold: 3 qualifying children (Line 16b = $5100) enables Part II-B
   assertEquals(input.line28_actc, 4125);
 });
 
-Deno.test("threshold: 2 qualifying children (Line 16b = $3400) skips Part II-B for non-PR filer", () => {
+test("threshold: 2 qualifying children (Line 16b = $3400) skips Part II-B for non-PR filer", () => {
   // 2 children, Line 16b = $3400 < $5100, non-PR filer → Part II-A path (15% method only)
   const result = compute([minimalItem({
     qualifying_children_count: 2,
@@ -442,7 +444,7 @@ Deno.test("threshold: 2 qualifying children (Line 16b = $3400) skips Part II-B f
 // The IRS has no explicit computation rules that require a throw beyond schema validation
 // per context.md. The following verify boundary cases DO NOT throw.
 
-Deno.test("hard rule: zero agi does not throw — full CTC at zero income", () => {
+test("hard rule: zero agi does not throw — full CTC at zero income", () => {
   // AGI = 0 is below both phase-out thresholds → no reduction, full CTC = $2200
   const result = compute([
     minimalItem({ qualifying_children_count: 1, agi: 0 }),
@@ -451,7 +453,7 @@ Deno.test("hard rule: zero agi does not throw — full CTC at zero income", () =
   assertEquals(input.line19_child_tax_credit, 2200);
 });
 
-Deno.test("hard rule: zero earned_income — CTC routes to f1040, ACTC is zero", () => {
+test("hard rule: zero earned_income — CTC routes to f1040, ACTC is zero", () => {
   // earned_income = 0 → ACTC earned income method yields 0, no line28 output
   // income_tax_liability = 0 → nonrefundable CTC also 0, no f1040 output
   const result = compute([minimalItem({
@@ -470,7 +472,7 @@ Deno.test("hard rule: zero earned_income — CTC routes to f1040, ACTC is zero",
 // 6. Warning-Only / Does-Not-Throw Rules
 // ============================================================
 
-Deno.test("warning: form_2555_amounts > 0 increases modified AGI for phase-out", () => {
+test("warning: form_2555_amounts > 0 increases modified AGI for phase-out", () => {
   // AGI = 100000, form_2555_amounts = 50000 → modified AGI = 150000 (below $200K threshold)
   // No phase-out reduction, full CTC = $2200
   const result = compute([minimalItem({
@@ -482,7 +484,7 @@ Deno.test("warning: form_2555_amounts > 0 increases modified AGI for phase-out",
   assertEquals(input.line19_child_tax_credit, 2200);
 });
 
-Deno.test("warning: puerto_rico_excluded_income > 0 increases modified AGI for phase-out", () => {
+test("warning: puerto_rico_excluded_income > 0 increases modified AGI for phase-out", () => {
   // AGI = 100000, pr_income = 20000 → modified AGI = 120000 (below $200K threshold)
   // No phase-out reduction, full CTC = $2200
   const result = compute([minimalItem({
@@ -494,7 +496,7 @@ Deno.test("warning: puerto_rico_excluded_income > 0 increases modified AGI for p
   assertEquals(input.line19_child_tax_credit, 2200);
 });
 
-Deno.test("warning: form_4563_amount > 0 increases modified AGI for phase-out", () => {
+test("warning: form_4563_amount > 0 increases modified AGI for phase-out", () => {
   // AGI = 100000, form_4563 = 30000 → modified AGI = 130000 (below $200K threshold)
   // No phase-out reduction, full CTC = $2200
   const result = compute([minimalItem({
@@ -506,7 +508,7 @@ Deno.test("warning: form_4563_amount > 0 increases modified AGI for phase-out", 
   assertEquals(input.line19_child_tax_credit, 2200);
 });
 
-Deno.test("warning: nontaxable_combat_pay increases effective earned income for ACTC", () => {
+test("warning: nontaxable_combat_pay increases effective earned income for ACTC", () => {
   // earned_income = 5000, combat_pay = 3000 → effective = 8000
   // (8000 - 2500) × 0.15 = 825; cap = 1700; ctcUnused = 2200 → actc = 825
   const result = compute([minimalItem({
@@ -520,7 +522,7 @@ Deno.test("warning: nontaxable_combat_pay increases effective earned income for 
   assertEquals(input.line28_actc, 825);
 });
 
-Deno.test("warning: do_not_claim_actc=true suppresses ACTC, CTC still routes to f1040", () => {
+test("warning: do_not_claim_actc=true suppresses ACTC, CTC still routes to f1040", () => {
   // 2 children, large earned income, do_not_claim_actc=true
   // Non-refundable CTC = min(4400, 0) = 0 (tax liability = 0), no f1040
   // ACTC = 0 (opted out)
@@ -538,7 +540,7 @@ Deno.test("warning: do_not_claim_actc=true suppresses ACTC, CTC still routes to 
   );
 });
 
-Deno.test("warning: has_form_2555=true suppresses ACTC, non-refundable CTC still applies", () => {
+test("warning: has_form_2555=true suppresses ACTC, non-refundable CTC still applies", () => {
   // has_form_2555=true blocks ACTC; non-refundable CTC limited by tax liability
   const result = compute([minimalItem({
     qualifying_children_count: 1,
@@ -558,7 +560,7 @@ Deno.test("warning: has_form_2555=true suppresses ACTC, non-refundable CTC still
 // 7. Informational Fields — Must NOT produce additional tax outputs
 // ============================================================
 
-Deno.test("informational: nontaxable_combat_pay increases ACTC via higher earned income", () => {
+test("informational: nontaxable_combat_pay increases ACTC via higher earned income", () => {
   // Without: (20000-2500)*0.15 = 2625, cap=1700 → actc=1700
   // With combat pay 5000: (25000-2500)*0.15 = 3375, cap=1700 → actc=1700 (same, capped)
   // Use lower earned income to see the difference
@@ -585,7 +587,7 @@ Deno.test("informational: nontaxable_combat_pay increases ACTC via higher earned
   assertEquals(fieldsOf(withCombat.outputs, f1040)!.line28_actc, 1125);
 });
 
-Deno.test("informational: form_8332_override does not affect CTC amount — routes full CTC to f1040", () => {
+test("informational: form_8332_override does not affect CTC amount — routes full CTC to f1040", () => {
   // form_8332_override is informational — CTC still routes to f1040 at full $2200
   const result = compute([
     minimalItem({
@@ -598,7 +600,7 @@ Deno.test("informational: form_8332_override does not affect CTC amount — rout
   assertEquals(input.line19_child_tax_credit, 2200);
 });
 
-Deno.test("informational: ACTC refund delay flag — no impact on computed amounts", () => {
+test("informational: ACTC refund delay flag — no impact on computed amounts", () => {
   // ACTC delay is informational only; ACTC amount unchanged
   const result = compute([minimalItem({
     qualifying_children_count: 1,
@@ -617,7 +619,7 @@ Deno.test("informational: ACTC refund delay flag — no impact on computed amoun
 
 // Edge Case 1: Child born and died in 2025 (SSN = "DIED") — treated as qualifying child
 // This is handled by schema/routing logic; we test that a valid child count routes correctly
-Deno.test("edge: CTC fully phased out produces no credit outputs", () => {
+test("edge: CTC fully phased out produces no credit outputs", () => {
   // Single filer with AGI so high that CTC = 0
   const result = compute([minimalItem({
     qualifying_children_count: 1,
@@ -630,7 +632,7 @@ Deno.test("edge: CTC fully phased out produces no credit outputs", () => {
 });
 
 // Edge Case 2: ITIN child → ODC only (not CTC/ACTC)
-Deno.test("edge: ITIN child (ssn_not_valid_for_work) eligible for ODC but not CTC — routes to ODC", () => {
+test("edge: ITIN child (ssn_not_valid_for_work) eligible for ODC but not CTC — routes to ODC", () => {
   // In the simplified schema, this is expressed by not counting child in qualifying_children_count
   // but counting in other_dependents_count (implementation must handle ssn_not_valid_for_work flag)
   const result = compute([
@@ -641,7 +643,7 @@ Deno.test("edge: ITIN child (ssn_not_valid_for_work) eligible for ODC but not CT
 });
 
 // Edge Case 3: Form 2555 filers cannot claim ACTC (but CAN claim non-refundable CTC)
-Deno.test("edge: has_form_2555=true suppresses ACTC (line28 = 0 or absent)", () => {
+test("edge: has_form_2555=true suppresses ACTC (line28 = 0 or absent)", () => {
   const result = compute([minimalItem({
     qualifying_children_count: 1,
     agi: 50000,
@@ -652,7 +654,7 @@ Deno.test("edge: has_form_2555=true suppresses ACTC (line28 = 0 or absent)", () 
   assertEquals(fieldsOf(result.outputs, f1040)?.line28_actc ?? 0, 0);
 });
 
-Deno.test("edge: has_form_2555=true still allows non-refundable CTC on f1040", () => {
+test("edge: has_form_2555=true still allows non-refundable CTC on f1040", () => {
   const result = compute([minimalItem({
     qualifying_children_count: 1,
     agi: 50000,
@@ -665,7 +667,7 @@ Deno.test("edge: has_form_2555=true still allows non-refundable CTC on f1040", (
 });
 
 // Edge Case 4: Phase-out rounding trap (ceiling rounding)
-Deno.test("edge: phase-out rounding — $1 excess becomes $1000 (ceiling), not $0", () => {
+test("edge: phase-out rounding — $1 excess becomes $1000 (ceiling), not $0", () => {
   const result = compute([minimalItem({
     qualifying_children_count: 1,
     agi: 200001,
@@ -678,7 +680,7 @@ Deno.test("edge: phase-out rounding — $1 excess becomes $1000 (ceiling), not $
 });
 
 // Edge Case 5: Noncustodial parent with Form 8332 — CTC allowed
-Deno.test("edge: form_8332_override=true allows CTC for noncustodial parent", () => {
+test("edge: form_8332_override=true allows CTC for noncustodial parent", () => {
   const result = compute([minimalItem({
     qualifying_children_count: 1,
     agi: 50000,
@@ -689,7 +691,7 @@ Deno.test("edge: form_8332_override=true allows CTC for noncustodial parent", ()
 });
 
 // Edge Case 6: ACTC opt-out (do_not_claim_actc)
-Deno.test("edge: do_not_claim_actc=true suppresses ACTC (line28 = 0 or absent)", () => {
+test("edge: do_not_claim_actc=true suppresses ACTC (line28 = 0 or absent)", () => {
   const result = compute([minimalItem({
     qualifying_children_count: 2,
     agi: 50000,
@@ -700,7 +702,7 @@ Deno.test("edge: do_not_claim_actc=true suppresses ACTC (line28 = 0 or absent)",
   assertEquals(fieldsOf(result.outputs, f1040)?.line28_actc ?? 0, 0);
 });
 
-Deno.test("edge: do_not_claim_actc=true does not affect non-refundable CTC on f1040", () => {
+test("edge: do_not_claim_actc=true does not affect non-refundable CTC on f1040", () => {
   const result = compute([minimalItem({
     qualifying_children_count: 2,
     agi: 50000,
@@ -711,7 +713,7 @@ Deno.test("edge: do_not_claim_actc=true does not affect non-refundable CTC on f1
   assertEquals(input.line19_child_tax_credit, 4400);
 });
 
-Deno.test("ACTC opt-out rejects conflicting explicit answers across children", () => {
+test("ACTC opt-out rejects conflicting explicit answers across children", () => {
   assertThrows(
     () =>
       compute([
@@ -730,7 +732,7 @@ Deno.test("ACTC opt-out rejects conflicting explicit answers across children", (
 });
 
 // Edge Case 7: Bona fide Puerto Rico resident — triggers Part II-B with < 3 children
-Deno.test("edge: bona_fide_pr_resident=true enables Part II-B path with 1 qualifying child", () => {
+test("edge: bona_fide_pr_resident=true enables Part II-B path with 1 qualifying child", () => {
   // PR resident with 1 child: Part II-B applies even with < 3 children
   // Part II-A: (20000-2500)*0.15 = 2625; actcCap = 1700; actc_IIA = min(1700, 2625) = 1700
   // No payroll taxes provided → partIIB = 0; actc = max(1700, 0) capped at 1700 = 1700
@@ -746,7 +748,7 @@ Deno.test("edge: bona_fide_pr_resident=true enables Part II-B path with 1 qualif
 });
 
 // Edge Case 8: modified AGI exclusions (PR income, Form 2555, Form 4563) increase phase-out
-Deno.test("edge: puerto_rico_excluded_income added to AGI for phase-out calculation", () => {
+test("edge: puerto_rico_excluded_income added to AGI for phase-out calculation", () => {
   // AGI = 195000, pr income = 10000 → modified AGI = 205000 (single, threshold = 200000)
   // excess = 5000 → ceil to 5000 → reduction = 250 → CTC = 2200 - 250 = 1950
   const result = compute([minimalItem({
@@ -759,7 +761,7 @@ Deno.test("edge: puerto_rico_excluded_income added to AGI for phase-out calculat
   assertEquals(input.line19_child_tax_credit, 1950);
 });
 
-Deno.test("edge: form_2555_amounts added to AGI for modified AGI phase-out", () => {
+test("edge: form_2555_amounts added to AGI for modified AGI phase-out", () => {
   // AGI = 195000, form_2555_amounts = 10000 → modified AGI = 205000 (single)
   // excess = 5000 → reduction = 250 → CTC = 2200 - 250 = 1950
   const result = compute([minimalItem({
@@ -772,7 +774,7 @@ Deno.test("edge: form_2555_amounts added to AGI for modified AGI phase-out", () 
   assertEquals(input.line19_child_tax_credit, 1950);
 });
 
-Deno.test("edge: form_4563_amount added to AGI for modified AGI phase-out", () => {
+test("edge: form_4563_amount added to AGI for modified AGI phase-out", () => {
   // AGI = 195000, form_4563_amount = 10000 → modified AGI = 205000 (single)
   // excess = 5000 → reduction = 250 → CTC = 2200 - 250 = 1950
   const result = compute([minimalItem({
@@ -786,7 +788,7 @@ Deno.test("edge: form_4563_amount added to AGI for modified AGI phase-out", () =
 });
 
 // Edge Case 9: income_tax_liability limits non-refundable CTC
-Deno.test("edge: nonrefundable CTC limited to income_tax_liability", () => {
+test("edge: nonrefundable CTC limited to income_tax_liability", () => {
   const result = compute([minimalItem({
     qualifying_children_count: 2,
     agi: 50000,
@@ -797,7 +799,7 @@ Deno.test("edge: nonrefundable CTC limited to income_tax_liability", () => {
   assertEquals(input.line19_child_tax_credit, 1500);
 });
 
-Deno.test("edge: zero income_tax_liability means nonrefundable CTC is zero on f1040", () => {
+test("edge: zero income_tax_liability means nonrefundable CTC is zero on f1040", () => {
   const result = compute([minimalItem({
     qualifying_children_count: 2,
     agi: 50000,
@@ -810,7 +812,7 @@ Deno.test("edge: zero income_tax_liability means nonrefundable CTC is zero on f1
 });
 
 // Edge Case 10: nontaxable combat pay increases earned income for ACTC
-Deno.test("edge: nontaxable_combat_pay increases earned income for ACTC calculation", () => {
+test("edge: nontaxable_combat_pay increases earned income for ACTC calculation", () => {
   // Without combat pay: earned_income = 5000, (5000-2500)*0.15 = 375
   // With combat pay 5000: earned_income_effective = 10000, (10000-2500)*0.15 = 1125
   const withoutCombat = compute([minimalItem({
@@ -835,7 +837,7 @@ Deno.test("edge: nontaxable_combat_pay increases earned income for ACTC calculat
 // 9. Smoke Test — Comprehensive
 // ============================================================
 
-Deno.test("smoke: 2 qualifying children + 1 other dependent, moderate income, partial phase-out, TY2025", () => {
+test("smoke: 2 qualifying children + 1 other dependent, moderate income, partial phase-out, TY2025", () => {
   // Setup:
   //   - 2 qualifying children (CTC = 2 × $2200 = $4400)
   //   - 1 other dependent (ODC = $500)
@@ -861,7 +863,7 @@ Deno.test("smoke: 2 qualifying children + 1 other dependent, moderate income, pa
   assertEquals(result.outputs.length, 1);
 });
 
-Deno.test("Schedule 8812 rejects a nonrefundable claim without Form 1040 tax", () => {
+test("Schedule 8812 rejects a nonrefundable claim without Form 1040 tax", () => {
   assertThrows(
     () =>
       compute([
@@ -875,7 +877,7 @@ Deno.test("Schedule 8812 rejects a nonrefundable claim without Form 1040 tax", (
   );
 });
 
-Deno.test("Schedule 8812 does not add repeated AGI or tax across dependent entries", () => {
+test("Schedule 8812 does not add repeated AGI or tax across dependent entries", () => {
   const result = compute([
     minimalItem({
       qualifying_children_count: 1,
@@ -891,7 +893,7 @@ Deno.test("Schedule 8812 does not add repeated AGI or tax across dependent entri
   assertEquals(fieldsOf(result.outputs, f1040)?.line19_child_tax_credit, 1_000);
 });
 
-Deno.test("Schedule 8812 rejects conflicting return facts", () => {
+test("Schedule 8812 rejects conflicting return facts", () => {
   assertThrows(
     () =>
       compute([
@@ -918,7 +920,7 @@ Deno.test("Schedule 8812 rejects conflicting return facts", () => {
   );
 });
 
-Deno.test("Schedule 8812 explicit worksheet facts must match engine-derived return facts", () => {
+test("Schedule 8812 explicit worksheet facts must match engine-derived return facts", () => {
   const item = minimalItem({
     qualifying_children_count: 1,
     agi: 50_000,
@@ -956,7 +958,7 @@ Deno.test("Schedule 8812 explicit worksheet facts must match engine-derived retu
   );
 });
 
-Deno.test("Schedule 8812 auto path does not guess filing status", () => {
+test("Schedule 8812 auto path does not guess filing status", () => {
   assertThrows(
     () =>
       f8812.compute({ taxYear: 2025, formType: "f1040" }, {
@@ -969,7 +971,7 @@ Deno.test("Schedule 8812 auto path does not guess filing status", () => {
   );
 });
 
-Deno.test("smoke: MFJ 3 children, high earned income, below phase-out — maximum ACTC", () => {
+test("smoke: MFJ 3 children, high earned income, below phase-out — maximum ACTC", () => {
   // 3 children × $2200 = $6600 CTC
   // MFJ, AGI = $380,000 (below $400K threshold → no phase-out)
   // income_tax_liability = $0 → nonrefundable = $0
@@ -992,7 +994,7 @@ Deno.test("smoke: MFJ 3 children, high earned income, below phase-out — maximu
 // 10. Part II-B (Payroll Tax Method)
 // ============================================================
 
-Deno.test("part2b: 2 qualifying children — Part II-B is ignored, Part II-A used", () => {
+test("part2b: 2 qualifying children — Part II-B is ignored, Part II-A used", () => {
   // 2 children < 3, non-PR → Part II-B does not apply
   // Part II-A: tentativeActc = min(ctcUnused, actcCap)
   //   CTC = 4400, nonrefundable = 0, ctcUnused = 4400
@@ -1011,7 +1013,7 @@ Deno.test("part2b: 2 qualifying children — Part II-B is ignored, Part II-A use
   assertEquals(input.line28_actc, 3400);
 });
 
-Deno.test("part2b: 3 qualifying children, Part II-B > Part II-A — Part II-B wins", () => {
+test("part2b: 3 qualifying children, Part II-B > Part II-A — Part II-B wins", () => {
   // 3 children → Part II-B applies
   // Part II-A: earnedIncomeBased = (10000 - 2500) × 0.15 = 1125
   //   tentativeActc = min(ctcUnused, actcCap) = min(6600, 5100) = 5100
@@ -1030,7 +1032,7 @@ Deno.test("part2b: 3 qualifying children, Part II-B > Part II-A — Part II-B wi
   assertEquals(input.line28_actc, 4580);
 });
 
-Deno.test("part2b: 3 qualifying children, Part II-A > Part II-B — Part II-A wins", () => {
+test("part2b: 3 qualifying children, Part II-A > Part II-B — Part II-A wins", () => {
   // Line 20 exceeds line 17, so the printed form skips Part II-B.
   // Part II-A: earnedIncomeBased = (80000 - 2500) × 0.15 = 11625
   //   tentativeActc = min(ctcUnused=6600, actcCap=5100) = 5100
@@ -1045,7 +1047,7 @@ Deno.test("part2b: 3 qualifying children, Part II-A > Part II-B — Part II-A wi
   assertEquals(input.line28_actc, 5100);
 });
 
-Deno.test("part2b: Puerto Rico resident (1 child) — Part II-B applies", () => {
+test("part2b: Puerto Rico resident (1 child) — Part II-B applies", () => {
   // PR resident with 1 child triggers Part II-B even with < 3 children
   // Part II-A: earnedIncomeBased = (20000 - 2500) × 0.15 = 2625
   //   tentativeActc = min(ctcUnused=2200, actcCap=1700) = 1700
@@ -1070,7 +1072,7 @@ Deno.test("part2b: Puerto Rico resident (1 child) — Part II-B applies", () => 
   assertEquals(input.line28_actc, 1700);
 });
 
-Deno.test("part2b: Puerto Rico resident (1 child), Part II-B > Part II-A — Part II-B wins", () => {
+test("part2b: Puerto Rico resident (1 child), Part II-B > Part II-A — Part II-B wins", () => {
   // PR resident with low earned income but high payroll taxes
   // Part II-A: earnedIncomeBased = (5000 - 2500) × 0.15 = 375
   //   tentativeActc = min(ctcUnused=2200, actcCap=1700) = 1700
@@ -1095,7 +1097,7 @@ Deno.test("part2b: Puerto Rico resident (1 child), Part II-B > Part II-A — Par
   assertEquals(input.line28_actc, 1700);
 });
 
-Deno.test("part2b: eic_amount reduces payroll tax method result", () => {
+test("part2b: eic_amount reduces payroll tax method result", () => {
   // 3 children, Part II-B applies
   // payrollTaxes = 3000, eic = 1500 → partIIB = 1500
   // Part II-A: (15000 - 2500) × 0.15 = 1875; actcCap = 5100; tentativeActc = min(6600, 5100) = 5100
@@ -1116,7 +1118,7 @@ Deno.test("part2b: eic_amount reduces payroll tax method result", () => {
   assertEquals(input.line28_actc, 1875);
 });
 
-Deno.test("part2b: eic_amount exceeds payroll taxes → partIIB = 0, Part II-A is used", () => {
+test("part2b: eic_amount exceeds payroll taxes → partIIB = 0, Part II-A is used", () => {
   // 3 children, Part II-B: payrollTaxes = 500, eic = 1000 → partIIB = max(0, -500) = 0
   // Part II-A: (20000 - 2500) × 0.15 = 2625; actcCap = 5100; tentativeActc = min(6600, 5100) = 5100
   //   actc_IIA = min(5100, 2625) = 2625
@@ -1136,7 +1138,7 @@ Deno.test("part2b: eic_amount exceeds payroll taxes → partIIB = 0, Part II-A i
   assertEquals(input.line28_actc, 2625);
 });
 
-Deno.test("part2b: Schedule 1 line 15 enters line 22 of Part II-B", () => {
+test("part2b: Schedule 1 line 15 enters line 22 of Part II-B", () => {
   // 3 children, line 21 = 1250 and line 22 = 2000, for line 23 = 3250.
   // eic = 0 → partIIB = 3250
   // Part II-A: (10000 - 2500) × 0.15 = 1125; actcCap = 5100; tentativeActc = min(6600, 5100) = 5100
@@ -1156,7 +1158,7 @@ Deno.test("part2b: Schedule 1 line 15 enters line 22 of Part II-B", () => {
   assertEquals(input.line28_actc, 3250);
 });
 
-Deno.test("part2b: verified zero payroll sources let Part II-A win", () => {
+test("part2b: verified zero payroll sources let Part II-A win", () => {
   // 3 children, verified zero Part II-B sources yield line 25 = 0.
   // Part II-A: (30000 - 2500) × 0.15 = 4125; actcCap = 5100; tentativeActc = min(6600, 5100) = 5100
   //   actc_IIA = min(5100, 4125) = 4125
@@ -1171,7 +1173,7 @@ Deno.test("part2b: verified zero payroll sources let Part II-A win", () => {
   assertEquals(input.line28_actc, 4125);
 });
 
-Deno.test("part2b: missing line sources cannot be treated as zero", () => {
+test("part2b: missing line sources cannot be treated as zero", () => {
   assertThrows(
     () =>
       compute([minimalItem({
@@ -1184,7 +1186,7 @@ Deno.test("part2b: missing line sources cannot be treated as zero", () => {
   );
 });
 
-Deno.test("part2b: old payroll shortcuts are rejected instead of ignored", () => {
+test("part2b: old payroll shortcuts are rejected instead of ignored", () => {
   assertThrows(
     () =>
       compute([minimalItem({
@@ -1199,7 +1201,7 @@ Deno.test("part2b: old payroll shortcuts are rejected instead of ignored", () =>
   );
 });
 
-Deno.test("Schedule 8812 Worksheet A uses exactly the IRS-listed prior credits", () => {
+test("Schedule 8812 Worksheet A uses exactly the IRS-listed prior credits", () => {
   const worksheet = {
     schedule3_line1: 100,
     schedule3_line2: 200,
@@ -1232,7 +1234,7 @@ Deno.test("Schedule 8812 Worksheet A uses exactly the IRS-listed prior credits",
   );
 });
 
-Deno.test("Schedule 8812 derives Worksheet B line 14 for Form 8859", () => {
+test("Schedule 8812 derives Worksheet B line 14 for Form 8859", () => {
   const result = f8812.compute({ taxYear: 2025, formType: "f1040" }, {
     f8812s: [minimalItem({ qualifying_children_count: 1 })],
     line18a_earned_income: 20_000,
@@ -1257,7 +1259,7 @@ Deno.test("Schedule 8812 derives Worksheet B line 14 for Form 8859", () => {
   assertEquals(fields?.form8859_worksheet_b_line14, 500);
 });
 
-Deno.test("Schedule 8812 Worksheet B calculates payroll branch and adoption/EIC subtraction", () => {
+test("Schedule 8812 Worksheet B calculates payroll branch and adoption/EIC subtraction", () => {
   const earned = {
     form1040_line1z_wages: 10_000,
     nontaxable_combat_pay: 0,
@@ -1283,6 +1285,7 @@ Deno.test("Schedule 8812 Worksheet B calculates payroll branch and adoption/EIC 
     earned,
     false,
     payroll,
+    CONFIG_BY_YEAR[2025],
   );
   assertEquals(lines.line5, 1_125);
   assertEquals(lines.usesPayrollBranch, true);
@@ -1290,26 +1293,54 @@ Deno.test("Schedule 8812 Worksheet B calculates payroll branch and adoption/EIC 
   assertEquals(lines.line13, 1_500);
   assertEquals(lines.line14, 5_100);
   assertThrows(
-    () => calculateCreditLimitWorksheetBLines(6_600, 3, earned, false),
+    () => calculateCreditLimitWorksheetBLines(
+        6_600,
+        3,
+        earned,
+        false,
+        undefined,
+        CONFIG_BY_YEAR[2025],
+      ),
     Error,
     "lines 7-10 need",
   );
   assertEquals(
-    calculateCreditLimitWorksheetBLines(2_200, 1, earned, false).line14,
+    calculateCreditLimitWorksheetBLines(
+      2_200,
+      1,
+      earned,
+      false,
+      undefined,
+      CONFIG_BY_YEAR[2025],
+    ).line14,
     1_075,
   );
   assertEquals(
-    calculateCreditLimitWorksheetBLines(500, 1, earned, false).line14,
+    calculateCreditLimitWorksheetBLines(
+      500,
+      1,
+      earned,
+      false,
+      undefined,
+      CONFIG_BY_YEAR[2025],
+    ).line14,
     0,
   );
   assertEquals(
-    calculateCreditLimitWorksheetBLines(2_200, 1, earned, true, payroll)
+    calculateCreditLimitWorksheetBLines(
+      2_200,
+      1,
+      earned,
+      true,
+      payroll,
+      CONFIG_BY_YEAR[2025],
+    )
       .usesPayrollBranch,
     true,
   );
 });
 
-Deno.test("Schedule 8812 Worksheet B refuses caller line 14 and missing earned worksheet", () => {
+test("Schedule 8812 Worksheet B refuses caller line 14 and missing earned worksheet", () => {
   const item = minimalItem({ qualifying_children_count: 1 });
   const creditWorksheet = {
     ...zeroCreditWorksheet,
@@ -1339,7 +1370,7 @@ Deno.test("Schedule 8812 Worksheet B refuses caller line 14 and missing earned w
   );
 });
 
-Deno.test("Schedule 8812 rejects missing or duplicated credit-limit worksheets", () => {
+test("Schedule 8812 rejects missing or duplicated credit-limit worksheets", () => {
   const f8812s = [minimalItem({ qualifying_children_count: 1 })];
   assertThrows(
     () => calculateSchedule8812Lines(2025, { f8812s }),
@@ -1361,7 +1392,7 @@ Deno.test("Schedule 8812 rejects missing or duplicated credit-limit worksheets",
   );
 });
 
-Deno.test("Schedule 8812 structured worksheet limits line 19", () => {
+test("Schedule 8812 structured worksheet limits line 19", () => {
   const result = f8812.compute({ taxYear: 2025, formType: "f1040" }, {
     f8812s: [
       minimalItem({
@@ -1386,7 +1417,7 @@ Deno.test("Schedule 8812 structured worksheet limits line 19", () => {
   assertEquals(fieldsOf(result.outputs, f1040)?.line19_child_tax_credit, 1_700);
 });
 
-Deno.test("Schedule 8812 refundable credit requires verified line 18a", () => {
+test("Schedule 8812 refundable credit requires verified line 18a", () => {
   const f8812s = [minimalItem({
     qualifying_children_count: 1,
     income_tax_liability: 0,
@@ -1427,7 +1458,7 @@ Deno.test("Schedule 8812 refundable credit requires verified line 18a", () => {
   );
 });
 
-Deno.test("Schedule 8812 earned-income worksheet follows printed lines", () => {
+test("Schedule 8812 earned-income worksheet follows printed lines", () => {
   const worksheet = {
     form1040_line1z_wages: 10_000,
     nontaxable_combat_pay: 2_000,
@@ -1475,7 +1506,7 @@ Deno.test("Schedule 8812 earned-income worksheet follows printed lines", () => {
   );
 });
 
-Deno.test("Schedule 8812 farm optional method caps positive farm profit", () => {
+test("Schedule 8812 farm optional method caps positive farm profit", () => {
   const worksheet = {
     form1040_line1z_wages: 5_000,
     nontaxable_combat_pay: 0,
@@ -1501,7 +1532,7 @@ Deno.test("Schedule 8812 farm optional method caps positive farm profit", () => 
   );
 });
 
-Deno.test("Schedule 8812 computes line 18a from a complete worksheet", () => {
+test("Schedule 8812 computes line 18a from a complete worksheet", () => {
   const earned_income_worksheet = {
     form1040_line1z_wages: 8_000,
     nontaxable_combat_pay: 2_000,
@@ -1563,7 +1594,7 @@ Deno.test("Schedule 8812 computes line 18a from a complete worksheet", () => {
   );
 });
 
-Deno.test("Schedule 8812 Part II-B uses each printed line source", () => {
+test("Schedule 8812 Part II-B uses each printed line source", () => {
   const details = {
     line21_w2_withheld_social_security_medicare: 3_000,
     schedule1_line15: 400,
@@ -1595,4 +1626,112 @@ Deno.test("Schedule 8812 Part II-B uses each printed line source", () => {
   });
   assertEquals(lines?.line17, 5_100);
   assertEquals(lines?.line27, 3_800);
+});
+
+// 2025 Instructions for Schedule 8812, Credit Limit Worksheet A line 2:
+// Schedule 3 lines 1, 2, 3, 4, 5b, 6d, 6f, 6l and 6m.
+test("Credit Limit Worksheet A uses the computed Schedule 3 credits", () => {
+  const lines = calculateSchedule8812Lines(2025, {
+    f8812s: [minimalItem({
+      other_dependents_count: 1,
+      agi: 16_000,
+      filing_status: FilingStatus.QSS,
+      income_tax_liability: 758,
+    })],
+    schedule3_credit_limit_worksheet: {
+      ...zeroCreditWorksheet,
+      schedule3_line2: 272,
+      schedule3_line6d: 113,
+    },
+  });
+  assertEquals(lines?.line13, 373);
+  assertEquals(lines?.line14, 373);
+});
+
+test("a supplied Credit Limit Worksheet A must agree with Schedule 3", () => {
+  assertThrows(
+    () =>
+      calculateSchedule8812Lines(2025, {
+        f8812s: [minimalItem({
+          other_dependents_count: 1,
+          agi: 16_000,
+          filing_status: FilingStatus.QSS,
+          income_tax_liability: 758,
+          credit_limit_worksheet: {
+            ...zeroCreditWorksheet,
+            schedule3_line2: 272,
+          },
+        })],
+        schedule3_credit_limit_worksheet: {
+          ...zeroCreditWorksheet,
+          schedule3_line2: 272,
+          schedule3_line6d: 113,
+        },
+      }),
+    Error,
+    "differs from the return's Schedule 3 credits",
+  );
+});
+
+// Draft 2026 Schedule 8812 instructions: $2,200 CTC and $1,700 ACTC per
+// child; Credit Limit Worksheet A line 2 omits Schedule 3 line 5b, which the
+// draft 2026 Schedule 3 reserves.
+test("Schedule 8812 TY2026 uses the 2026 amounts and drops line 5b", () => {
+  const worksheet = {
+    schedule3_line1: 0,
+    schedule3_line2: 0,
+    schedule3_line3: 0,
+    schedule3_line4: 0,
+    schedule3_line5b: 0,
+    schedule3_line6d: 0,
+    schedule3_line6f: 0,
+    schedule3_line6l: 0,
+    schedule3_line6m: 0,
+    worksheet_b_applies: false,
+  };
+  const claim = {
+    f8812s: [minimalItem({
+      qualifying_children_count: 2,
+      income_tax_liability: 1_000,
+    })],
+    line18a_earned_income: 30_000,
+  };
+  const result = f8812.compute({ taxYear: 2026, formType: "f1040" }, {
+    ...claim,
+    credit_limit_worksheet: worksheet,
+  });
+  const fields = fieldsOf(result.outputs, f1040);
+  assertEquals(fields?.line19_child_tax_credit, 1_000);
+  // Line 16b is 2 x $1,700; line 20 is 15% of $27,500.
+  assertEquals(fields?.line28_actc, 3_400);
+  assertThrows(
+    () =>
+      f8812.compute({ taxYear: 2026, formType: "f1040" }, {
+        ...claim,
+        credit_limit_worksheet: { ...worksheet, schedule3_line5b: 100 },
+      }),
+    Error,
+    "line 5b is reserved",
+  );
+  const lines = calculateCreditLimitWorksheetBLines(
+    6_600,
+    3,
+    {
+      form1040_line1z_wages: 60_000,
+      nontaxable_combat_pay: 0,
+      schedule_c_statutory_employee_income: 0,
+      nonfarm_schedule_c_and_k1_net: 0,
+      farm_schedule_f_and_k1_net: 0,
+      farm_optional_method_used: false,
+      excluded_medicaid_waiver_payments: 0,
+      schedule1_line15_se_deduction: 0,
+    },
+    false,
+    undefined,
+    CONFIG_BY_YEAR[2026],
+  );
+  assertEquals(lines.line2, 5_100);
+  assertEquals(lines.line4, 57_500);
+  assertEquals(lines.usesPayrollBranch, false);
+  assertEquals(lines.line14, 1_500);
 });

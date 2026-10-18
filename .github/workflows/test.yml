@@ -16,19 +16,39 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: denoland/setup-deno@v2
+      - uses: oven-sh/setup-bun@v2
         with:
-          deno-version: v2.x
+          bun-version: 1.4.2
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+      - name: Install PDF tools the form tests read output with
+        run: sudo apt-get update -q && sudo apt-get install -y -q poppler-utils
       - name: Fetch the base branch for the oracle check
         run: git fetch --no-tags --depth=1 origin main
       - name: Nodes placed, registered and reachable
-        run: deno task check:structure
+        run: bun run check:structure
       - name: Benchmark cases fit their node schemas and cite a publication
-        run: deno task check:cases
+        run: bun run check:cases
       - name: Expected values change only with a cited ledger entry
-        run: deno task check:oracle --base origin/main
-      - name: Graph preflight and typed unit and harness verification
-        run: deno task test:unit
+        run: bun run check:oracle --base origin/main
+      - name: The binary can only reach the network through restricted fetch
+        run: bun run check:sandbox
+      - name: Graph preflight, type check and typed unit and harness verification
+        run: bun run test:unit
+      - name: Node, export and return-processing tests fail only on known, baselined failures
+        run: bun run test:forms
+      - name: Sample returns gain no new MeF blockers
+        run: bun run check:mef
+      - name: Sample returns run as TY2026 gain no new blockers
+        run: bun run check:ty2026
+      - name: Complete returns work end to end through the product CLI
+        run: bun run check:cli
+      - name: Code names only declared IRS files
+        run: bun run check:irs
+      - name: The compiled binary passes the release smoke
+        run: |
+          bun build cli/main.ts --compile --target=bun-linux-x64-baseline --outfile opentax-smoke
+          bun scripts/release/smoke-release-binary.ts ./opentax-smoke dev smoke-opentax.json
       - name: Preserve verification report
         if: always()
         uses: actions/upload-artifact@v6
@@ -42,15 +62,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: denoland/setup-deno@v2
+      - uses: oven-sh/setup-bun@v2
         with:
-          deno-version: v2.x
+          bun-version: 1.4.2
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
       - name: Provision PDF text utilities for worksheet checks
         run: sudo apt-get update && sudo apt-get install -y poppler-utils
       - name: California arithmetic, readiness and workpaper tests
-        run: deno task test:ca540
+        run: bun run test:ca540
       - name: Canonical California evidence benchmark (not filing certification)
-        run: deno task bench --form ca540 --year 2025 --json
+        run: bun run bench --form ca540 --year 2025 --json
 
 # Private IRS schemas, reviewed attachment bytes and ATS acceptance require
 # the separately recorded full/evidence gates; this job does not claim them.

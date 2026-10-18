@@ -73,6 +73,7 @@ export enum Box12Code {
   R = "R", // Employer contributions to Archer MSA
   S = "S", // 408(p) SIMPLE salary reduction contributions
   T = "T", // Adoption benefits
+  TT = "TT", // Qualified overtime compensation (2026 W-2)
   V = "V", // Income from exercise of nonstatutory stock options
   W = "W", // Employer contributions to HSA
   Y = "Y", // 409A nonqualified deferred compensation deferrals
@@ -331,6 +332,27 @@ const ELECTIVE_DEFERRAL_CODES = new Set<Box12Code>([
   Box12Code.BB,
   Box12Code.EE,
 ]);
+
+/** Below the year's base deferral limit no owner can have a line 1h excess. */
+function noCodeDExcessDeferral(
+  w2s: W2Items,
+  baseLimit: number,
+): { amount: number; owners: string[] } {
+  const byOwner = new Map<string, number>();
+  for (const item of w2s) {
+    const owner = item.employee_ssn?.replaceAll("-", "") ?? "";
+    const codeD = (item.box12_entries ?? [])
+      .filter((entry) => entry.code === Box12Code.D)
+      .reduce((sum, entry) => sum + entry.amount, 0);
+    byOwner.set(owner, (byOwner.get(owner) ?? 0) + codeD);
+  }
+  if ([...byOwner.values()].some((total) => total > baseLimit)) {
+    throw new Error(
+      "W-2 code D above the base deferral limit needs the TY2025 excess review, not yet available for this year",
+    );
+  }
+  return { amount: 0, owners: [] };
+}
 
 /** The one supported 2025 line 1h W-2 excess: traditional, non-SIMPLE code D. */
 export function codeDExcessDeferral(w2s: W2Items): {
@@ -926,11 +948,13 @@ function scheduleAOutput(w2s: W2Items): NodeOutput[] {
     .flatMap((item) => item.box14_entries ?? [])
     .filter((entry) => entry.is_state_sdi_pfml)
     .reduce((sum, entry) => sum + entry.amount, 0);
-  const line5b = regularItems(w2s).reduce(
+  // A statutory employee's box 1 moves to Schedule C; boxes 17 and 19 remain
+  // personal state and local income tax.
+  const line5b = w2s.reduce(
     (sum, item) => sum + (item.box17_state_withheld ?? 0),
     0,
   );
-  const line5c = regularItems(w2s).reduce(
+  const line5c = w2s.reduce(
     (sum, item) => sum + (item.box19_local_withheld ?? 0),
     0,
   );
@@ -1249,7 +1273,7 @@ class W2Node extends TaxNode<typeof inputSchema> {
     }
     const excessDeferral = ctx.taxYear === 2025
       ? codeDExcessDeferral(input.w2s)
-      : { amount: 0, owners: [] };
+      : noCodeDExcessDeferral(input.w2s, cfg.retirementLimits["401k"][49]);
 
     const incomeTaxFields = input.f8958_allocation
       ? communityW2Fields(input.w2s, input.f8958_allocation)

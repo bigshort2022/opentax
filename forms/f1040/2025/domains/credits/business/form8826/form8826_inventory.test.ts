@@ -1,4 +1,4 @@
-// deno-lint-ignore-file no-explicit-any
+import { test } from "bun:test";
 import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import {
   disabledAccessInventoryCases,
@@ -22,7 +22,7 @@ for (
     c.id !== "above-cap-cents"
   )
 ) {
-  Deno.test(`Form 8826 source inventory component: ${c.id}`, () => {
+  test(`Form 8826 source inventory component: ${c.id}`, () => {
     const input = disabledAccessInventoryFixture(c);
     const result = f1040_2025.executeReturn(input);
     assertEquals(result.diagnostics, []);

@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../scripts/support/sys.ts";
 import {
   assertEquals,
   assertRejects,
@@ -19,27 +22,27 @@ const scheduleF = pdfReviewFixtures.find((fixture) =>
   fixture.id === "single-schedule-f-raised-products-qbi"
 )!;
 const xsdPath = new URL(
-  "../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+  "../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
   import.meta.url,
 ).pathname;
 
 async function assertValidXsd(xml: string): Promise<void> {
   try {
-    await Deno.stat(xsdPath);
+    await sys.stat(xsdPath);
   } catch {
     throw new Error(`Missing verification prerequisite: ${xsdPath}`);
   }
-  const path = await Deno.makeTempFile({ suffix: ".xml" });
+  const path = await sys.makeTempFile({ suffix: ".xml" });
   try {
-    await Deno.writeTextFile(path, xml);
-    const result = await new Deno.Command("xmllint", {
+    await fs.writeFile(path, xml);
+    const result = await new sys.Command("xmllint", {
       args: ["--noout", "--schema", xsdPath, path],
       stdout: "piped",
       stderr: "piped",
     }).output();
     assertEquals(result.code, 0, new TextDecoder().decode(result.stderr));
   } finally {
-    await Deno.remove(path);
+    await sys.remove(path);
   }
 }
 
@@ -74,7 +77,7 @@ for (const farm of [false, true]) {
   const label = farm ? "Schedule F" : "Schedule C";
   const key = farm ? "line6_schedule_f" : "line3_schedule_c";
 
-  Deno.test(`${label} zero-net source stays at zero on Schedule 1 in native and PDF`, async () => {
+  test(`${label} zero-net source stays at zero on Schedule 1 in native and PDF`, async () => {
     const { pending, filer } = zeroNetReturn(farm);
     assertEquals(pending.schedule1?.[key], 0);
     const xml = buildMefXml(pending, filer);
@@ -88,7 +91,7 @@ for (const farm of [false, true]) {
     }
   });
 
-  Deno.test(`${label} rejects a changed source or detached Schedule 1 amount`, async () => {
+  test(`${label} rejects a changed source or detached Schedule 1 amount`, async () => {
     const { pending, filer } = zeroNetReturn(farm);
     const c = farm ? undefined : scheduleCSchema.parse(pending.schedule_c);
     const f = farm ? scheduleFSchema.parse(pending.schedule_f) : undefined;

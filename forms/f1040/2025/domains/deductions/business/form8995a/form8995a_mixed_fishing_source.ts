@@ -12,10 +12,11 @@ import { assertOwnedScheduleSE } from "../../../taxes/self-employment/schedule-s
 export function assertMixedFishingQbiReturn(
   input: Form8995AInput,
   pending: Readonly<Record<string, unknown>> | undefined,
+  taxYear: number,
 ) {
   if (!input.mixed_fishing_qbi_source) return undefined;
   if (!pending) throw new Error("Mixed fishing QBI needs its final return");
-  const calculated = calculateMixedFishingQbi(input);
+  const calculated = calculateMixedFishingQbi(input, taxYear);
   const source = calculated.source;
   const c = (pending.schedule_c as { schedule_cs?: unknown[] } | undefined)
     ?.schedule_cs;
@@ -26,7 +27,10 @@ export function assertMixedFishingQbiReturn(
   const owner = String(filed?.taxpayer_ssn ?? "").replace(/\D/g, "");
   const joint = source.joint_se_source !== undefined;
   const owned = joint
-    ? assertOwnedScheduleSE(pending as Record<string, Record<string, unknown>>)
+    ? assertOwnedScheduleSE(
+      pending as Record<string, Record<string, unknown>>,
+      taxYear,
+    )
     : undefined;
   if (
     retainedFishingProfit({
@@ -61,13 +65,17 @@ export function assertMixedFishingQbiReturn(
       "Mixed fishing Form 8995-A rows differ from filed owned C/F and SE sources",
     );
   }
+  // A joint source has no single owner; both spouses own the return.
+  const general = pending.general as Record<string, unknown> | undefined;
   const investment = assertMultiBusinessInvestmentSources(
     {
       ...input,
-      taxpayer_ssn: source.owner_ssn,
+      taxpayer_ssn: joint ? String(general?.taxpayer_ssn) : source.owner_ssn,
     },
     pending as Record<string, Record<string, unknown>>,
+    taxYear,
     true,
+    joint ? String(general?.spouse_ssn) : undefined,
   );
   if (input.net_capital_gain !== investment.filedQbiCapitalLimit) {
     throw new Error(

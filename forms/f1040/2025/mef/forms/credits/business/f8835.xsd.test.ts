@@ -1,28 +1,25 @@
+import * as fs from "node:fs/promises";
+import { test } from "bun:test";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { EnergyType } from "../../../../../nodes/inputs/credits/business/f8835/index.ts";
 import { buildMefXml } from "../../../builder.ts";
 import { testFiler } from "../../../execution/test-filer.ts";
 
 const XSD_PATH = new URL(
-  "../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+  "../../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
   import.meta.url,
 ).pathname;
 
 let xsdAvailable = false;
 try {
-  Deno.statSync(XSD_PATH);
+  sys.statSync(XSD_PATH);
   xsdAvailable = true;
 } catch {
   // The IRS schema bundle is local-only.
 }
 
-Deno.test({
-  name:
-    "XSD: two 2025 Form 8835 facility documents follow ReturnData1040 order",
-  ignore: !xsdAvailable,
-  sanitizeOps: false,
-  sanitizeResources: false,
-}, async () => {
+test.skipIf(!xsdAvailable)("XSD: two 2025 Form 8835 facility documents follow ReturnData1040 order", async () => {
   const facility = {
     energy_type: EnergyType.Wind,
     subject_to_passive_activity_limit: false,
@@ -89,16 +86,16 @@ Deno.test({
     },
   }, testFiler());
   assertStringIncludes(xml, "<IRS8835 documentId=");
-  const path = await Deno.makeTempFile({ suffix: ".xml" });
+  const path = await sys.makeTempFile({ suffix: ".xml" });
   try {
-    await Deno.writeTextFile(path, xml);
-    const result = await new Deno.Command("xmllint", {
+    await fs.writeFile(path, xml);
+    const result = await new sys.Command("xmllint", {
       args: ["--noout", "--schema", XSD_PATH, path],
       stdout: "piped",
       stderr: "piped",
     }).output();
     assertEquals(result.code, 0, new TextDecoder().decode(result.stderr));
   } finally {
-    await Deno.remove(path);
+    await sys.remove(path);
   }
 });

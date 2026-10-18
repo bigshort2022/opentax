@@ -1,4 +1,6 @@
-import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
+import { test } from "bun:test";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
+import { assertEquals, assertStringIncludes } from "@std/assert";
 import { pdfReviewFixtures } from "../../../../pdf/review-fixtures.ts";
 import { f1040_2025 } from "../../../../index.ts";
 import { normalizeAllPending } from "../../../../return-processing/pending.ts";
@@ -8,12 +10,12 @@ import { inputSchema } from "../../../../../nodes/intermediate/forms/deductions/
 const fixtures = pdfReviewFixtures.filter((f) =>
   f.id.startsWith("owned-farm-wotc")
 );
-Deno.test("owned farm WOTC actual source full return native PDF and full local XSD", async () => {
+test("owned farm WOTC actual source full return native PDF and full local XSD", async () => {
   for (const fixture of fixtures) {
     const r = f1040_2025.executeReturn(fixture.inputs);
     assertEquals(r.diagnostics, []);
     const p = normalizeAllPending(r.pending);
-    assertFarmWotcReturn(p.form8995a ?? p.form8995, p, fixture.filer);
+    assertFarmWotcReturn(p.form8995a ?? p.form8995, p, 2025, fixture.filer);
     console.log(
       fixture.id,
       JSON.stringify({
@@ -25,18 +27,18 @@ Deno.test("owned farm WOTC actual source full return native PDF and full local X
         credit: p.f3800.allowed_credit,
         tax: p.f1040.line24_total_tax,
         phase: p.form8995a
-          ? calculateFarmWotcLines(inputSchema.parse(p.form8995a)).parent
+          ? calculateFarmWotcLines(inputSchema.parse(p.form8995a), 2025).parent
             .phaseIn
           : null,
       }),
     );
     const prepared = await f1040_2025.prepareReturn(r.pending, fixture.filer);
     assertStringIncludes(prepared.bundle.xml, "<IRS1040ScheduleF ");
-    const proc = new Deno.Command("xmllint", {
+    const proc = new sys.Command("xmllint", {
       args: [
         "--noout",
         "--schema",
-        ".state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+        "irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
         "-",
       ],
       stdin: "piped",

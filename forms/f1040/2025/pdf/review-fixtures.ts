@@ -1,6 +1,6 @@
 import { withHealthPolicyRecords } from "../../nodes/intermediate/forms/adjustments/health/form7206/policy-records.fixture.ts";
 import { withRentedHomeEvidence } from "../../nodes/intermediate/forms/deductions/business/form_8829/source.fixture.ts";
-import { form8582crReviewFixtures } from "../domains/credits/business/form8582c/form8582cr_k1.fixture.ts";
+import { form8582crReviewFixtures } from "../domains/credits/business/form8582cr/form8582cr_k1.fixture.ts";
 import { ordinaryRothSubstituteReviewFixture } from "./reviews/general/composed-returns/review-4852-ordinary-roth.fixture.ts";
 import type { Form4852RetainedDocument } from "../domains/income/wages/form4852/form4852_source.ts";
 import { form8621QefReviewFixture } from "../domains/income/foreign/form8621/form8621_qef.fixture.ts";
@@ -11,6 +11,7 @@ import { multipleNuaReviewFixtures } from "./reviews/taxes/retirement/form4972/r
 import { twoFarmHealthFixtures } from "./reviews/general/composed-returns/review-two-farm-health.fixture.ts";
 import { mixedCfHealthFixtures } from "./reviews/general/composed-returns/review-mixed-cf-health.fixture.ts";
 import { qualifiedTipReviewFixtures } from "./reviews/deductions/additional/review-qualified-tips.fixture.ts";
+import { form8995InvestmentReviewFixtures } from "./reviews/deductions/business/form8995-investment-income.fixture.ts";
 import { form8941MixedThreeReviewFixtures } from "./reviews/general/composed-returns/review-8941-mixed-three.fixture.ts";
 import { ownedFarmShopReviewFixtures, carrierDailyBilledShopReviewFixtures, independentOwnerHealthReviewFixtures } from "./reviews/general/composed-returns/review-farm-shop-partmonth-health.fixture.ts";
 import { mixedControlledWotcFixtures } from "./reviews/general/composed-returns/review-mixed-controlled-wotc.fixture.ts";
@@ -66,6 +67,7 @@ import {
 } from "../../nodes/inputs/credits/business/f8864/fixture.ts";
 import { type FilerIdentity, FilingStatus } from "../../mef/header.ts";
 import { withReviewedForm8874A } from "../../nodes/inputs/credits/business/f8874/issuance_fixture.ts";
+import { withSyntheticCdeYearEndStatus } from "../../nodes/inputs/credits/business/f8874/cde_status_fixture.ts";
 import {
   DistributionCode,
   RolloverCode,
@@ -86,11 +88,18 @@ import {
   form8882ScheduleCFixture,
 } from "../../nodes/inputs/credits/business/f8882/fixture.ts";
 import { withSyntheticForm1098Copy } from "./reviews/deductions/mortgage/review-1098-copy.fixture.ts";
+import { withSyntheticW2GCopy } from "./reviews/income/other/review-w2g-copy.fixture.ts";
 import type { MefPdfAttachment } from "../mef/form-descriptor.ts";
 import {
   adoptionReviewAttachments,
   adoptionReviewSource,
 } from "./reviews/general/composed-returns/review-8839.fixture.ts";
+
+const CTC_NOTICE_COPY = {
+  document_reference: "Retained synthetic CTC notice copy",
+  text: "Synthetic retained copy of the 2023 IRS CTC disallowance notice for the Form 8862 review fixture.\n",
+  sha256: "1c68e71f4c34a2b3341881b3b5e7ac6fccb7514cbf14dd53e59c7ac7d5109686",
+};
 
 /** Synthetic source returns for the held TY2025 filled-PDF review. */
 export interface PdfReviewFixture {
@@ -119,6 +128,64 @@ const singleFiler: FilerIdentity = {
   },
   filingStatus: FilingStatus.Single,
 };
+
+const withheldW2G = await withSyntheticW2GCopy(
+  "single-withheld-w2g",
+  {
+    calendar_year: 2025,
+    source_document_reference: "2025 Casino W-2G recipient copy",
+    payer_name: "Casino Inc",
+    payer_name_control: "CASI",
+    payer_us_address: {
+      line1: "500 Casino Way",
+      city: "Las Vegas",
+      state: "NV",
+      zip: "89101",
+    },
+    payer_ein: "12-3456789",
+    winner_name: "Alex Example",
+    winner_us_address: {
+      line1: "1 Example Way",
+      city: "Austin",
+      state: "TX",
+      zip: "78701",
+    },
+    box9_winner_tin: "111-22-3333",
+    box1_winnings: 10_000,
+    box4_federal_withheld: 2_400,
+    standard_or_nonstandard_code: "S",
+  },
+  singleFiler,
+);
+
+const partnershipW2G = await withSyntheticW2GCopy(
+  "single-partnership-code-k-and-w2g",
+  {
+    calendar_year: 2025,
+    source_document_reference: "Synthetic casino W-2G recipient copy",
+    payer_name: "Casino Inc",
+    payer_name_control: "CASI",
+    payer_us_address: {
+      line1: "500 Casino Way",
+      city: "Las Vegas",
+      state: "NV",
+      zip: "89101",
+    },
+    payer_ein: "12-3456789",
+    winner_name: "Alex Example",
+    winner_us_address: {
+      line1: "1 Example Way",
+      city: "Austin",
+      state: "TX",
+      zip: "78701",
+    },
+    box9_winner_tin: "111-22-3333",
+    box1_winnings: 200,
+    box4_federal_withheld: 50,
+    standard_or_nonstandard_code: "S",
+  },
+  singleFiler,
+);
 
 const stockBasisFiler: FilerIdentity = {
   ...singleFiler,
@@ -331,7 +398,7 @@ function noAptcPolicyForMonths(
   };
 }
 
-const basePdfReviewFixtures: readonly PdfReviewFixture[] = [
+const sourcePdfReviewFixtures: readonly PdfReviewFixture[] = [
   {
     id: "single-reviewed-adoption-credit",
     inputs: {
@@ -573,8 +640,8 @@ const basePdfReviewFixtures: readonly PdfReviewFixture[] = [
           custodial_eitc_release_review: {
             form8332_source_reference: "Synthetic signed 2025 Form 8332",
             custody_record_reference: "Synthetic 2025 residence ledger",
-            custodial_parent_for_2025: true,
-            valid_2025_release_to_noncustodial_parent: true,
+            custodial_parent_for_tax_year: true,
+            valid_tax_year_release_to_noncustodial_parent: true,
             no_competing_eitc_claim_verified: true,
           },
         }],
@@ -871,8 +938,8 @@ const basePdfReviewFixtures: readonly PdfReviewFixture[] = [
           custodial_eitc_release_review: {
             form8332_source_reference: "Synthetic signed 2025 Form 8332",
             custody_record_reference: "Synthetic 2025 custody nights ledger",
-            custodial_parent_for_2025: true,
-            valid_2025_release_to_noncustodial_parent: true,
+            custodial_parent_for_tax_year: true,
+            valid_tax_year_release_to_noncustodial_parent: true,
             no_competing_eitc_claim_verified: true,
           },
         }],
@@ -928,8 +995,8 @@ const basePdfReviewFixtures: readonly PdfReviewFixture[] = [
           custodial_eitc_release_review: {
             form8332_source_reference: "Synthetic signed 2025 Form 8332",
             custody_record_reference: "Synthetic 2025 custody nights ledger",
-            custodial_parent_for_2025: true,
-            valid_2025_release_to_noncustodial_parent: true,
+            custodial_parent_for_tax_year: true,
+            valid_tax_year_release_to_noncustodial_parent: true,
             no_competing_eitc_claim_verified: true,
           },
         }],
@@ -1429,7 +1496,8 @@ const basePdfReviewFixtures: readonly PdfReviewFixture[] = [
         prior_ctc_disallowance_review: {
           disallowed_year: 2023,
           notice_reference: "Synthetic 2023 IRS CTC notice",
-          notice_copy_reference: "Retained synthetic CTC notice copy",
+          notice_copy_reference: CTC_NOTICE_COPY.document_reference,
+          notice_copy_sha256: CTC_NOTICE_COPY.sha256,
           taxpayer_ssn: "111223333",
           nonclerical_disallowance_verified: true,
           no_active_ban_verified: true,
@@ -1493,6 +1561,10 @@ const basePdfReviewFixtures: readonly PdfReviewFixture[] = [
       },
     },
     filer: singleFiler,
+    retainedSourceDocuments: [{
+      document_reference: CTC_NOTICE_COPY.document_reference,
+      bytes: new TextEncoder().encode(CTC_NOTICE_COPY.text),
+    }],
     expectedPdfForms: ["f1040", "f8812", "f8862"],
     reviewFocus: [
       "Form 8862 Part III names the same child as the Form 1040 dependent and checks the CTC eligibility answers",
@@ -1559,32 +1631,10 @@ const basePdfReviewFixtures: readonly PdfReviewFixture[] = [
     id: "single-withheld-w2g",
     inputs: {
       general: singleGeneral,
-      w2g: [{
-        calendar_year: 2025,
-        source_document_reference: "2025 Casino W-2G recipient copy",
-        payer_name: "Casino Inc",
-        payer_name_control: "CASI",
-        payer_us_address: {
-          line1: "500 Casino Way",
-          city: "Las Vegas",
-          state: "NV",
-          zip: "89101",
-        },
-        payer_ein: "12-3456789",
-        winner_name: "Alex Example",
-        winner_us_address: {
-          line1: "1 Example Way",
-          city: "Austin",
-          state: "TX",
-          zip: "78701",
-        },
-        box9_winner_tin: "111-22-3333",
-        box1_winnings: 10_000,
-        box4_federal_withheld: 2_400,
-        standard_or_nonstandard_code: "S",
-      }],
+      w2g: [withheldW2G.item],
     },
     filer: singleFiler,
+    attachments: [withheldW2G.attachment],
     expectedPdfForms: ["f1040", "schedule1", "w2g"],
     reviewFocus: [
       "Schedule 1 line 8b and Form 1040 income include the $10,000 box 1 winnings once",
@@ -1599,19 +1649,19 @@ const basePdfReviewFixtures: readonly PdfReviewFixture[] = [
         filing_status: SourceFilingStatus.MFJ,
         taxpayer_first_name: "Tara",
         taxpayer_last_name: "Black",
-        taxpayer_ssn: "400-00-1032",
+        taxpayer_ssn: "400-01-1032",
         taxpayer_dob: "1980-04-10",
         digital_assets: false,
         spouse_first_name: "Sam",
         spouse_last_name: "Black",
-        spouse_ssn: "400-00-1041",
+        spouse_ssn: "400-01-1041",
         address_line1: "17 Lexington Drive",
         address_city: "Cincinnati",
         address_state: "OH",
         address_zip: "45223",
       },
       w2: [{
-        employee_ssn: "400-00-1041",
+        employee_ssn: "400-01-1041",
         employer_name: "Tara Black",
         employer_ein: "123456789",
         employer_address_line1: "17 Lexington Drive",
@@ -1632,10 +1682,10 @@ const basePdfReviewFixtures: readonly PdfReviewFixture[] = [
         federal_income_tax_withheld: 250,
         family_withholding_only_payroll: {
           all_household_employees_included: true,
-          employer_ssn: "400001032",
+          employer_ssn: "400011032",
           employee: {
             employee_id: "spouse-employee-1",
-            employee_ssn: "400001041",
+            employee_ssn: "400011041",
             relationship: "spouse",
             relationship_source_reference: "spouse-relationship-review",
             marriage_date: "2010-06-15",
@@ -1651,7 +1701,7 @@ const basePdfReviewFixtures: readonly PdfReviewFixture[] = [
             w4_source_reference: "2025-spouse-form-w4",
             w2: {
               source_reference: "2025-spouse-form-w2",
-              employee_ssn: "400001041",
+              employee_ssn: "400011041",
               box1_wages: 5_000,
               box2_federal_income_tax_withheld: 250,
               box3_social_security_wages: 0,
@@ -1667,13 +1717,13 @@ const basePdfReviewFixtures: readonly PdfReviewFixture[] = [
       lastName: "Black",
       nameLine1: "BLACK TARA",
       fullName: "Tara Black",
-      primarySSN: "400001032",
+      primarySSN: "400011032",
       nameControl: "BLAC",
       filingStatus: FilingStatus.MarriedFilingJointly,
       spouse: {
         firstName: "Sam",
         lastName: "Black",
-        ssn: "400001041",
+        ssn: "400011041",
         nameControl: "BLAC",
       },
       address: {
@@ -2831,30 +2881,7 @@ const basePdfReviewFixtures: readonly PdfReviewFixture[] = [
     inputs: {
       general: singleGeneral,
       w2: [wage(30_000, 3_000, "Example Employer", "12-3456789")],
-      w2g: [{
-        calendar_year: 2025,
-        source_document_reference: "Synthetic casino W-2G recipient copy",
-        payer_name: "Casino Inc",
-        payer_name_control: "CASI",
-        payer_us_address: {
-          line1: "500 Casino Way",
-          city: "Las Vegas",
-          state: "NV",
-          zip: "89101",
-        },
-        payer_ein: "12-3456789",
-        winner_name: "Alex Example",
-        winner_us_address: {
-          line1: "1 Example Way",
-          city: "Austin",
-          state: "TX",
-          zip: "78701",
-        },
-        box9_winner_tin: "111-22-3333",
-        box1_winnings: 200,
-        box4_federal_withheld: 50,
-        standard_or_nonstandard_code: "S",
-      }],
+      w2g: [partnershipW2G.item],
       k1_partnership: [
         {
           partnership_name: "Alpha Partnership",
@@ -2887,6 +2914,7 @@ const basePdfReviewFixtures: readonly PdfReviewFixture[] = [
       ],
     },
     filer: singleFiler,
+    attachments: [partnershipW2G.attachment],
     expectedPdfForms: ["f1040", "schedule1", "w2g"],
     reviewFocus: [
       "Two partnership code K winnings of $400/$600 and distinct $200 W-2G make $1,200 on Schedule 1 line 8b",
@@ -4735,6 +4763,11 @@ const basePdfReviewFixtures: readonly PdfReviewFixture[] = [
     id: "single-k-reported-error",
     inputs: {
       general: singleGeneral,
+      // Synthetic: a part-time W-2 with withholding. Below the filing
+      // threshold, the return is filed to get the withholding back (2025
+      // Form 1040 instructions, Do You Have To File?); an all-zero return is
+      // rejected by MeF F1040-065-05.
+      w2: [wage(3_000, 150, "Example Employer", "12-3456789")],
       f1099k: [{
         pse_name: "Example Payment App",
         pse_tin: "34-5678901",
@@ -4768,7 +4801,8 @@ const basePdfReviewFixtures: readonly PdfReviewFixture[] = [
     reviewFocus: [
       "K box 1a $1,000 splits into a $800 personal gift and $200 expense reimbursement",
       "Schedule 1 top entry shows $1,000 reported in error without line 8 income",
-      "Form 1040 total income and AGI remain zero",
+      "Form 1040 total income and AGI are the $3,000 W-2 wages alone",
+      "The $150 W-2 withholding is refunded",
     ],
   },
   {
@@ -7088,6 +7122,20 @@ const basePdfReviewFixtures: readonly PdfReviewFixture[] = [
           amt_line2b_disallowed_deductions_and_exclusions: 0,
         },
       },
+      // Synthetic: the prior-year return's overpayment, applied to this year's
+      // estimated tax. Excluded foreign income still counts toward the filing
+      // requirement (2025 Form 1040 instructions, Chart A), and refunding this
+      // payment keeps the return off MeF F1040-065-05's all-zero reject.
+      f1040es: {
+        applied_from_prior_year: 1_000,
+        prior_year_applied_credit_review: {
+          accepted_prior_year_return_reference:
+            "Synthetic accepted prior-year Form 1040 electing the credit",
+          irs_account_credit_record_reference:
+            "Synthetic IRS account transcript showing the applied credit",
+          applied_amount: 1_000,
+        },
+      },
     },
     filer: singleFiler,
     expectedPdfForms: ["f1040", "form2555", "schedule1"],
@@ -8126,6 +8174,8 @@ const basePdfReviewFixtures: readonly PdfReviewFixture[] = [
     inputs: {
       general: {
         ...singleGeneral,
+        qbi_no_prior_loss_or_suspended_loss_confirmed: true,
+        qbi_not_patron_of_specified_cooperative_confirmed: true,
         form461_scope_review: {
           only_schedule_c_and_f_business_items: true,
           other_part_i_lines_zero: true,
@@ -8144,17 +8194,28 @@ const basePdfReviewFixtures: readonly PdfReviewFixture[] = [
         business_reference: "south-2025",
         line_f_accounting_method: "cash",
         line_g_material_participation: true,
+        line_i_made_1099_payments: false,
         line_32_at_risk: "a",
         line_1_gross_receipts: 0,
-        line_27b_other_expenses: 400_000,
+        part_v_other_expenses: [{
+          description: "Synthetic shop operating expenses",
+          amount: 400_000,
+        }],
       }],
     },
     filer: singleFiler,
-    expectedPdfForms: ["f1040", "schedule_c", "schedule1", "form461"],
+    expectedPdfForms: [
+      "f1040",
+      "schedule_c",
+      "schedule1",
+      "form461",
+      "form8995",
+    ],
     reviewFocus: [
       "Form 461 reports the 400,000 Schedule C loss and 87,000 excess business loss",
       "The 87,000 addback reaches Schedule 1 while the business loss stays on Schedule C",
       "Form 1040 AGI and the separate next-year loss workpaper trace the same source review",
+      "Form 8995 line 1 excludes the 87,000 disallowed loss: -313,000 QBI and a 313,000 line 16 carryforward",
     ],
   },
   {
@@ -8547,7 +8608,7 @@ const basePdfReviewFixtures: readonly PdfReviewFixture[] = [
         filing_status: SourceFilingStatus.Single,
         prior_year_filing_status: SourceFilingStatus.Single,
         f8936s: [{
-          vin: "1HGCM82633A004352",
+          vin: "1HGCM8265SA004352",
           vehicle_year: 2025,
           vehicle_make: "Example",
           vehicle_model: "EV",
@@ -9023,6 +9084,32 @@ const basePdfReviewFixtures: readonly PdfReviewFixture[] = [
   },
 ];
 
+/** Direct QEIs carry their CDE's synthetic year-end status and its retained copies. */
+async function withNewMarketsCdeStatus(
+  fixture: PdfReviewFixture,
+): Promise<PdfReviewFixture> {
+  const f8874 = fixture.inputs.f8874 as
+    | { investments: Parameters<typeof withSyntheticCdeYearEndStatus>[0] }
+    | undefined;
+  if (!f8874) return fixture;
+  const status = await withSyntheticCdeYearEndStatus(f8874.investments);
+  return {
+    ...fixture,
+    inputs: {
+      ...fixture.inputs,
+      f8874: { ...f8874, investments: status.investments },
+    },
+    retainedSourceDocuments: [
+      ...(fixture.retainedSourceDocuments ?? []),
+      ...status.retainedSourceDocuments,
+    ],
+  };
+}
+
+const basePdfReviewFixtures: readonly PdfReviewFixture[] = await Promise.all(
+  sourcePdfReviewFixtures.map(withNewMarketsCdeStatus),
+);
+
 const educationBase = basePdfReviewFixtures.find((fixture) =>
   fixture.id === "single-form8863-lifetime-learning-scholarship"
 )!;
@@ -9236,4 +9323,5 @@ mutablePdfReviewFixtures.push(
   ...ownedFarmShopReviewFixtures(existingPdfReviewFixtures.find((row) => row.id === "owned-farm-wotc-single-below")!),
   ...carrierDailyBilledShopReviewFixtures(),
   ...independentOwnerHealthReviewFixtures(),
+  ...form8995InvestmentReviewFixtures,
 );

@@ -1,5 +1,8 @@
+import * as fs from "node:fs/promises";
+import * as sys from "../support/sys.ts";
 /** Oracle contract: expected benchmark values change only with a cited publication. */
-import { dirname, fromFileUrl, join } from "@std/path";
+import { dirname, join } from "node:path";
+import { fileURLToPath as fromFileUrl } from "node:url";
 import { z } from "zod";
 import {
   benchmarkExpectedSchema,
@@ -251,7 +254,7 @@ export function ledgerProblems(
 }
 
 async function git(root: string, args: string[]): Promise<string> {
-  const result = await new Deno.Command("git", {
+  const result = await new sys.Command("git", {
     args,
     cwd: root,
     stdout: "piped",
@@ -331,12 +334,12 @@ async function currentCases(root: string): Promise<Map<string, unknown>> {
     try {
       entries.push([
         path,
-        JSON.parse(await Deno.readTextFile(join(root, path))),
+        JSON.parse(await fs.readFile(join(root, path), "utf8")),
       ]);
     } catch (error) {
       // Git's index can still list a working-tree deletion. Compare it as a
       // removal against the base; the ledger/inventory must authorize it.
-      if (!(error instanceof Deno.errors.NotFound)) throw error;
+      if (!sys.isNotFound(error)) throw error;
     }
   }
   return new Map(entries);
@@ -352,11 +355,11 @@ async function currentLedgers(
       entries.push([
         product,
         (product === "ca540/2025" ? caLedgerSchema : ledgerSchema).parse(
-          JSON.parse(await Deno.readTextFile(join(root, ledgerPath(product)))),
+          JSON.parse(await fs.readFile(join(root, ledgerPath(product)), "utf8")),
         ),
       ]);
     } catch (error) {
-      if (!(error instanceof Deno.errors.NotFound)) throw error;
+      if (!(sys.isNotFound(error))) throw error;
     }
   }
   return new Map(entries);
@@ -414,7 +417,7 @@ export async function oracleReport(
     );
     if (
       options.requireCaInventory || hasCa ||
-      !(error instanceof Deno.errors.NotFound)
+      !sys.isNotFound(error)
     ) {
       inventoryProblems.push({
         kind: "missing-source",
@@ -447,8 +450,10 @@ export function formatReport(report: OracleReport): string {
 
 if (import.meta.main) {
   const root = dirname(dirname(dirname(fromFileUrl(import.meta.url))));
-  const baseIndex = Deno.args.indexOf("--base");
-  const base = baseIndex === -1 ? "origin/main" : Deno.args[baseIndex + 1];
+  const baseIndex = process.argv.slice(2).indexOf("--base");
+  const base = baseIndex === -1
+    ? "origin/main"
+    : process.argv.slice(2)[baseIndex + 1];
   let report: OracleReport;
   try {
     report = await oracleReport(root, base, { requireCaInventory: true });
@@ -458,12 +463,12 @@ if (import.meta.main) {
         base.replace(/^origin\//, "")
       }`,
     );
-    Deno.exit(2);
+    process.exit(2);
   }
   console.log(
-    Deno.args.includes("--json")
+    process.argv.slice(2).includes("--json")
       ? JSON.stringify(report)
       : formatReport(report),
   );
-  Deno.exit(report.problems.length === 0 ? 0 : 1);
+  process.exit(report.problems.length === 0 ? 0 : 1);
 }

@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import {
   assert,
   assertEquals,
@@ -35,7 +38,7 @@ const cases = [
     line12: 3602,
     deduction: 16017,
     tax: 9551,
-    rawAgi: 99438.94,
+    agi: 99439,
     filedTaxable: 67672,
   },
   {
@@ -48,9 +51,9 @@ const cases = [
     capital: [10000.49, 5500.49],
     line12: 34002,
     deduction: 15799,
-    tax: 22618,
-    rawAgi: 168298.46,
-    filedTaxable: 136749,
+    tax: 22619,
+    agi: 168299,
+    filedTaxable: 136750,
   },
   {
     id: "zero-rate-income-limit",
@@ -63,8 +66,8 @@ const cases = [
     line12: 28002,
     deduction: 4256,
     tax: 1805,
-    rawAgi: 65030.45,
-    filedTaxable: 45024,
+    agi: 65031,
+    filedTaxable: 45025,
   },
   {
     id: "net-loss-investment",
@@ -77,7 +80,7 @@ const cases = [
     line12: 3602,
     deduction: 0,
     tax: 3023,
-    rawAgi: 46502.95,
+    agi: 46503,
     filedTaxable: 30753,
   },
 ];
@@ -180,10 +183,10 @@ function inputsFor(scenario: typeof cases[number]) {
 }
 async function validate(xml: string) {
   const schema = new URL(
-    "../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+    "../../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
     import.meta.url,
   ).pathname;
-  const child = new Deno.Command("xmllint", {
+  const child = new sys.Command("xmllint", {
     args: ["--noout", "--schema", schema, "-"],
     stdin: "piped",
     stdout: "piped",
@@ -195,15 +198,15 @@ async function validate(xml: string) {
   const result = await child.output();
   assertEquals(result.code, 0, new TextDecoder().decode(result.stderr));
 }
-Deno.test("owned multi-payer investment income combines with multi-business QBI, losses, SE and preferential tax", async () => {
+test("owned multi-payer investment income combines with multi-business QBI, losses, SE and preferential tax", async () => {
   for (const scenario of cases) {
     const result = f1040_2025.executeReturn(inputsFor(scenario));
     assertEquals(result.diagnostics, [], scenario.id);
     const pending = normalizeAllPending(result.pending);
     const qbi = pending.form8995;
-    assert(
-      Math.abs((pending.f1040.line11_agi as number) - scenario.rawAgi) < 1e-8,
-    );
+    // Line 9 adds whole-dollar lines 1z through 8, so line 11 is not the
+    // rounded cent AGI.
+    assertEquals(pending.f1040.line11_agi, scenario.agi);
     assertEquals(
       Math.round(pending.f1040.line15_taxable_income as number),
       scenario.filedTaxable,
@@ -222,7 +225,7 @@ Deno.test("owned multi-payer investment income combines with multi-business QBI,
     const qualified = scenario.qualified.reduce((sum, value) => sum + value, 0);
     const capital = scenario.capital.reduce((sum, value) => sum + value, 0);
     assertEquals(pending.f1040.line3a_qualified_dividends, qualified);
-    assertEquals(pending.f1040.line7a_cap_gain_distrib, capital);
+    assertEquals(pending.f1040.line7a_cap_gain_distrib, Math.round(capital));
     const tax = qualifiedDividendTax2025(
       pending.f1040.line15_taxable_income as number,
       qualified,
@@ -257,9 +260,7 @@ Deno.test("owned multi-payer investment income combines with multi-business QBI,
     await validate(prepared.bundle.xml);
     assertStringIncludes(
       prepared.bundle.xml,
-      `<AdjustedGrossIncomeAmt>${
-        Math.round(scenario.rawAgi)
-      }</AdjustedGrossIncomeAmt>`,
+      `<AdjustedGrossIncomeAmt>${scenario.agi}</AdjustedGrossIncomeAmt>`,
     );
     assertStringIncludes(
       prepared.bundle.xml,
@@ -269,15 +270,15 @@ Deno.test("owned multi-payer investment income combines with multi-business QBI,
     assertStringIncludes(prepared.bundle.xml, `<TaxAmt>${tax}</TaxAmt>`);
     const pdf = await prepared.renderPdf();
     assert(pdf.length > 0);
-    if (Deno.args.includes("--write-review-artifacts")) {
+    if (process.argv.slice(2).includes("--write-review-artifacts")) {
       const directory = new URL(
         `../../../.state/research/ty2025-filled-pdf-review/2026-10-06-form8995-investment/${scenario.id}/`,
         import.meta.url,
       ).pathname;
-      await Deno.mkdir(directory, { recursive: true });
-      await Deno.writeFile(`${directory}filled-return.pdf`, pdf);
-      await Deno.writeTextFile(`${directory}return.xml`, prepared.bundle.xml);
-      await Deno.writeTextFile(
+      await fs.mkdir(directory, { recursive: true });
+      await fs.writeFile(`${directory}filled-return.pdf`, pdf);
+      await fs.writeFile(`${directory}return.xml`, prepared.bundle.xml);
+      await fs.writeFile(
         `${directory}calculation.json`,
         JSON.stringify(
           {
@@ -292,7 +293,7 @@ Deno.test("owned multi-payer investment income combines with multi-business QBI,
     }
   }
 });
-Deno.test("multi-business investment exports reject altered ownership, copies, payers, holdings, totals and tax", () => {
+test("multi-business investment exports reject altered ownership, copies, payers, holdings, totals and tax", () => {
   const result = f1040_2025.executeReturn(inputsFor(cases[1]));
   assertEquals(result.diagnostics, []);
   const pending = normalizeAllPending(result.pending);
@@ -400,7 +401,7 @@ Deno.test("multi-business investment exports reject altered ownership, copies, p
   }
 });
 
-Deno.test("multi-business QBI line 12 adds entered qualified dividend and distribution totals separately", async () => {
+test("multi-business QBI line 12 adds entered qualified dividend and distribution totals separately", async () => {
   const scenario = {
     ...cases[0],
     qualified: [1200.25, 600.24],
@@ -410,7 +411,7 @@ Deno.test("multi-business QBI line 12 adds entered qualified dividend and distri
   assertEquals(result.diagnostics, []);
   const pending = normalizeAllPending(result.pending);
   assertEquals(pending.f1040.line3a_qualified_dividends, 1800.49);
-  assertEquals(pending.f1040.line7a_cap_gain_distrib, 1800.49);
+  assertEquals(pending.f1040.line7a_cap_gain_distrib, 1800);
   assertEquals(pending.form8995.line12, 3600);
   assertEquals(pending.form8995.line13, 80088);
   assertEquals(pending.form8995.line15, 16018);

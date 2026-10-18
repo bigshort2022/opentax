@@ -1,4 +1,5 @@
 import { type FilerIdentity, FilingStatus } from "../../../../../mef/header.ts";
+import { roundWholeDollars } from "../../../../../whole-dollars.ts";
 import { inputSchema as bSchema } from "../../../../../nodes/inputs/income/investments/f1099b/index.ts";
 import {
   assertDistinct1099DIVCopies,
@@ -37,6 +38,7 @@ type Source = {
   readonly rows: string;
   readonly fields: readonly string[];
   readonly schema: { parse(input: unknown): unknown };
+  readonly payer?: string;
   readonly recipient?: string;
   readonly recipientOnJointOnly?: boolean;
   readonly include?: (row: Record<string, unknown>) => boolean;
@@ -50,6 +52,7 @@ const sources: readonly Source[] = [
     rows: "f1099bs",
     fields: ["federal_withheld"],
     schema: bSchema,
+    payer: "payer_tin",
   },
   { key: "f1099div", rows: "f1099divs", fields: ["box4"], schema: divSchema },
   {
@@ -57,20 +60,29 @@ const sources: readonly Source[] = [
     rows: "f1099gs",
     fields: ["box_4_federal_withheld"],
     schema: gSchema,
+    payer: "payer_tin",
     recipient: "recipient_tin",
   },
-  { key: "f1099int", rows: "f1099ints", fields: ["box4"], schema: intSchema },
+  {
+    key: "f1099int",
+    rows: "f1099ints",
+    fields: ["box4"],
+    schema: intSchema,
+    payer: "payer_tin",
+  },
   {
     key: "f1099k",
     rows: "f1099ks",
     fields: ["box4_federal_withheld"],
     schema: kSchema,
+    payer: "pse_tin",
   },
   {
     key: "f1099m",
     rows: "f1099ms",
     fields: ["box4_federal_withheld"],
     schema: mSchema,
+    payer: "payer_tin",
     recipient: "recipient_tin",
   },
   {
@@ -78,18 +90,21 @@ const sources: readonly Source[] = [
     rows: "f1099necs",
     fields: ["box4_federal_withheld"],
     schema: necSchema,
+    payer: "payer_tin",
   },
   {
     key: "f1099oid",
     rows: "f1099oids",
     fields: ["box4_federal_withheld"],
     schema: oidSchema,
+    payer: "payer_tin",
   },
   {
     key: "f1099patr",
     rows: "f1099patrs",
     fields: ["box4_federal_withheld"],
     schema: patrSchema,
+    payer: "payer_tin",
   },
   {
     key: "f1099r",
@@ -120,6 +135,122 @@ const sources: readonly Source[] = [
     schema: socialSecuritySchema,
   },
 ];
+
+function rowWithholding(source: Source, row: Record<string, unknown>): number {
+  if (source.include && !source.include(row)) return 0;
+  return source.fields.reduce(
+    (sum, field) => sum + ((row[field] as number | undefined) ?? 0),
+    0,
+  );
+}
+
+function payerEin(value: unknown): string | undefined {
+  if (typeof value !== "string" || /^\d{3}-\d{2}-\d{4}$/.test(value.trim())) {
+    return undefined;
+  }
+  const digits = value.replace(/\D/g, "");
+  return digits.length === 9 ? digits : undefined;
+}
+
+export interface OtherWithholdingRow {
+  readonly ein?: string;
+  readonly amount: number;
+}
+
+// Form 1099-R withholding, including Form 4852 substitutes, is filed on
+// IRS1099R documents; every other line 25b copy needs a statement row.
+const filedOnForm1099R = new Set(["f1099r", "f4852"]);
+
+interface CopyWithholding {
+  readonly onForm1099R: boolean;
+  readonly ein?: string;
+  readonly cents: number;
+}
+
+function line25bCopies(
+  pending: Readonly<Record<string, unknown>>,
+): readonly CopyWithholding[] {
+  const substitutesOn1099R =
+    (pending.f1099r as Record<string, unknown> | undefined)
+      ?.substitute_f1099rs !== undefined;
+  return sources.flatMap((source) => {
+    const raw = pending[source.key];
+    if (raw === undefined) return [];
+    if (source.key === "f4852" && substitutesOn1099R) return [];
+    const parsed = source.schema.parse(raw) as Record<string, unknown>;
+    return (parsed[source.rows] as Record<string, unknown>[]).flatMap((row) => {
+      const amount = rowWithholding(source, row);
+      if (amount <= 0) return [];
+      const ein = source.payer ? payerEin(row[source.payer]) : undefined;
+      return [{
+        onForm1099R: filedOnForm1099R.has(source.key),
+        cents: Math.round(amount * 100),
+        ...(ein ? { ein } : {}),
+      }];
+    });
+  });
+}
+
+// Largest-remainder allocation: whole-dollar rows that sum to `target`.
+function allocateWholeDollars(
+  cents: readonly number[],
+  target: number,
+): readonly number[] {
+  const floors = cents.map((value) => Math.floor(value / 100));
+  const order = cents
+    .map((value, index) => ({ index, fraction: value % 100 }))
+    .sort((a, b) => b.fraction - a.fraction || a.index - b.index)
+    .map((item) => item.index);
+  const shortfall = target - floors.reduce((sum, value) => sum + value, 0);
+  const adjust = (index: number, rank: number): number =>
+    shortfall >= 0
+      ? floors[index] + Math.floor(shortfall / order.length) +
+        (rank < shortfall % order.length ? 1 : 0)
+      : floors[index] - (rank >= order.length + shortfall ? 1 : 0);
+  const allocated = [...floors];
+  order.forEach((index, rank) => {
+    allocated[index] = adjust(index, rank);
+  });
+  if (
+    allocated.some((value) => value < 0) ||
+    allocated.reduce((sum, value) => sum + value, 0) !== target
+  ) {
+    throw new Error(
+      "OtherWithholdingStatement rows cannot reconcile to Form 1040 line 25b in whole dollars",
+    );
+  }
+  return allocated;
+}
+
+/**
+ * Line 25b withholding for the OtherWithholdingStatement, one row per copy.
+ * Form 1040 adds the copies with cents and rounds only the total (2025 Form
+ * 1040 instructions, "Rounding Off to Whole Dollars"), so the whole-dollar
+ * rows are allocated to sum to rounded line 25b less the Form 1099-R amounts
+ * filed on their own documents.
+ */
+export function otherWithholdingStatementRows(
+  pending: Readonly<Record<string, unknown>>,
+): readonly OtherWithholdingRow[] {
+  const copies = line25bCopies(pending);
+  const statement = copies.filter((copy) => !copy.onForm1099R);
+  if (statement.length === 0) return [];
+  const line25b = roundWholeDollars(
+    copies.reduce((sum, copy) => sum + copy.cents, 0) / 100,
+  );
+  const onForm1099R = copies
+    .filter((copy) => copy.onForm1099R)
+    .reduce((sum, copy) => sum + roundWholeDollars(copy.cents / 100), 0);
+  const amounts = allocateWholeDollars(
+    statement.map((copy) => copy.cents),
+    line25b - onForm1099R,
+  );
+  return statement.flatMap((copy, index) => {
+    const amount = amounts[index];
+    if (amount <= 0) return [];
+    return [copy.ein ? { ein: copy.ein, amount } : { amount }];
+  });
+}
 
 /** Replay all retained 1099-family withholding into Form 1040 line 25b. */
 export function assert1099WithholdingSource(
@@ -159,11 +290,7 @@ export function assert1099WithholdingSource(
       assertDistinct1099MCopies(mSchema.parse(raw).f1099ms);
     }
     for (const [index, row] of rows.entries()) {
-      if (source.include && !source.include(row)) continue;
-      const amount = source.fields.reduce(
-        (sum, field) => sum + ((row[field] as number | undefined) ?? 0),
-        0,
-      );
+      const amount = rowWithholding(source, row);
       if (amount <= 0) continue;
       if (source.key === "f1099b" && typeof row.transaction_id === "string") {
         brokerTransactionIds.add(row.transaction_id);

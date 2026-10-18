@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import {
   AcceptedFormClassification,
@@ -53,7 +54,7 @@ function assessment(id: string, ...candidate: [] | [typeof input | undefined]) {
   return row;
 }
 
-Deno.test("coverage rejects duplicate IDs and unknown predicates", () => {
+test("coverage rejects duplicate IDs and unknown predicates", () => {
   const row = COVERAGE_INVENTORY[0];
   assertThrows(() => validateCoverageInventory([row, row]));
   assertThrows(() =>
@@ -61,7 +62,7 @@ Deno.test("coverage rejects duplicate IDs and unknown predicates", () => {
   );
 });
 
-Deno.test("coverage rejects missing provenance and unsupported evidence claims", () => {
+test("coverage rejects missing provenance and unsupported evidence claims", () => {
   const row = COVERAGE_INVENTORY[0];
   assertThrows(() =>
     validateCoverageInventory([{ ...row, source: undefined }])
@@ -94,7 +95,7 @@ Deno.test("coverage rejects missing provenance and unsupported evidence claims",
   }
 });
 
-Deno.test("coverage schemas reject extra fields and unknown finite codes", () => {
+test("coverage schemas reject extra fields and unknown finite codes", () => {
   assertEquals(
     coverageRequirementSchema.safeParse({
       ...COVERAGE_INVENTORY[0],
@@ -128,7 +129,7 @@ Deno.test("coverage schemas reject extra fields and unknown finite codes", () =>
   );
 });
 
-Deno.test("explicit false applicability differs from unavailable facts", () => {
+test("explicit false applicability differs from unavailable facts", () => {
   const itemized = "ca540.line18.itemized_deduction";
   const dependent = "ca540.line18.dependent_standard_deduction";
   for (const id of [itemized, dependent]) {
@@ -160,7 +161,7 @@ Deno.test("explicit false applicability differs from unavailable facts", () => {
   );
 });
 
-Deno.test("aggregate zeros and affirmative reviews never discharge source-reconciled schedules", () => {
+test("aggregate zeros and affirmative reviews never discharge source-reconciled schedules", () => {
   for (
     const id of [
       "accepted.form3506",
@@ -187,7 +188,7 @@ Deno.test("aggregate zeros and affirmative reviews never discharge source-reconc
   );
 });
 
-Deno.test("a required unsupported HOH schedule is retained without a computed form", () => {
+test("a required unsupported HOH schedule is retained without a computed form", () => {
   const id = "accepted.form3532";
   assertEquals(assessment(id, undefined).applicability, Applicability.Unknown);
   assertEquals(assessment(id).applicability, Applicability.NotApplicable);
@@ -201,7 +202,7 @@ Deno.test("a required unsupported HOH schedule is retained without a computed fo
   assertEquals(required.scenarioEvidenceIds, []);
 });
 
-Deno.test("capability distinguishes supplied Schedule CA totals, computed deduction, unavailable official schema", () => {
+test("capability distinguishes supplied Schedule CA totals, computed deduction, unavailable official schema", () => {
   assertEquals(
     assessment("ca540.line14.schedule_ca_subtractions").capability,
     CoverageCapability.SuppliedInput,
@@ -229,7 +230,7 @@ Deno.test("capability distinguishes supplied Schedule CA totals, computed deduct
   }
 });
 
-Deno.test("printed line groups and every accepted form retain classifications and multiplicity", () => {
+test("printed line groups and every accepted form retain classifications and multiplicity", () => {
   const accepted = COVERAGE_INVENTORY.filter((row) => row.acceptedForm);
   assertEquals(accepted.length, 65);
   assertEquals(
@@ -323,7 +324,7 @@ Deno.test("printed line groups and every accepted form retain classifications an
   ) assert(assessment(id));
 });
 
-Deno.test("coverage evidence records only safe fact names and explicit decisions", () => {
+test("coverage evidence records only safe fact names and explicit decisions", () => {
   const sentinel = 81_735_249;
   const result = assessCoverage({
     ...input,

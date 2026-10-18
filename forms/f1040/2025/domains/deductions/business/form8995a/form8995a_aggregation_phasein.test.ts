@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { assert, assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { f1040_2025 } from "../../../../index.ts";
 import { buildPdfBytes } from "../../../../pdf/builder.ts";
@@ -10,11 +13,10 @@ import {
   aggregationPhaseInCases,
   aggregationPhaseInFixture,
 } from "./form8995a_aggregation_phasein_fixture.ts";
-// deno-lint-ignore no-explicit-any
 type Row = Record<string, any>;
 
 for (const c of aggregationPhaseInCases) {
-  Deno.test(`aggregation phase-in ${c.name}: filed limits, owner sources, XML and PDF`, async () => {
+  test(`aggregation phase-in ${c.name}: filed limits, owner sources, XML and PDF`, async () => {
     const { input, filer } = aggregationPhaseInFixture(c);
     const result = f1040_2025.executeReturn(input);
     assertEquals(result.diagnostics, []);
@@ -30,7 +32,7 @@ for (const c of aggregationPhaseInCases) {
       Math.abs(c.tax - c.payments),
     );
     const fields = inputSchema.parse(pending.form8995a);
-    const { parent } = calculateTwoBusinessAggregationLines(fields);
+    const { parent } = calculateTwoBusinessAggregationLines(fields, 2025);
     assertEquals([
       parent.line33,
       parent.phaseIn,
@@ -44,13 +46,13 @@ for (const c of aggregationPhaseInCases) {
       calculateTwoBusinessAggregationLines({
         ...fields,
         taxable_income: threshold,
-      })
+      }, 2025)
     );
     for (const excess of [1, range - 1, range, range + 1]) {
       const { parent: p } = calculateTwoBusinessAggregationLines({
         ...fields,
         taxable_income: threshold + excess,
-      });
+      }, 2025);
       const phased = excess <= range;
       const expected = phased
         ? p.line3 - Math.round((p.line3 - p.line10) * excess / range)
@@ -90,17 +92,11 @@ for (const c of aggregationPhaseInCases) {
         QBIAfterPhaseInReductionAmt: c.qbi,
       })
     ) assert(xml.includes(`<${tag}>${value}</${tag}>`), tag);
-    const permission = await Deno.permissions.query({
-      name: "env",
-      variable: "AGGREGATION_PHASEIN_EVIDENCE",
-    });
-    const root = permission.state === "granted"
-      ? Deno.env.get("AGGREGATION_PHASEIN_EVIDENCE")
-      : undefined;
-    const dir = root ? `${root}/${c.name}` : await Deno.makeTempDir();
-    await Deno.mkdir(dir, { recursive: true });
+    const root = process.env.AGGREGATION_PHASEIN_EVIDENCE;
+    const dir = root ? `${root}/${c.name}` : await sys.makeTempDir();
+    await fs.mkdir(dir, { recursive: true });
     try {
-      await Deno.writeTextFile(
+      await fs.writeFile(
         `${dir}/source.json`,
         JSON.stringify(
           { input, filer, pending: prepared.bundle.pending },
@@ -108,13 +104,13 @@ for (const c of aggregationPhaseInCases) {
           2,
         ),
       );
-      await Deno.writeTextFile(`${dir}/return.xml`, xml);
-      await Deno.writeFile(
+      await fs.writeFile(`${dir}/return.xml`, xml);
+      await fs.writeFile(
         `${dir}/annual-disclosure.pdf`,
         prepared.bundle.attachments[0].bytes,
       );
       const origins: Parameters<typeof buildPdfBytes>[4] = [];
-      await Deno.writeFile(
+      await fs.writeFile(
         `${dir}/return.pdf`,
         await buildPdfBytes(
           prepared.bundle.pending,
@@ -124,16 +120,16 @@ for (const c of aggregationPhaseInCases) {
           origins,
         ),
       );
-      await Deno.writeTextFile(
+      await fs.writeFile(
         `${dir}/origins.json`,
         JSON.stringify(origins, null, 2),
       );
-      const xsd = await new Deno.Command("xmllint", {
+      const xsd = await new sys.Command("xmllint", {
         args: [
           "--noout",
           "--schema",
           new URL(
-            "../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+            "../../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
             import.meta.url,
           ).pathname,
           `${dir}/return.xml`,
@@ -141,7 +137,7 @@ for (const c of aggregationPhaseInCases) {
         stdout: "piped",
         stderr: "piped",
       }).output();
-      await Deno.writeFile(`${dir}/xsd.log`, xsd.stderr);
+      await fs.writeFile(`${dir}/xsd.log`, xsd.stderr);
       assertEquals(xsd.code, 0, new TextDecoder().decode(xsd.stderr));
       for (
         const kind of [
@@ -186,12 +182,12 @@ for (const c of aggregationPhaseInCases) {
         );
       }
     } finally {
-      if (!root) await Deno.remove(dir, { recursive: true });
+      if (!root) await sys.remove(dir, { recursive: true });
     }
   });
 }
 
-Deno.test("aggregation skips Part III when sourced property makes the wage/property limit nonbinding", async () => {
+test("aggregation skips Part III when sourced property makes the wage/property limit nonbinding", async () => {
   for (const c of aggregationPhaseInCases) {
     const { input, filer } = aggregationPhaseInFixture(c);
     for (let i = 0; i < c.count; i++) {
@@ -205,7 +201,7 @@ Deno.test("aggregation skips Part III when sourced property makes the wage/prope
     assertEquals(result.diagnostics, []);
     const pending = result.pending as Row;
     const fields = inputSchema.parse(pending.form8995a);
-    const { parent } = calculateTwoBusinessAggregationLines(fields);
+    const { parent } = calculateTwoBusinessAggregationLines(fields, 2025);
     assertEquals(parent.phaseInRequired, false);
     assertEquals(parent.line39, parent.line3);
     const projection = projectStagedAggregatedParentPdf(fields, filer, pending);

@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertFalse } from "@std/assert";
 import {
   GateId,
@@ -7,7 +8,7 @@ import {
 import { assessForm540 } from "./assessment.ts";
 import { workpaperInput } from "./test-fixtures.ts";
 
-Deno.test("valid workpaper has arithmetic evidence but no filing readiness", () => {
+test("valid workpaper has arithmetic evidence but no filing readiness", () => {
   const { calculation, report } = assessForm540([workpaperInput]);
   assertEquals(calculation?.lines.line19_taxable_income, 68_494);
   assertEquals(calculation?.lines.line31_tax, 2_864);
@@ -50,7 +51,7 @@ Deno.test("valid workpaper has arithmetic evidence but no filing readiness", () 
   ]);
 });
 
-Deno.test("missing duplicate or malformed CA inputs cannot yield calculations", () => {
+test("missing duplicate or malformed CA inputs cannot yield calculations", () => {
   for (
     const input of [[], [workpaperInput, workpaperInput], [{
       ...workpaperInput,
@@ -73,7 +74,7 @@ Deno.test("missing duplicate or malformed CA inputs cannot yield calculations", 
   }
 });
 
-Deno.test("stable review codes survive removal of an earlier finding", () => {
+test("stable review codes survive removal of an earlier finding", () => {
   const input = {
     ...workpaperInput,
     review: {
@@ -113,7 +114,7 @@ Deno.test("stable review codes survive removal of an earlier finding", () => {
   }
 });
 
-Deno.test("unsupported taxpayer assumptions remain specifically diagnosed", () => {
+test("unsupported taxpayer assumptions remain specifically diagnosed", () => {
   const result = assessForm540([{
     ...workpaperInput,
     residency: "part_year_ca",
@@ -138,7 +139,7 @@ Deno.test("unsupported taxpayer assumptions remain specifically diagnosed", () =
   );
 });
 
-Deno.test("valid zero facts are distinct from missing facts", () => {
+test("valid zero facts are distinct from missing facts", () => {
   const result = assessForm540([{
     ...workpaperInput,
     federalAgi: 0,
@@ -156,7 +157,7 @@ Deno.test("valid zero facts are distinct from missing facts", () => {
   assertEquals(result.report.canFile, false);
 });
 
-Deno.test("unsafe arithmetic is a failed gate without calculated values", () => {
+test("unsafe arithmetic is a failed gate without calculated values", () => {
   for (
     const change of [
       { personalExemptions: Number.MAX_SAFE_INTEGER },
@@ -188,7 +189,7 @@ Deno.test("unsafe arithmetic is a failed gate without calculated values", () => 
   }
 });
 
-Deno.test("invalid facts identify schema-owned fields without echoing unknown keys", () => {
+test("invalid facts identify schema-owned fields without echoing unknown keys", () => {
   const badAmount = assessForm540([{
     ...workpaperInput,
     federalAgi: "PRIVATE_SENTINEL",
@@ -220,7 +221,7 @@ Deno.test("invalid facts identify schema-owned fields without echoing unknown ke
   assertFalse(JSON.stringify(badAmount.report).includes("PRIVATE_SENTINEL"));
 });
 
-Deno.test("each required review answer independently blocks its review gate", () => {
+test("each required review answer independently blocks its review gate", () => {
   const checks = [
     ["fullYearCaliforniaResidence", "CA540_REVIEW_RESIDENCY"],
     ["filingStatusEligibility", "CA540_REVIEW_FILING_STATUS"],
@@ -249,7 +250,7 @@ Deno.test("each required review answer independently blocks its review gate", ()
   }
 });
 
-Deno.test("nonresident facts do not enter resident return scope", () => {
+test("nonresident facts do not enter resident return scope", () => {
   const { report } = assessForm540([{
     ...workpaperInput,
     residency: "nonresident_ca",

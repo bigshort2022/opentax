@@ -4,18 +4,24 @@ import { assertEducationIncomeSource } from "../../../../../nodes/inputs/income/
 import { element, elements } from "../../../../../mef/xml.ts";
 import { retainedActcOptOut } from "../../../../domains/credits/earned-income/actc-opt-out-source.ts";
 import { retainedEicOptOut } from "../../../../domains/credits/earned-income/earned-income/eic-opt-out-source.ts";
-import { assertLine1hSupportedSource } from "../../../../domains/income/other/line1h-source.ts";
-import { assertIdentified1099IntOwner } from "../../../../domains/income/other/f1099i/f1099int-owner-reconciliation.ts";
-import { assertPositive1099OidOwner } from "../../../../domains/income/other/f1099o/f1099oid-owner-reconciliation.ts";
-import { assertPositive1099DivOwner } from "../../../../domains/income/other/f1099d/f1099div-owner-reconciliation.ts";
+import {
+  assertLine1hSupportedSource,
+  retainedDisabilityPension,
+} from "../../../../domains/income/other/line1h-source.ts";
+import { assertIdentified1099IntOwner } from "../../../../domains/income/investments/f1099int/f1099int-owner-reconciliation.ts";
+import { assertPositive1099OidOwner } from "../../../../domains/income/investments/f1099oid/f1099oid-owner-reconciliation.ts";
+import { assertPositive1099DivOwner } from "../../../../domains/income/investments/f1099div/f1099div-owner-reconciliation.ts";
 import { assertPositive1099GOwner } from "../../../../domains/income/other/f1099g/f1099g-owner-reconciliation.ts";
-import { assertPositive1099MOwner } from "../../../../domains/income/other/f1099m/f1099m-owner-reconciliation.ts";
-import { assertPositive1099NecOwner } from "../../../../domains/income/other/f1099n/f1099nec-owner-reconciliation.ts";
-import { assertPositive1099PatrOwner } from "../../../../domains/income/other/f1099p/f1099patr-owner-reconciliation.ts";
+import { assertPositive1099MOwner } from "../../../../domains/income/business/f1099m/f1099m-owner-reconciliation.ts";
+import { assertPositive1099NecOwner } from "../../../../domains/income/business/f1099nec/f1099nec-owner-reconciliation.ts";
+import { assertPositive1099PatrOwner } from "../../../../domains/income/business/f1099patr/f1099patr-owner-reconciliation.ts";
 import { assertDirectCapitalGainDistributionSource } from "../../../../domains/income/investments/line7a-source-reconciliation.ts";
 import { assertJointDependentRefundSource } from "../../../../domains/general/return-assembly/line12a-dependent-source.ts";
 import { assertLine36EstimatedTaxSource } from "../../../../domains/payments/settlement/line36-estimated-tax-source.ts";
-import { assertNoUnsupportedDeceasedReturn } from "../../../../domains/general/return-assembly/filer-source-reconciliation.ts";
+import {
+  assertNoUnsupportedDeceasedReturn,
+  isReviewedSurvivingSpouseJointReturn,
+} from "../../../../domains/general/return-assembly/filer-source-reconciliation.ts";
 import { assertHohQualifyingChildSource } from "../../../../domains/general/return-assembly/filing-status/hoh-qualifying-child-source.ts";
 import { assertQssNonclaimedChildSource } from "../../../../domains/general/return-assembly/filing-status/qss-nonclaimed-child-source.ts";
 import {
@@ -49,6 +55,7 @@ import { assertEicSource } from "../../../../domains/credits/earned-income/earne
 import { residentElectionName } from "../../../../domains/general/return-assembly/resident-election-source.ts";
 import { assertSchedule2Line23 } from "../../../../domains/taxes/other/schedule2-line23-reconciliation.ts";
 import { assertEstimatedPaymentLine26 } from "../../../../domains/payments/settlement/estimated-payment-reconciliation.ts";
+import { mefTaxYear } from "../../../support/year-config.ts";
 import { assertOtherFormsWithholding } from "../../../../domains/payments/withholding/f8288/f8288-withholding-reconciliation.ts";
 import { assertPresidentialCampaignSource } from "../../../../domains/general/return-assembly/presidential-campaign-source.ts";
 import {
@@ -113,6 +120,7 @@ export interface Fields {
   line6b_ss_taxable?: number | null;
   mfs_spouse_lived_with_taxpayer?: boolean;
   mfs_eitc_separation_rule?: boolean;
+  hoh_spouse_lived_apart?: boolean;
   line7_capital_gain?: number | null;
   line7a_cap_gain_distrib?: number | null;
   line8_additional_income?: number | null;
@@ -350,7 +358,9 @@ function dependentXml(fields: Input, context?: MefBuildContext): string[] {
       "Form 1040 dependent credits do not match the dependent rows",
     );
   }
-  const separatedSpouseMark = fields.mfs_eitc_separation_rule === true
+  const separatedSpouseMark = fields.mfs_eitc_separation_rule === true ||
+      (fields.hoh_spouse_lived_apart === true &&
+        fields.filing_status === FilingStatus.HOH)
     ? element("SepdSpsFilingSepRetMeetsRqrInd", "X")
     : "";
   if (details.length === 0) {
@@ -362,6 +372,7 @@ function dependentXml(fields: Input, context?: MefBuildContext): string[] {
   ) {
     throw new Error("Form 1040 dependent rows need a filing status");
   }
+  const taxYear = mefTaxYear(context);
   const filer = filerCreditEligibility({
     filing_status: fields.filing_status as FilingStatus,
     taxpayer_ssn: fields.taxpayer_ssn,
@@ -403,7 +414,7 @@ function dependentXml(fields: Input, context?: MefBuildContext): string[] {
         `${label} needs a confirmed qualifying-child or qualifying-relative support basis`,
       );
     }
-    if (dep.credit_category !== dependentCreditCategory(dep, filer)) {
+    if (dep.credit_category !== dependentCreditCategory(dep, filer, taxYear)) {
       throw new Error(
         `${label} credit category does not match the dependent facts`,
       );
@@ -477,8 +488,16 @@ function dependentXml(fields: Input, context?: MefBuildContext): string[] {
 }
 
 function buildIRS1040(fields: Input, context?: MefBuildContext): string {
-  assertHohQualifyingChildSource(fields, context?.pending ?? {});
-  assertQssNonclaimedChildSource(fields, context?.pending ?? {});
+  assertHohQualifyingChildSource(
+    fields,
+    context?.pending ?? {},
+    mefTaxYear(context),
+  );
+  assertQssNonclaimedChildSource(
+    fields,
+    context?.pending ?? {},
+    mefTaxYear(context),
+  );
   assertIdentified1099IntOwner(
     fields as Record<string, unknown>,
     context?.pending,
@@ -507,7 +526,11 @@ function buildIRS1040(fields: Input, context?: MefBuildContext): string {
     fields as Record<string, unknown>,
     context?.pending,
   );
-  assertJointDependentRefundSource(fields, context?.pending);
+  assertJointDependentRefundSource(
+    fields,
+    context?.pending,
+    mefTaxYear(context),
+  );
   assertNoUnsupportedDeceasedReturn(
     fields,
     context?.pending?.general as Record<string, unknown> | undefined,
@@ -519,6 +542,7 @@ function buildIRS1040(fields: Input, context?: MefBuildContext): string {
   const formerSpouseEstimatedTaxSsn = assertEstimatedPaymentLine26(
     fields,
     context?.pending,
+    mefTaxYear(context),
   );
   assertOtherFormsWithholding(fields, context?.pending);
   assertReturnScheduleJoins(fields, context?.pending);
@@ -574,6 +598,7 @@ function buildIRS1040(fields: Input, context?: MefBuildContext): string {
         excess.owners.some((owner) => !allowedOwners.includes(owner)) ||
         context.pending.form2555 !== undefined ||
         hasCorrectiveDistribution ||
+        retainedDisabilityPension(context.pending, mefTaxYear(context)) > 0 ||
         fields.line1h_other_earned !== expected ||
         agiAmount !== expected
       ) {
@@ -583,7 +608,12 @@ function buildIRS1040(fields: Input, context?: MefBuildContext): string {
       }
     }
   }
-  assertLine1hSupportedSource(fields, context?.pending, context?.filer);
+  assertLine1hSupportedSource(
+    fields,
+    mefTaxYear(context),
+    context?.pending,
+    context?.filer,
+  );
   const iraRollover = fields.line4c_ira_rollover === true;
   const rollover = fields.line5c_pension_rollover === true;
   if (
@@ -615,7 +645,10 @@ function buildIRS1040(fields: Input, context?: MefBuildContext): string {
         "Form 1040 line 4c rollover does not match the reviewed IRA Form 1099-R source",
       );
     }
-    const explanation = iraDistributionExplanation(parsed.data.f1099rs);
+    const explanation = iraDistributionExplanation(
+      parsed.data.f1099rs,
+      mefTaxYear(context),
+    );
     if (explanation !== undefined && context?.documentIdsByPendingKey) {
       const ids = context.documentIdsByPendingKey.ira_distribution_statement ??
         [];
@@ -738,7 +771,18 @@ function buildIRS1040(fields: Input, context?: MefBuildContext): string {
 
   // VirtualCurAcquiredDurTYInd is required by IRS1040.xsd §338 (BooleanType).
   // Preserve the answer supplied on the general input rather than overwriting Yes.
+  const survivingSpouseReturn = isReviewedSurvivingSpouseJointReturn(
+    fields as Record<string, unknown>,
+    context?.pending?.general as Record<string, unknown> | undefined,
+    context?.filer,
+  );
   const requiredPrefix = [
+    ...(survivingSpouseReturn
+      ? [
+        element("DeceasedInd", "X"),
+        element("SpouseDeathDt", String(fields.spouse_death_date)),
+      ]
+      : []),
     ...(mainHomeInUS === true
       ? [element("MainHomeInUSOverHalfYrInd", "X")]
       : []),
@@ -795,6 +839,7 @@ function buildIRS1040(fields: Input, context?: MefBuildContext): string {
     resolveNumber(fields.line27_eitc),
     mainHomeInUS,
     context?.pending,
+    mefTaxYear(context),
   );
 
   const capitalGain = resolveNumber(fields.line7_capital_gain);
@@ -840,7 +885,9 @@ function buildIRS1040(fields: Input, context?: MefBuildContext): string {
     }
     if (key === "line1h_other_earned") {
       const scheduleId = context?.documentIdsByPendingKey
-        ?.wages_not_shown_schedule?.[0];
+        ?.wages_not_shown_schedule?.[0] ??
+        context?.documentIdsByPendingKey
+          ?.non_w2_disability_payment_statement?.[0];
       return element(
         tag,
         value,
@@ -849,6 +896,20 @@ function buildIRS1040(fields: Input, context?: MefBuildContext): string {
             referenceDocumentId: scheduleId,
             referenceDocumentName:
               "NonW2DisabilityPaymentStatement WagesNotShownSchedule",
+          }
+          : undefined,
+      );
+    }
+    if (key === "line25b_withheld_1099") {
+      const statementId = context?.documentIdsByPendingKey
+        ?.other_withholding_statement?.[0];
+      return element(
+        tag,
+        value,
+        statementId
+          ? {
+            referenceDocumentId: statementId,
+            referenceDocumentName: "OtherWithholdingStatement",
           }
           : undefined,
       );
@@ -1117,6 +1178,7 @@ function buildIRS1040(fields: Input, context?: MefBuildContext): string {
   // "NO FINANCIAL PRODUCT" indicates the filer is not using a refund anticipation
   // loan or refund transfer product — the correct value for direct refunds.
   const requiredSuffix = [
+    survivingSpouseReturn ? element("SurvivingSpouseInd", "X") : "",
     element("RefundProductCd", "NO FINANCIAL PRODUCT"),
   ];
 

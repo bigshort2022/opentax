@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { execute } from "../../../../../../../core/runtime/executor.ts";
 import { buildExecutionPlan } from "../../../../../../../core/runtime/planner.ts";
@@ -12,7 +13,7 @@ const fixture = pdfReviewFixtures.find((item) =>
   item.id === "single-8862-ctc-reinstatement"
 )!;
 
-Deno.test("reviewed CTC credit calculates, but notice assertions cannot authorize export", async () => {
+test("reviewed CTC credit calculates, but notice assertions cannot authorize export", async () => {
   const result = execute(
     buildExecutionPlan(registry),
     registry,
@@ -25,7 +26,7 @@ Deno.test("reviewed CTC credit calculates, but notice assertions cannot authoriz
   assertThrows(
     () => nativeForm8862.build(pending.f8862!, { pending }),
     Error,
-    "executor-owned authentication of prior IRS notice issuance and contents",
+    "retained prior IRS notice copy with matching SHA-256",
   );
   assertThrows(
     () =>
@@ -35,11 +36,11 @@ Deno.test("reviewed CTC credit calculates, but notice assertions cannot authoriz
         f8812: pending.f8812!,
       }),
     Error,
-    "executor-owned authentication of prior IRS notice issuance and contents",
+    "retained prior IRS notice copy with matching SHA-256",
   );
   await assertRejects(
     () => buildMefBundle(pending, { filer: fixture.filer, attachments: [] }),
     Error,
-    "executor-owned authentication of prior IRS notice issuance and contents",
+    "retained prior IRS notice copy with matching SHA-256",
   );
 });

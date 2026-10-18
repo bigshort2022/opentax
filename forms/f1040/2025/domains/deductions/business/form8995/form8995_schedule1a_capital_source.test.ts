@@ -1,10 +1,12 @@
-import { assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
+import { assertEquals, assertRejects } from "@std/assert";
 import { f1040_2025 } from "../../../../index.ts";
 import { pdfReviewFixtures } from "../../../../pdf/review-fixtures.ts";
-import { form8995 } from "../../../../mef/forms/deductions/business/f8995/f8995.ts";
 import { buildPdfBytes } from "../../../../pdf/builder.ts";
 import { normalizeAllPending } from "../../../../return-processing/pending.ts";
-Deno.test("actual ScheduleC tip deduction and personal-sale capital sources retain positive QBI zero and positive income caps", async () => {
+test("actual ScheduleC tip deduction and personal-sale capital sources retain positive QBI zero and positive income caps", async () => {
   for (
     const [kind, positive] of [["tips", false], ["tips", true], [
       "capital",
@@ -61,18 +63,18 @@ Deno.test("actual ScheduleC tip deduction and personal-sale capital sources reta
     assertEquals(prepared.bundle.xml.includes("<IRS8995 "), !whollyExcluded);
     const id = kind + (positive ? "-positive" : "-zero");
     const dir = ".state/research/2026-10-06-form8995-schedule1a-capital-source";
-    await Deno.mkdir(dir, { recursive: true });
-    await Deno.writeTextFile(
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(
       `${dir}/${id}.json`,
       JSON.stringify({ input, pending: p }, null, 2),
     );
-    await Deno.writeTextFile(`${dir}/${id}.xml`, prepared.bundle.xml);
-    await Deno.writeFile(`${dir}/${id}.pdf`, await prepared.renderPdf());
-    const x = await new Deno.Command("xmllint", {
+    await fs.writeFile(`${dir}/${id}.xml`, prepared.bundle.xml);
+    await fs.writeFile(`${dir}/${id}.pdf`, await prepared.renderPdf());
+    const x = await new sys.Command("xmllint", {
       args: [
         "--noout",
         "--schema",
-        ".state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+        "irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
         `${dir}/${id}.xml`,
       ],
       stderr: "piped",

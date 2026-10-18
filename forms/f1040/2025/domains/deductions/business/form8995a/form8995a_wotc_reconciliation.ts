@@ -1,3 +1,4 @@
+import { roundWholeDollars } from "../../../../../whole-dollars.ts";
 import { assertLossWotcSources } from "./form8995a_loss_wotc_source.ts";
 import { assertQualifiedTipQbiSource } from "../form8995/form8995_qualified_tip_source.ts";
 import { assertOwnedScheduleSE } from "../../../taxes/self-employment/schedule-se/schedule-se-owner-source.ts";
@@ -11,6 +12,7 @@ import {
 } from "../../../../../nodes/intermediate/forms/deductions/business/form8995a/index.ts";
 import {
   inputSchema as scheduleCInputSchema,
+  scheduleCSchedule1Line3,
   wotcReductionsByBusiness,
 } from "../../../../../nodes/inputs/income/business/schedule_c/model.ts";
 import {
@@ -19,13 +21,14 @@ import {
 } from "../../../../../nodes/inputs/credits/business/f5884/index.ts";
 import { inputSchema as seInputSchema } from "../../../../../nodes/intermediate/forms/taxes/self-employment/schedule_se/index.ts";
 import { scheduleSELines } from "../../../../../nodes/intermediate/forms/taxes/self-employment/schedule_se/calculation.ts";
-import { CONFIG_BY_YEAR } from "../../../../../nodes/config/index.ts";
+import { qbiYearConfig } from "../../../../../nodes/intermediate/forms/deductions/business/form8995a/thresholds.ts";
 import { normalizeAllPending } from "../../../../return-processing/pending.ts";
 
 /** Replay the retained employer credit, wage deduction, SE tax and QBI source. */
 export function assertForm8995AWotcReturn(
   input: Form8995AInput,
   rawPending: Readonly<Record<string, unknown>> | undefined,
+  taxYear: number,
 ): void {
   if (input.schedule_c_qbi_businesses?.some((b) => b.qbi < 0)) {
     assertLossWotcSources(input, rawPending);
@@ -47,13 +50,14 @@ export function assertForm8995AWotcReturn(
       "Form 8995-A with WOTC needs its retained Schedule C and full return source",
     );
   }
-  if (input.wotc_business_sources) calculateOwnedWotcBusinesses(input);
-  else assertSingleScheduleCWotcAmounts(input);
+  if (input.wotc_business_sources) {
+    calculateOwnedWotcBusinesses(input, taxYear);
+  } else assertSingleScheduleCWotcAmounts(input, taxYear);
   const pending = normalizeAllPending(rawPending as Record<string, unknown>);
   assertQualifiedTipQbiSource({
     qualified_tip_qbi_source: input.single_schedule_c_source
       ?.qualified_tip_qbi_source,
-  }, pending);
+  }, pending, taxYear);
   const additional = Number(pending.f1040?.line13b_additional_deductions ?? 0);
   const parent = form8995aInputSchema.strict().safeParse(pending.form8995a);
   if (
@@ -63,7 +67,6 @@ export function assertForm8995AWotcReturn(
       "Form 8995-A WOTC needs the matching retained parent source",
     );
   }
-  const business = source.business;
   const scheduleC = scheduleCInputSchema.parse(pending.schedule_c);
   const wotc = wotcInputSchema.parse(pending.f5884);
   if (sources.length === 2) {
@@ -124,6 +127,9 @@ export function assertForm8995AWotcReturn(
     0,
   );
   const profit = sources.reduce((sum, s) => sum + s.business.qbi, 0);
+  const schedule1Profit = scheduleCSchedule1Line3(
+    sources.map((s) => s.business.qbi),
+  );
   const retained = scheduleC.schedule_cs[0];
   const reductions = wotcReductionsByBusiness(scheduleC);
   const credit = pending.f3800?.f5884_credit as
@@ -208,10 +214,10 @@ export function assertForm8995AWotcReturn(
   }
   const se = seInputSchema.parse(pending.schedule_se);
   const joint = source.joint_se_source;
-  const owned = joint ? assertOwnedScheduleSE(pending) : undefined;
+  const owned = joint ? assertOwnedScheduleSE(pending, taxYear) : undefined;
   const seLines = owned
     ? { line12: owned.tax, line13: owned.deduction }
-    : scheduleSELines(se, CONFIG_BY_YEAR[2025].ssWageBase);
+    : scheduleSELines(se, qbiYearConfig(taxYear).ssWageBase);
   const wageRows = pending.w2 ? w2Schema.parse(pending.w2).w2s : [];
   if (
     wageRows.some((row) =>
@@ -227,7 +233,10 @@ export function assertForm8995AWotcReturn(
   const wagesTotal = wageRows.reduce((sum, row) => sum + row.box1_wages, 0);
   if (
     joint && (!owned || !isDeepStrictEqual(joint, owned.source) ||
-      Math.abs(wagesTotal - (source.joint_wages_total ?? 0)) > 1e-7 ||
+      // The joint source carries the whole-dollar line 1z.
+      Math.abs(
+          roundWholeDollars(wagesTotal) - (source.joint_wages_total ?? 0),
+        ) > 1e-7 ||
       pending.general?.filing_status !== "mfj" ||
       sources.some((s) =>
         (s.business.source_schedule_c.proprietor_recipient === "S"
@@ -262,21 +271,24 @@ export function assertForm8995AWotcReturn(
       sources.reduce((sum, s) => sum + s.se_tax_deduction, 0) ||
     schedule1?.line15_se_deduction !== seLines.line13 ||
     pending.schedule2?.line4_se_tax !== seLines.line12 ||
-    schedule1?.line3_schedule_c !== profit ||
-    schedule1?.line10_total_additional_income !== profit ||
+    schedule1?.line3_schedule_c !== schedule1Profit ||
+    schedule1?.line10_total_additional_income !== schedule1Profit ||
     !noAmount(schedule1?.line16_sep_simple) ||
     !noAmount(schedule1?.line17_se_health_insurance) ||
-    f1040?.line8_additional_income !== profit ||
+    f1040?.line8_additional_income !== schedule1Profit ||
     (joint &&
       (f1040?.line1a_wages !== wagesTotal ||
-        f1040?.line1z_total_wages !== wagesTotal)) ||
+        f1040?.line1z_total_wages !== roundWholeDollars(wagesTotal))) ||
     f1040?.line9_total_income !==
-      (joint ? profit + wagesTotal : Math.round(profit + wagesTotal)) ||
+      (joint
+        ? roundWholeDollars(schedule1Profit) + roundWholeDollars(wagesTotal)
+        : Math.round(schedule1Profit + wagesTotal)) ||
     f1040?.line10_adjustments !== seLines.line13 ||
     f1040?.line11_agi !==
       (joint
-        ? profit + wagesTotal - seLines.line13
-        : Math.round(profit + wagesTotal - seLines.line13)) ||
+        ? roundWholeDollars(schedule1Profit) + roundWholeDollars(wagesTotal) -
+          seLines.line13
+        : Math.round(schedule1Profit + wagesTotal - seLines.line13)) ||
     input.taxable_income !==
       Math.max(
         0,

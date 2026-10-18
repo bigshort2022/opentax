@@ -11,7 +11,9 @@ You prepare supported federal tax returns with the `opentax` CLI. The California
 
 First ask which tax year and jurisdiction(s) the user needs, whether each return is already filed, and whether residence changed during the year. Keep each year and jurisdiction as a separate return. Tax year is not the current calendar year.
 
-The supported full-return preparation scope is federal Form 1040 for TY2025. A separate TY2025 California Form 540 workpaper supports selected calculations for full-year California residents only. It is not a complete California return, filing-readiness check, or e-fileable return. No federal TY2022–TY2024, California TY2022–TY2024, Form 540NR, Form 540 2EZ, or amended-return support is claimed. See `docs/ca540-ty2025.md` for exact supported lines, reviewed inputs, and exclusions.
+Federal Form 1040 TY2025 is the established preparation/recalculation path, subject to feature-specific diagnostics and review. This `2.2.0-ca540.1` fork also integrates developing federal Form 1040 TY2026 and Form 4868 TY2026 products from upstream v2.2.0. Form 1040 TY2026 reuses the TY2025 input catalog with year-aware execution, but known calculation, rule, and 2026v1.0 schema gaps remain; accepted input is not evidence of complete TY2026 support. Neither TY2026 product has PDF export. Before collecting values for a TY2026 request, verify the exact product, inputs, and year-specific coverage; use only the supported calculation or extension workflow and keep unresolved limitations explicit. Do not imply general TY2026 filing readiness.
+
+A separate California Form 540 TY2025 workpaper supports selected calculations for full-year residents only. It is not a complete California return, filing-readiness review, or e-fileable return. Federal TY2022–TY2024, California years other than TY2025, Form 540NR, Form 540 2EZ, and amended-return support are not claimed. See `docs/ca540-ty2025.md` for exact supported lines, reviewed inputs, and exclusions.
 
 For an unsupported or unverified year/jurisdiction, stop before asking for source documents, creating a return, or entering facts. State which row is unsupported and explain that this engine cannot prepare it; recommend using the relevant official tax authority materials or a qualified tax preparer. Do not approximate with TY2025 rules or treat California forms as federal inputs.
 
@@ -23,7 +25,9 @@ Only when the user’s scope is verified as supported may preparation continue. 
 opentax version
 ```
 
-The remainder of this skill's full preparation workflow applies to the federal TY2025 return only. For a California workpaper request, proceed only if the user specifically wants selected-line arithmetic and supplies independently reviewed California adjustments and supporting line amounts. Do not characterize it as preparing or reviewing their complete state return. MeF export is unavailable.
+Use the binary and skills from `bigshort2022/opentax` for this integration, not an upstream `filedcom/opentax` binary without the California workpaper. The intended release is `2.2.0-ca540.1`; choose its exact tag once published or a reviewed source build (which reports `dev`). Follow this fork's README for installation. Never substitute an upstream or `releases/latest` download for the prerelease, and never install or update without the user's permission. Automatic checks and self-update are disabled in this fork; `opentax update` only prints the fork's release guidance and leaves the executable unchanged. With the user's permission, manually install an explicitly pinned fork tag to preserve the California code and release channel, then verify `opentax version`.
+
+The worked full-preparation flow below applies to federal Form 1040 TY2025. Do not reuse its year, figures, or assumptions for TY2026; a TY2026 request needs the separately verified scope above. Form 4868 is an extension request, not a prepared Form 1040. For a California workpaper request, proceed only if the user specifically wants selected-line arithmetic and supplies independently reviewed California adjustments and supporting line amounts. Do not characterize it as preparing or reviewing their complete state return. MeF export is unavailable.
 
 For the CA path, use `opentax return validate --returnId <id> --format json` and inspect `coverage`, `gates`, `readiness`, and stable diagnostic codes. Distinguish computed arithmetic from supplied aggregates and unknown schedule applicability. An inspection exit zero does not establish readiness; the workpaper scope remains unsupported and official schema/rule gates unavailable. Do not set missing facts or review flags merely to remove findings. Force/draft never authorize CA MeF export.
 
@@ -123,11 +127,13 @@ Wait for the user to confirm or correct before proceeding.
 
 Once confirmed, add all forms to the return using the CLI.
 
-Use `opentax node inspect --node_type <type> --json` to see what fields each form expects before adding it.
+Run `opentax node template --document <kind>` (e.g. `w2`, `1099-int`; `--list-documents` lists them) for the JSON a document's `form add` takes; `--full` adds optional fields. `opentax node inspect --node_type <type>` shows the full schema.
 
 ```bash
-# Filing status and dependents
-opentax form add --returnId <id> --node_type general '{"filing_status": "single"}'
+# Filing status, taxpayer identity and dependents go in the `general` object of a start entry
+# (`opentax node inspect --node_type start` lists its fields)
+opentax form add --returnId <id> --node_type start \
+  '{"general": {"filing_status": "single", "taxpayer_first_name": "Riley", "taxpayer_last_name": "Chen", "taxpayer_dob": "1985-04-12"}}'
 
 # W-2
 opentax form add --returnId <id> --node_type w2 \
@@ -135,10 +141,10 @@ opentax form add --returnId <id> --node_type w2 \
 
 # 1099-INT
 opentax form add --returnId <id> --node_type f1099int \
-  '{"payer_name": "Chase Bank", "box1_interest": 420}'
+  '{"payer_name": "Chase Bank", "box1": 420}'
 ```
 
-Common node types: `general`, `w2`, `f1099int`, `f1099div`, `f1099nec`, `f1099r`, `f1099b`, `f1099g`, `ssa1099`, `schedule_c`, `schedule_a`, `f1098`, `f1098e`, `f8949`.
+Common node types: `start`, `w2`, `f1099int`, `f1099div`, `f1099nec`, `f1099r`, `f1099b`, `f1099g`, `ssa1099`, `schedule_c`, `schedule_a`, `f1098`, `f1098e`, `f8949`.
 
 Run `opentax node list` to see all supported forms.
 
@@ -198,9 +204,22 @@ opentax return validate --returnId <id>
 # This does not transmit a return or prove IRS acceptance.
 opentax return export --returnId <id> --type mef > return.xml
 
-# Export as filled PDF
+# Export as filled PDF (written to the return's folder unless --output is given)
 opentax return export --returnId <id> --type pdf
 ```
+
+Federal export checks required identity/signature fields and other diagnostics and reports missing inputs. A successful export is not proof of a complete or correct return. Review the report and the entry-safety rules below before changing an existing entry; never fill missing facts with invented values.
+
+```bash
+# Add a PDF that MeF files with the return, or record a retained source copy
+opentax return attach --returnId <id> --file statement.pdf --description "Explanation statement"
+opentax return attach --returnId <id> --file source.pdf --reference "<document reference>"
+
+# Build the MeF submission ZIP a transmitter sends
+opentax return export --returnId <id> --type mef-submission [--efin <efin> --software-id <id>]
+```
+
+`opentax mef login-check | send | status | acks` implements TY2025 Form 1040 transmission through IRS MeF A2A. It has only been tested against a local mock IRS server; no live ATS or production acceptance or IRS product approval is established. It needs the user's own enrollment and strong-authentication credentials, defaults to ATS (IRS test returns only), and requires separate production opt-ins. California workpapers cannot use this path. Preparation or export does not authorize transmission: obtain the user's explicit approval for the exact return and destination before sending, and follow the host assistant's credential and transmission safeguards. Run `opentax mef --help` and read `docs/mef/transmission.md` before a transmission workflow.
 
 ## Inspecting entries
 

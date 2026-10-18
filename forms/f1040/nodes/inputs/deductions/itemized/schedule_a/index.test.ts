@@ -1,5 +1,10 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
-import { inputSchema, scheduleA } from "./index.ts";
+import {
+  CharitableCarryoverCategory,
+  inputSchema,
+  scheduleA,
+} from "./index.ts";
 import { FilingStatus } from "../../../../types.ts";
 
 type ScheduleAInput = Parameters<typeof scheduleA.compute>[1];
@@ -25,12 +30,12 @@ function deductionInput(
 // 1. INPUT SCHEMA VALIDATION — one representative check per rule
 // =============================================================================
 
-Deno.test("scheduleA.inputSchema: empty object is valid — all fields optional", () => {
+test("scheduleA.inputSchema: empty object is valid — all fields optional", () => {
   const parsed = scheduleA.inputSchema.safeParse({});
   assertEquals(parsed.success, true);
 });
 
-Deno.test("scheduleA.compute: Pub. 526 capital-gain election refigures older property carryover", () => {
+test("scheduleA.compute: Pub. 526 capital-gain election refigures older property carryover", () => {
   const result = compute({
     agi: 60_000,
     capital_gain_50_percent_election_confirmed: true,
@@ -71,7 +76,7 @@ Deno.test("scheduleA.compute: Pub. 526 capital-gain election refigures older pro
   );
 });
 
-Deno.test("scheduleA.inputSchema: elected current gifts need complete item classification and an explicit prior ledger", () => {
+test("scheduleA.inputSchema: elected current gifts need complete item classification and an explicit prior ledger", () => {
   const elected = {
     source: "investment land",
     contribution_id: "land",
@@ -103,7 +108,7 @@ Deno.test("scheduleA.inputSchema: elected current gifts need complete item class
   );
 });
 
-Deno.test("scheduleA.compute: no-appreciation capital property still participates in a return-wide 50% election", () => {
+test("scheduleA.compute: no-appreciation capital property still participates in a return-wide 50% election", () => {
   const result = compute({
     agi: 20_000,
     capital_gain_50_percent_election_confirmed: true,
@@ -130,7 +135,7 @@ Deno.test("scheduleA.compute: no-appreciation capital property still participate
   );
 });
 
-Deno.test("scheduleA.compute: fifth-year elected carryover expires after its last eligible deduction year", () => {
+test("scheduleA.compute: fifth-year elected carryover expires after its last eligible deduction year", () => {
   const result = compute({
     agi: 0,
     capital_gain_50_percent_election_confirmed: true,
@@ -156,7 +161,7 @@ Deno.test("scheduleA.compute: fifth-year elected carryover expires after its las
   );
 });
 
-Deno.test("scheduleA.compute: elected capital-gain carryovers use oldest property first", () => {
+test("scheduleA.compute: elected capital-gain carryovers use oldest property first", () => {
   const result = compute({
     agi: 20_000,
     capital_gain_50_percent_election_confirmed: true,
@@ -208,7 +213,7 @@ Deno.test("scheduleA.compute: elected capital-gain carryovers use oldest propert
   );
 });
 
-Deno.test("scheduleA.compute: elected carryover rejects mixed 30% current gifts pending full limit ordering", () => {
+test("scheduleA.compute: elected carryover rejects mixed 30% current gifts pending full limit ordering", () => {
   assertThrows(
     () =>
       compute({
@@ -238,17 +243,17 @@ Deno.test("scheduleA.compute: elected carryover rejects mixed 30% current gifts 
   );
 });
 
-Deno.test("scheduleA.inputSchema: negative numeric field rejected", () => {
+test("scheduleA.inputSchema: negative numeric field rejected", () => {
   const parsed = scheduleA.inputSchema.safeParse({ line_1_medical: -1 });
   assertEquals(parsed.success, false);
 });
 
-Deno.test("scheduleA.inputSchema: non-boolean force_itemized rejected", () => {
+test("scheduleA.inputSchema: non-boolean force_itemized rejected", () => {
   const parsed = scheduleA.inputSchema.safeParse({ force_itemized: "yes" });
   assertEquals(parsed.success, false);
 });
 
-Deno.test("Schedule A rejects contradictory deduction choices", () => {
+test("Schedule A rejects contradictory deduction choices", () => {
   assertEquals(
     scheduleA.inputSchema.safeParse({
       force_itemized: true,
@@ -258,7 +263,7 @@ Deno.test("Schedule A rejects contradictory deduction choices", () => {
   );
 });
 
-Deno.test("Schedule A mortgage-use warning requires reviewed loan and interest facts", () => {
+test("Schedule A mortgage-use warning requires reviewed loan and interest facts", () => {
   const review = {
     loan_document_reference: "2025 home equity loan statement",
     outstanding_balance_2025: 100_000,
@@ -291,7 +296,7 @@ Deno.test("Schedule A mortgage-use warning requires reviewed loan and interest f
   );
 });
 
-Deno.test("Schedule A line 6 tax types require distinct reviewed rows totaling the filed amount", () => {
+test("Schedule A line 6 tax types require distinct reviewed rows totaling the filed amount", () => {
   const item = {
     type: "foreign_income_tax",
     amount: 500,
@@ -328,7 +333,7 @@ Deno.test("Schedule A line 6 tax types require distinct reviewed rows totaling t
   );
 });
 
-Deno.test("Schedule A seller-financed line 8b needs exact interest and recipient evidence", () => {
+test("Schedule A seller-financed line 8b needs exact interest and recipient evidence", () => {
   const seller = {
     amount: 2_000,
     seller_name: "Seller Example",
@@ -362,7 +367,7 @@ Deno.test("Schedule A seller-financed line 8b needs exact interest and recipient
   );
 });
 
-Deno.test("scheduleA.inputSchema: string where number expected is rejected", () => {
+test("scheduleA.inputSchema: string where number expected is rejected", () => {
   const parsed = scheduleA.inputSchema.safeParse({ line_1_medical: "5000" });
   assertEquals(parsed.success, false);
 });
@@ -371,37 +376,37 @@ Deno.test("scheduleA.inputSchema: string where number expected is rejected", () 
 // 2. MEDICAL EXPENSES — 7.5% AGI floor
 // =============================================================================
 
-Deno.test("scheduleA.compute: medical deduction = expenses minus 7.5% AGI floor", () => {
+test("scheduleA.compute: medical deduction = expenses minus 7.5% AGI floor", () => {
   // 10000 - (80000 × 7.5%) = 10000 - 6000 = 4000
   const result = compute({ line_1_medical: 10_000, agi: 80_000 });
   assertEquals(deductionInput(result).itemized_deductions, 4_000);
 });
 
-Deno.test("scheduleA.compute: medical expenses exactly at 7.5% AGI floor = zero deduction", () => {
+test("scheduleA.compute: medical expenses exactly at 7.5% AGI floor = zero deduction", () => {
   // 6000 = 80000 × 0.075 → deductible = max(0, 0) = 0
   const result = compute({ line_1_medical: 6_000, agi: 80_000 });
   assertEquals(deductionInput(result).itemized_deductions, 0);
 });
 
-Deno.test("scheduleA.compute: medical expenses $1 above 7.5% AGI floor yields $1 deduction", () => {
+test("scheduleA.compute: medical expenses $1 above 7.5% AGI floor yields $1 deduction", () => {
   // 6001 - 6000 = 1
   const result = compute({ line_1_medical: 6_001, agi: 80_000 });
   assertEquals(deductionInput(result).itemized_deductions, 1);
 });
 
-Deno.test("scheduleA.compute: medical expenses below 7.5% AGI floor floors at zero, never negative", () => {
+test("scheduleA.compute: medical expenses below 7.5% AGI floor floors at zero, never negative", () => {
   // 3000 < 6000 → deductible = max(0, 3000 - 6000) = 0
   const result = compute({ line_1_medical: 3_000, agi: 80_000 });
   assertEquals(deductionInput(result).itemized_deductions, 0);
 });
 
-Deno.test("scheduleA.compute: medical deduction with zero AGI equals full medical amount", () => {
+test("scheduleA.compute: medical deduction with zero AGI equals full medical amount", () => {
   // floor = 0 × 7.5% = 0 → deductible = 5000
   const result = compute({ line_1_medical: 5_000, agi: 0 });
   assertEquals(deductionInput(result).itemized_deductions, 5_000);
 });
 
-Deno.test("scheduleA.compute: negative AGI cannot make the medical deduction exceed expenses", () => {
+test("scheduleA.compute: negative AGI cannot make the medical deduction exceed expenses", () => {
   const result = compute({ line_1_medical: 5_000, agi: -1_000 });
   assertEquals(deductionInput(result).itemized_deductions, 5_000);
 });
@@ -410,22 +415,22 @@ Deno.test("scheduleA.compute: negative AGI cannot make the medical deduction exc
 // 3. SALT CAP — $40,000 (OBBBA §70002, TY2025)
 // =============================================================================
 
-Deno.test("scheduleA.compute: SALT below $40,000 cap passes through unchanged", () => {
+test("scheduleA.compute: SALT below $40,000 cap passes through unchanged", () => {
   const result = compute({ line_5a_state_income_tax: 9_999 });
   assertEquals(deductionInput(result).itemized_deductions, 9_999);
 });
 
-Deno.test("scheduleA.compute: SALT exactly $40,000 passes through unchanged", () => {
+test("scheduleA.compute: SALT exactly $40,000 passes through unchanged", () => {
   const result = compute({ line_5a_state_income_tax: 40_000 });
   assertEquals(deductionInput(result).itemized_deductions, 40_000);
 });
 
-Deno.test("scheduleA.compute: SALT $40,001 is capped at $40,000", () => {
+test("scheduleA.compute: SALT $40,001 is capped at $40,000", () => {
   const result = compute({ line_5a_state_income_tax: 40_001 });
   assertEquals(deductionInput(result).itemized_deductions, 40_000);
 });
 
-Deno.test("scheduleA.compute: SALT three components aggregate then cap — 5a+5b+5c well above cap", () => {
+test("scheduleA.compute: SALT three components aggregate then cap — 5a+5b+5c well above cap", () => {
   // 20000 + 15000 + 10000 = 45000 → capped at 40000
   const result = compute({
     line_5a_state_income_tax: 20_000,
@@ -435,7 +440,7 @@ Deno.test("scheduleA.compute: SALT three components aggregate then cap — 5a+5b
   assertEquals(deductionInput(result).itemized_deductions, 40_000);
 });
 
-Deno.test("scheduleA.compute: SALT three components sum to exactly $40,000 passes through", () => {
+test("scheduleA.compute: SALT three components sum to exactly $40,000 passes through", () => {
   // 20000 + 12000 + 8000 = 40000 = cap
   const result = compute({
     line_5a_state_income_tax: 20_000,
@@ -445,7 +450,7 @@ Deno.test("scheduleA.compute: SALT three components sum to exactly $40,000 passe
   assertEquals(deductionInput(result).itemized_deductions, 40_000);
 });
 
-Deno.test("scheduleA.compute: SALT aggregates 5a + 5b + 5c before applying cap (below cap)", () => {
+test("scheduleA.compute: SALT aggregates 5a + 5b + 5c before applying cap (below cap)", () => {
   // 3000 + 2000 + 1000 = 6000 < 40000 cap
   const result = compute({
     line_5a_state_income_tax: 3_000,
@@ -459,21 +464,21 @@ Deno.test("scheduleA.compute: SALT aggregates 5a + 5b + 5c before applying cap (
 // 4. AMT ADDBACK SOURCE — standard_deduction resolves line 2a
 // =============================================================================
 
-Deno.test("scheduleA.compute: SALT alone routes capped taxes to deduction decision", () => {
+test("scheduleA.compute: SALT alone routes capped taxes to deduction decision", () => {
   // 8000 < 10000 cap → passes through uncapped
   const result = compute({ line_5a_state_income_tax: 8_000 });
   const deduction = findOutput(result, "standard_deduction");
   assertEquals(deduction?.fields.itemized_taxes, 8_000);
 });
 
-Deno.test("scheduleA.compute: capped SALT reaches deduction decision", () => {
+test("scheduleA.compute: capped SALT reaches deduction decision", () => {
   // 5a = 42000 → capped at 40000
   const result = compute({ line_5a_state_income_tax: 42_000 });
   const deduction = findOutput(result, "standard_deduction");
   assertEquals(deduction?.fields.itemized_taxes, 40_000);
 });
 
-Deno.test("scheduleA.compute: taxesTotal (SALT + line_6) reaches deduction decision", () => {
+test("scheduleA.compute: taxesTotal (SALT + line_6) reaches deduction decision", () => {
   // SALT: 25000 + 20000 = 45000, capped at 40000; line6: 3000 → taxesTotal = 43000
   const result = compute({
     line_5a_state_income_tax: 25_000,
@@ -484,13 +489,13 @@ Deno.test("scheduleA.compute: taxesTotal (SALT + line_6) reaches deduction decis
   assertEquals(deduction?.fields.itemized_taxes, 43_000);
 });
 
-Deno.test("scheduleA.compute: line_6_other_taxes reaches deduction decision", () => {
+test("scheduleA.compute: line_6_other_taxes reaches deduction decision", () => {
   const result = compute({ line_6_other_taxes: 8_000 });
   const deduction = findOutput(result, "standard_deduction");
   assertEquals(deduction?.fields.itemized_taxes, 8_000);
 });
 
-Deno.test("scheduleA.compute: zero taxes route as zero", () => {
+test("scheduleA.compute: zero taxes route as zero", () => {
   const result = compute({
     cash_contributions_to_50_percent_organizations: 500,
     agi: 10_000,
@@ -505,12 +510,12 @@ Deno.test("scheduleA.compute: zero taxes route as zero", () => {
 // 5. MORTGAGE INTEREST — passthrough
 // =============================================================================
 
-Deno.test("scheduleA.compute: mortgage interest from 1098 routes to f1040 line12e", () => {
+test("scheduleA.compute: mortgage interest from 1098 routes to f1040 line12e", () => {
   const result = compute({ line_8a_mortgage_interest_1098: 18_000 });
   assertEquals(deductionInput(result).itemized_deductions, 18_000);
 });
 
-Deno.test("scheduleA.compute: interest aggregates all four interest lines", () => {
+test("scheduleA.compute: interest aggregates all four interest lines", () => {
   // 12000 + 3000 + 800 + 2200 = 18000
   const result = compute({
     line_8a_mortgage_interest_1098: 12_000,
@@ -521,7 +526,7 @@ Deno.test("scheduleA.compute: interest aggregates all four interest lines", () =
   assertEquals(deductionInput(result).itemized_deductions, 18_000);
 });
 
-Deno.test("scheduleA.compute: Form 8396 line 3 reduces deductible mortgage interest", () => {
+test("scheduleA.compute: Form 8396 line 3 reduces deductible mortgage interest", () => {
   const result = compute({
     line_8a_mortgage_interest_1098: 15_000,
     form8396_interest_credit_reduction: 2_000,
@@ -534,7 +539,7 @@ Deno.test("scheduleA.compute: Form 8396 line 3 reduces deductible mortgage inter
 // 6. CHARITABLE CONTRIBUTIONS — Pub. 526 Worksheet 2
 // =============================================================================
 
-Deno.test("scheduleA.compute: cash contributions below 60% AGI cap pass through unchanged", () => {
+test("scheduleA.compute: cash contributions below 60% AGI cap pass through unchanged", () => {
   // 5000 < 60% × 100000 = 60000
   const result = compute({
     cash_contributions_to_50_percent_organizations: 5_000,
@@ -543,7 +548,7 @@ Deno.test("scheduleA.compute: cash contributions below 60% AGI cap pass through 
   assertEquals(deductionInput(result).itemized_deductions, 5_000);
 });
 
-Deno.test("scheduleA.compute: cash contributions exactly at 60% AGI cap pass through unchanged", () => {
+test("scheduleA.compute: cash contributions exactly at 60% AGI cap pass through unchanged", () => {
   // 60% × 100000 = 60000
   const result = compute({
     cash_contributions_to_50_percent_organizations: 60_000,
@@ -552,7 +557,7 @@ Deno.test("scheduleA.compute: cash contributions exactly at 60% AGI cap pass thr
   assertEquals(deductionInput(result).itemized_deductions, 60_000);
 });
 
-Deno.test("scheduleA.compute: cash contributions $1 above 60% AGI cap are capped at 60% AGI", () => {
+test("scheduleA.compute: cash contributions $1 above 60% AGI cap are capped at 60% AGI", () => {
   // 60001 > 60000 → capped at 60000
   const result = compute({
     cash_contributions_to_50_percent_organizations: 60_001,
@@ -562,7 +567,7 @@ Deno.test("scheduleA.compute: cash contributions $1 above 60% AGI cap are capped
   assertEquals(result.carryforwards?.charitable_cash_60_2025, 1);
 });
 
-Deno.test("scheduleA.compute: cash and 50% noncash route to separate filed lines", () => {
+test("scheduleA.compute: cash and 50% noncash route to separate filed lines", () => {
   const result = compute({
     cash_contributions_to_50_percent_organizations: 20_000,
     noncash_contribution_items: [{
@@ -583,7 +588,7 @@ Deno.test("scheduleA.compute: cash and 50% noncash route to separate filed lines
   );
 });
 
-Deno.test("scheduleA.compute: 50% noncash room subtracts deductible cash", () => {
+test("scheduleA.compute: 50% noncash room subtracts deductible cash", () => {
   const result = compute({
     cash_contributions_to_50_percent_organizations: 40_000,
     noncash_contribution_items: [{
@@ -597,7 +602,7 @@ Deno.test("scheduleA.compute: 50% noncash room subtracts deductible cash", () =>
   assertEquals(result.carryforwards?.charitable_noncash_50_2025, 5_000);
 });
 
-Deno.test("scheduleA.inputSchema: unclassified filed amounts and prior carryover are rejected", () => {
+test("scheduleA.inputSchema: unclassified filed amounts and prior carryover are rejected", () => {
   for (
     const field of [
       "line_11_cash_contributions",
@@ -612,7 +617,7 @@ Deno.test("scheduleA.inputSchema: unclassified filed amounts and prior carryover
   }
 });
 
-Deno.test("scheduleA.compute: classified contributions require AGI and zero AGI yields carryforward", () => {
+test("scheduleA.compute: classified contributions require AGI and zero AGI yields carryforward", () => {
   const input = { cash_contributions_to_50_percent_organizations: 5_000 };
   let threw = false;
   try {
@@ -626,7 +631,7 @@ Deno.test("scheduleA.compute: classified contributions require AGI and zero AGI 
   assertEquals(result.carryforwards?.charitable_cash_60_2025, 5_000);
 });
 
-Deno.test("scheduleA.compute: Pub. 526 20% category obeys nested 50%, 30%, and 20% ceilings", () => {
+test("scheduleA.compute: Pub. 526 20% category obeys nested 50%, 30%, and 20% ceilings", () => {
   const result = compute({
     agi: 100_000,
     cash_contributions_to_50_percent_organizations: 10_000,
@@ -648,7 +653,7 @@ Deno.test("scheduleA.compute: Pub. 526 20% category obeys nested 50%, 30%, and 2
   );
 });
 
-Deno.test("scheduleA.compute: Pub. 526 cash to a second-category charity uses the other 30% limit", () => {
+test("scheduleA.compute: Pub. 526 cash to a second-category charity uses the other 30% limit", () => {
   // Publication 526 example: $15,000 capital-gain property to a 50% charity
   // and $10,000 cash to a second-category organization, AGI $50,000.
   const result = compute({
@@ -671,7 +676,7 @@ Deno.test("scheduleA.compute: Pub. 526 cash to a second-category charity uses th
   assertEquals(deductionInput(result).itemized_deductions, 25_000);
 });
 
-Deno.test("scheduleA.compute: cash-only other 30% excess retains its own vintage", () => {
+test("scheduleA.compute: cash-only other 30% excess retains its own vintage", () => {
   const result = compute({ agi: 50_000, cash_contributions_other_30: 20_000 });
   assertEquals(
     result.finalizations?.[0].fields.line_11_cash_contributions,
@@ -684,7 +689,7 @@ Deno.test("scheduleA.compute: cash-only other 30% excess retains its own vintage
   assertEquals(result.carryforwards?.charitable_cash_other_30_2025, 5_000);
 });
 
-Deno.test("scheduleA.compute: fully allowed mixed other 30% gifts split exactly across filed lines", () => {
+test("scheduleA.compute: fully allowed mixed other 30% gifts split exactly across filed lines", () => {
   const result = compute({
     agi: 100_000,
     cash_contributions_other_30: 5_000,
@@ -704,7 +709,7 @@ Deno.test("scheduleA.compute: fully allowed mixed other 30% gifts split exactly 
   );
 });
 
-Deno.test("scheduleA.compute: partly limited mixed other 30% gifts reject an invented cash/property split", () => {
+test("scheduleA.compute: partly limited mixed other 30% gifts reject an invented cash/property split", () => {
   assertThrows(
     () =>
       compute({
@@ -721,7 +726,7 @@ Deno.test("scheduleA.compute: partly limited mixed other 30% gifts reject an inv
   );
 });
 
-Deno.test("scheduleA.compute: zero AGI leaves both mixed other-30 sources entirely undeducted", () => {
+test("scheduleA.compute: zero AGI leaves both mixed other-30 sources entirely undeducted", () => {
   const result = compute({
     agi: 0,
     cash_contributions_other_30: 2_000,
@@ -744,17 +749,17 @@ Deno.test("scheduleA.compute: zero AGI leaves both mixed other-30 sources entire
 // 7. TOTAL ITEMIZED DEDUCTIONS — routes to f1040 line12e
 // =============================================================================
 
-Deno.test("scheduleA.compute: all-zero inputs produce zero total itemized deduction", () => {
+test("scheduleA.compute: all-zero inputs produce zero total itemized deduction", () => {
   const result = compute({});
   assertEquals(deductionInput(result).itemized_deductions, 0);
 });
 
-Deno.test("scheduleA.compute: total itemized = medical + taxes + interest + contributions + casualty + other", () => {
+test("scheduleA.compute: total itemized = medical + taxes + interest + contributions + casualty + other", () => {
   // medical: 10000 - (80000×7.5%) = 10000 - 6000 = 4000
   // SALT: 4000 + 4000 = 8000 (under $40,000 cap); line6: 2000 → taxesTotal = 10000
   // interest: 15000
   // contributions: 3000 (under 60% of 80000=48000)
-  // casualty: 2000; other: 500
+  // casualty: Form 4684 line 16 10000 less 10% of AGI 8000 = 2000; other: 500
   // total = 4000 + 10000 + 15000 + 3000 + 2000 + 500 = 34500
   const result = compute({
     line_1_medical: 10_000,
@@ -764,24 +769,53 @@ Deno.test("scheduleA.compute: total itemized = medical + taxes + interest + cont
     line_6_other_taxes: 2_000,
     line_8a_mortgage_interest_1098: 15_000,
     cash_contributions_to_50_percent_organizations: 3_000,
-    line_15_casualty_theft_loss: 2_000,
+    form4684_line16_loss: 10_000,
     line_16_other_deductions: 500,
   });
   assertEquals(deductionInput(result).itemized_deductions, 34_500);
 });
 
-Deno.test("scheduleA.compute: casualty loss enters total directly without re-applying floors", () => {
-  // Form 4684 already applied $100/event and 10% AGI reductions
-  const result = compute({ line_15_casualty_theft_loss: 4_200 });
+// 2025 Form 4684 lines 17 and 18: line 16 less 10% of Form 1040 line 11b is
+// Schedule A line 15.
+test("scheduleA.compute: line 15 is Form 4684 line 16 less 10% of AGI", () => {
+  const result = compute({ agi: 50_000, form4684_line16_loss: 9_200 });
   assertEquals(deductionInput(result).itemized_deductions, 4_200);
+  assertEquals(
+    result.finalizations?.[0]?.fields.line_15_casualty_theft_loss,
+    4_200,
+  );
+  assertEquals(
+    compute({ agi: 50_000, form4684_line16_loss: 4_000 }).finalizations?.[0]
+      ?.fields.line_15_casualty_theft_loss,
+    0,
+  );
 });
 
-Deno.test("scheduleA.compute: other deductions enter total directly", () => {
+test("scheduleA.compute: line 15 is not entered directly", () => {
+  assertThrows(
+    () => compute({ line_15_casualty_theft_loss: 4_200 }),
+    Error,
+    "Form 4684 line 18",
+  );
+});
+
+// A net qualified disaster loss (Form 4684 line 15) is Schedule A line 16
+// when itemizing (2025 Instructions for Form 4684, Line 15).
+test("scheduleA.compute: a net qualified disaster loss joins the itemized total", () => {
+  const result = compute({
+    agi: 50_000,
+    line_16_other_deductions: 500,
+    net_qualified_disaster_loss: 2_500,
+  });
+  assertEquals(deductionInput(result).itemized_deductions, 3_000);
+});
+
+test("scheduleA.compute: other deductions enter total directly", () => {
   const result = compute({ line_16_other_deductions: 3_500 });
   assertEquals(deductionInput(result).itemized_deductions, 3_500);
 });
 
-Deno.test("scheduleA.compute: result always provides the itemized total for the deduction decision", () => {
+test("scheduleA.compute: result always provides the itemized total for the deduction decision", () => {
   const result = compute({});
   const deductionOut = findOutput(result, "standard_deduction");
   assertEquals(deductionOut !== undefined, true);
@@ -791,7 +825,7 @@ Deno.test("scheduleA.compute: result always provides the itemized total for the 
   );
 });
 
-Deno.test("scheduleA.compute: result always routes to standard_deduction for comparison", () => {
+test("scheduleA.compute: result always routes to standard_deduction for comparison", () => {
   const result = compute({ line_8a_mortgage_interest_1098: 20_000 });
   const sdOut = findOutput(result, "standard_deduction");
   assertEquals(sdOut !== undefined, true);
@@ -805,7 +839,7 @@ Deno.test("scheduleA.compute: result always routes to standard_deduction for com
 // 8. FORCE FLAGS — routing hints, must not change deduction totals
 // =============================================================================
 
-Deno.test("scheduleA.compute: force_itemized does not change deduction total", () => {
+test("scheduleA.compute: force_itemized does not change deduction total", () => {
   const withFlag = compute({
     force_itemized: true,
     line_8a_mortgage_interest_1098: 20_000,
@@ -817,7 +851,7 @@ Deno.test("scheduleA.compute: force_itemized does not change deduction total", (
   );
 });
 
-Deno.test("scheduleA.compute: force_standard does not change the Schedule A total", () => {
+test("scheduleA.compute: force_standard does not change the Schedule A total", () => {
   const result = compute({ force_standard: true });
   const deductionOut = findOutput(result, "standard_deduction");
   assertEquals(deductionOut !== undefined, true);
@@ -831,13 +865,13 @@ Deno.test("scheduleA.compute: force_standard does not change the Schedule A tota
 // 9. SMOKE TEST
 // =============================================================================
 
-Deno.test("scheduleA.compute: smoke — all major boxes populate total and AMT tax source", () => {
+test("scheduleA.compute: smoke — all major boxes populate total and AMT tax source", () => {
   // Medical: 15000 - (120000 × 7.5%) = 15000 - 9000 = 6000
   // SALT: 4000 + 3000 + 2000 = 9000 (under $40,000 cap)
   // line_6: 2500 → taxesTotal = 9000 + 2500 = 11500
   // Interest: 18000 + 1000 + 3000 = 22000
   // Contributions: 10000 cash + 5000 ordinary noncash + 2000 capital gain = 17000
-  // Casualty: 4000; Other: 750
+  // Casualty: Form 4684 line 16 16000 less 10% of AGI 12000 = 4000; Other: 750
   // Total = 6000 + 11500 + 22000 + 17000 + 4000 + 750 = 61250
   const result = compute({
     line_1_medical: 15_000,
@@ -858,7 +892,7 @@ Deno.test("scheduleA.compute: smoke — all major boxes populate total and AMT t
         category: "capital_gain_30",
       },
     ],
-    line_15_casualty_theft_loss: 4_000,
+    form4684_line16_loss: 16_000,
     line_16_other_deductions: 750,
   });
 
@@ -876,7 +910,7 @@ Deno.test("scheduleA.compute: smoke — all major boxes populate total and AMT t
 
 // ── MFS SALT cap ─────────────────────────────────────────────────────────────
 
-Deno.test("MFS SALT cap: $8,000 SALT passes through for MFS filer (below $20,000 MFS cap)", () => {
+test("MFS SALT cap: $8,000 SALT passes through for MFS filer (below $20,000 MFS cap)", () => {
   const result = compute({
     filing_status: FilingStatus.MFS,
     line_5a_state_income_tax: 4_000,
@@ -885,7 +919,7 @@ Deno.test("MFS SALT cap: $8,000 SALT passes through for MFS filer (below $20,000
   assertEquals(deductionInput(result).itemized_deductions, 8_000);
 });
 
-Deno.test("MFS SALT cap: $22,000 SALT capped at $20,000 for MFS (half of $40,000)", () => {
+test("MFS SALT cap: $22,000 SALT capped at $20,000 for MFS (half of $40,000)", () => {
   const result = compute({
     filing_status: FilingStatus.MFS,
     line_5a_state_income_tax: 22_000,
@@ -893,7 +927,7 @@ Deno.test("MFS SALT cap: $22,000 SALT capped at $20,000 for MFS (half of $40,000
   assertEquals(deductionInput(result).itemized_deductions, 20_000);
 });
 
-Deno.test("Non-MFS SALT cap: $8,000 SALT passes through for Single filer (below $10,000 cap)", () => {
+test("Non-MFS SALT cap: $8,000 SALT passes through for Single filer (below $10,000 cap)", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     line_5a_state_income_tax: 8_000,
@@ -901,12 +935,12 @@ Deno.test("Non-MFS SALT cap: $8,000 SALT passes through for Single filer (below 
   assertEquals(deductionInput(result).itemized_deductions, 8_000);
 });
 
-Deno.test("No filing_status: SALT uses $40,000 cap (OBBBA §70002, non-MFS default)", () => {
+test("No filing_status: SALT uses $40,000 cap (OBBBA §70002, non-MFS default)", () => {
   const result = compute({ line_5a_state_income_tax: 15_000 });
   assertEquals(deductionInput(result).itemized_deductions, 15_000);
 });
 
-Deno.test("Schedule A adds rounded line amounts rather than rounding their combined cents", () => {
+test("Schedule A adds rounded line amounts rather than rounding their combined cents", () => {
   const result = compute({
     filing_status: FilingStatus.MFJ,
     agi: 295230.09,
@@ -917,7 +951,7 @@ Deno.test("Schedule A adds rounded line amounts rather than rounding their combi
   assertEquals(deductionInput(result).itemized_taxes, 20284);
 });
 
-Deno.test("Schedule A combines sources on line 5a before rounding", () => {
+test("Schedule A combines sources on line 5a before rounding", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     agi: 50000,
@@ -925,4 +959,244 @@ Deno.test("Schedule A combines sources on line 5a before rounding", () => {
     retirement_state_local_withholding: 100.40,
   });
   assertEquals(deductionInput(result).itemized_deductions, 201);
+});
+
+test("scheduleA.inputSchema: line 11 qualified contributions stay within sourced cash gifts", () => {
+  assertEquals(
+    inputSchema.safeParse({
+      cash_contributions_to_50_percent_organizations: 250,
+      line_11_qualified_contributions: 200,
+    }).success,
+    true,
+  );
+  assertEquals(
+    inputSchema.safeParse({
+      cash_contributions_to_50_percent_organizations: 150,
+      line_11_qualified_contributions: 200,
+    }).success,
+    false,
+  );
+});
+
+// =============================================================================
+// TY2026 (P.L. 119-21)
+// =============================================================================
+
+function compute2026(input: ScheduleAInput) {
+  return scheduleA.compute({ taxYear: 2026, formType: "f1040" }, input);
+}
+
+test("TY2026 SALT cap is $40,400 less 30% of MAGI over $505,000 (IRC §164(b)(7))", () => {
+  const result = compute2026({
+    filing_status: FilingStatus.Single,
+    agi: 600_000,
+    line_5a_state_income_tax: 30_000,
+    line_5b_real_estate_tax: 20_000,
+  });
+  // $40,400 - 0.30 x $95,000 = $11,900.
+  assertEquals(deductionInput(result).itemized_taxes, 11_900);
+});
+
+test("TY2026 MFS SALT cap is $20,200 and never below $5,000 (IRC §164(b)(7))", () => {
+  const under = compute2026({
+    filing_status: FilingStatus.MFS,
+    agi: 100_000,
+    line_5a_state_income_tax: 30_000,
+  });
+  assertEquals(deductionInput(under).itemized_taxes, 20_200);
+  const floored = compute2026({
+    filing_status: FilingStatus.MFS,
+    agi: 400_000,
+    line_5a_state_income_tax: 30_000,
+  });
+  assertEquals(deductionInput(floored).itemized_taxes, 5_000);
+});
+
+test("TY2026 line 8d phases out 10% per $1,000 of AGI over $100,000 (IRC §163(h)(3)(E)(ii))", () => {
+  const base = {
+    filing_status: FilingStatus.Single,
+    line_8d_mortgage_insurance_premiums: 1_200,
+    mortgage_insurance_premiums_qualified_confirmed: true as const,
+  };
+  // $4,400 over is five steps or fractions: half of $1,200.
+  const partial = compute2026({ ...base, agi: 104_400 });
+  assertEquals(deductionInput(partial).itemized_deductions, 600);
+  assertEquals(
+    partial.finalizations?.[0].fields.line_8d_mortgage_insurance_allowed,
+    600,
+  );
+  const full = compute2026({ ...base, agi: 100_000 });
+  assertEquals(deductionInput(full).itemized_deductions, 1_200);
+  // SA-F1040-011-03: nothing remains above $109,000.
+  const none = compute2026({ ...base, agi: 109_001 });
+  assertEquals(deductionInput(none).itemized_deductions, 0);
+});
+
+test("TY2025 refuses mortgage insurance premiums (IRC §163(h)(3)(E)(iv))", () => {
+  assertThrows(
+    () =>
+      compute({
+        agi: 50_000,
+        line_8d_mortgage_insurance_premiums: 500,
+        mortgage_insurance_premiums_qualified_confirmed: true,
+      }),
+    Error,
+    "not deductible",
+  );
+});
+
+test("TY2026 charity above 0.5% of AGI is deductible (IRC §170(b)(1)(I))", () => {
+  const result = compute2026({
+    filing_status: FilingStatus.Single,
+    agi: 104_400,
+    cash_contributions_to_50_percent_organizations: 3_000,
+    cash_contributions_to_daf_or_supporting_organizations: 500,
+  });
+  // $3,000 - 0.005 x $104,400.
+  assertEquals(deductionInput(result).itemized_deductions, 2_478);
+  assertEquals(result.finalizations?.[0].fields.charitable_agi_floor, 522);
+  assertEquals(deductionInput(result).nonitemizer_charitable_cash, 2_500);
+});
+
+test("TY2026 refuses the charity floor when AGI limits or carryovers apply", () => {
+  assertThrows(
+    () =>
+      compute2026({
+        filing_status: FilingStatus.Single,
+        agi: 10_000,
+        cash_contributions_to_50_percent_organizations: 8_000,
+      }),
+    Error,
+    "limitation worksheet",
+  );
+});
+
+test("TY2026 marks 50%-organization cash without a donor-advised fund split", () => {
+  const result = compute2026({
+    filing_status: FilingStatus.Single,
+    agi: 50_000,
+    cash_contributions_to_50_percent_organizations: 300,
+  });
+  assertEquals(
+    findOutput(result, "standard_deduction")?.fields
+      .nonitemizer_charitable_cash_unclassified,
+    true,
+  );
+});
+
+test("TY2026 refuses an uncategorized line 17 amount", () => {
+  assertThrows(
+    () =>
+      compute2026({
+        filing_status: FilingStatus.Single,
+        agi: 50_000,
+        line_16_other_deductions: 1_000,
+      }),
+    Error,
+    "gambling",
+  );
+});
+
+test("TY2025 Schedule A does not send the non-itemizer charity source", () => {
+  const result = compute({
+    filing_status: FilingStatus.Single,
+    agi: 50_000,
+    cash_contributions_to_50_percent_organizations: 300,
+  });
+  const fields = findOutput(result, "standard_deduction")!.fields;
+  assertEquals("nonitemizer_charitable_cash" in fields, false);
+  assertEquals("nonitemizer_charitable_cash_unclassified" in fields, false);
+  assertEquals(deductionInput(result).itemized_deductions, 300);
+});
+
+// Pub. 526 (2025), Carryovers: a carryover keeps its contribution-year limit
+// category and is deducted after this year's gifts in that category.
+function priorCarryover(
+  category: CharitableCarryoverCategory,
+  amount: number,
+  contribution_year = 2024,
+) {
+  return {
+    contribution_year,
+    category,
+    amount,
+    source_document_reference: "2024 return carryover worksheet",
+    ordinary_carryover_rules_confirmed: true as const,
+    ...(category === CharitableCarryoverCategory.Cash60 ||
+        category === CharitableCarryoverCategory.CashOther30
+      ? {}
+      : { original_gift_500_or_less_confirmed: true as const }),
+  };
+}
+
+test("scheduleA.compute: prior-year carryovers within their limits fill line 13", () => {
+  const result = compute({
+    agi: 160_154,
+    cash_contributions_to_50_percent_organizations: 30_000,
+    cash_contributions_other_30: 300,
+    noncash_contribution_items: [
+      { source: "stock", amount: 100, category: "capital_gain_30" },
+      { source: "goods", amount: 200, category: "other_30" },
+    ],
+    prior_charitable_carryovers: [
+      priorCarryover(CharitableCarryoverCategory.Cash60, 3),
+      priorCarryover(CharitableCarryoverCategory.CashOther30, 3),
+      priorCarryover(CharitableCarryoverCategory.CapitalGain30, 1),
+      priorCarryover(CharitableCarryoverCategory.NoncashOther30, 2),
+      priorCarryover(CharitableCarryoverCategory.Noncash50, 1),
+    ],
+  });
+  const fields = result.finalizations?.[0]?.fields;
+  assertEquals(fields?.line_11_cash_contributions, 30_300);
+  assertEquals(fields?.line_12_noncash_contributions, 300);
+  assertEquals(fields?.line_13_contribution_carryover, 10);
+  assertEquals(deductionInput(result).itemized_deductions, 30_610);
+});
+
+test("scheduleA.compute: a carryover the 60% limit does not fully allow is refused", () => {
+  assertThrows(
+    () =>
+      compute({
+        agi: 10_000,
+        cash_contributions_to_50_percent_organizations: 5_900,
+        prior_charitable_carryovers: [
+          priorCarryover(CharitableCarryoverCategory.Cash60, 200),
+        ],
+      }),
+    Error,
+    "carryover ordering",
+  );
+});
+
+test("scheduleA.compute: a carryover older than five years has expired", () => {
+  assertThrows(
+    () =>
+      compute({
+        agi: 50_000,
+        prior_charitable_carryovers: [
+          priorCarryover(CharitableCarryoverCategory.Cash60, 100, 2019),
+        ],
+      }),
+    Error,
+    "five-year carryover window",
+  );
+});
+
+test("scheduleA.inputSchema: a noncash carryover needs the Form 8283 threshold answer", () => {
+  const parsed = inputSchema.safeParse({
+    prior_charitable_carryovers: [{
+      ...priorCarryover(CharitableCarryoverCategory.Noncash50, 50),
+      original_gift_500_or_less_confirmed: undefined,
+    }],
+  });
+  assertEquals(parsed.success, false);
+});
+
+test("scheduleA.inputSchema: line 13 input names the carryover field", () => {
+  const parsed = inputSchema.safeParse({ line_13_contribution_carryover: 10 });
+  assertEquals(parsed.success, false);
+  assertEquals(
+    parsed.error?.issues[0].message.includes("prior_charitable_carryovers"),
+    true,
+  );
 });

@@ -624,6 +624,10 @@ export const config2025: F1040Config = {
   amtBracketAdjustmentMfs: AMT_BRACKET_ADJUSTMENT_MFS_2025,
   ssWageBase: SS_WAGE_BASE_2025,
   ssTaxPerEmployer: SS_MAX_TAX_PER_EMPLOYER_2025,
+  // 2025 Schedule SE Part II lines 14-15 and instructions.
+  seOptionalMethodMaximum: 7_240,
+  seFarmOptionalGrossIncomeLimit: 10_860,
+  seFarmOptionalNetProfitLimit: 7_840,
   additionalMedicareThresholdMfj: ADDITIONAL_MEDICARE_THRESHOLD_MFJ,
   additionalMedicareThresholdMfs: ADDITIONAL_MEDICARE_THRESHOLD_MFS,
   additionalMedicareThresholdOther: ADDITIONAL_MEDICARE_THRESHOLD_OTHER,
@@ -645,6 +649,7 @@ export const config2025: F1040Config = {
   iraPhaseoutMfsUpper: IRA_PHASEOUT_MFS_UPPER_2025,
   qbiThresholdSingle: QBI_THRESHOLD_SINGLE_2025,
   qbiThresholdMfj: QBI_THRESHOLD_MFJ_2025,
+  qbiThresholdMfs: QBI_THRESHOLD_SINGLE_2025,
   qbiPhaseInRange: QBI_PHASE_IN_RANGE_2025,
   eitcInvestmentIncomeLimit: EITC_INVESTMENT_INCOME_LIMIT_2025,
   ctcPerChild: CTC_PER_CHILD_2025,
@@ -713,4 +718,126 @@ export const config2025: F1040Config = {
   sepContributionRate: SEP_CONTRIBUTION_RATE_2025,
   sepMaxContribution: SEP_MAX_CONTRIBUTION_2025,
   simpleEmployerMatchRate: SIMPLE_EMPLOYER_MATCH_RATE_2025,
+  // Rev. Proc. 2025-16 Tables 1-2, each succeeding year.
+  luxuryAutoSucceedingYears: 7_060,
+  // Rev. Proc. 2024-40 §2.06(1); credit and phaseout rates IRC §32(b)(1).
+  eitcByChildren: [
+    {
+      creditRate: 0.0765,
+      phaseoutRate: 0.0765,
+      earnedIncomeAmount: 8_490,
+      maxCredit: 649,
+      phaseoutStart: 10_620,
+      phaseoutStartMfj: 17_730,
+      phaseoutEnd: 19_104,
+      phaseoutEndMfj: 26_214,
+    },
+    {
+      creditRate: 0.34,
+      phaseoutRate: 0.1598,
+      earnedIncomeAmount: 12_730,
+      maxCredit: 4_328,
+      phaseoutStart: 23_350,
+      phaseoutStartMfj: 30_470,
+      phaseoutEnd: 50_434,
+      phaseoutEndMfj: 57_554,
+    },
+    {
+      creditRate: 0.40,
+      phaseoutRate: 0.2106,
+      earnedIncomeAmount: 17_880,
+      maxCredit: 7_152,
+      phaseoutStart: 23_350,
+      phaseoutStartMfj: 30_470,
+      phaseoutEnd: 57_310,
+      phaseoutEndMfj: 64_430,
+    },
+    {
+      creditRate: 0.45,
+      phaseoutRate: 0.2106,
+      earnedIncomeAmount: 17_880,
+      maxCredit: 8_046,
+      phaseoutStart: 23_350,
+      phaseoutStartMfj: 30_470,
+      phaseoutEnd: 61_555,
+      phaseoutEndMfj: 68_675,
+    },
+  ],
+  // IRC §21(a)(2) before P.L. 119-21 §70405: 35% down to a 20% floor.
+  depCareCreditMaxRate: 0.35,
+  depCareCreditFirstFloorRate: 0.20,
+  depCareCreditSecondPhaseout: null,
+  // IRC §224(b), §225(b) and §163(h)(4)(C), added by P.L. 119-21
+  // §§70201-70203 for 2025-2028.
+  qualifiedTipsCap: 25_000,
+  qualifiedOvertimeCap: 12_500,
+  qualifiedOvertimeCapMfj: 25_000,
+  tipsOvertimePhaseoutThreshold: 150_000,
+  tipsOvertimePhaseoutThresholdMfj: 300_000,
+  tipsOvertimePhaseoutPerThousand: 100,
+  vehicleLoanInterestCap: 10_000,
+  vehicleLoanInterestPhaseoutThreshold: 100_000,
+  vehicleLoanInterestPhaseoutThresholdMfj: 200_000,
+  vehicleLoanInterestPhaseoutPerThousand: 200,
+  // P.L. 119-21 §§70424, 70425 and 70111 apply only after 2025; §68 was
+  // suspended for 2025 by IRC §68(f) as then in effect.
+  nonitemizerCharitableLimit: 0,
+  nonitemizerCharitableLimitMfj: 0,
+  charitableAgiFloorRate: 0,
+  itemizedDeductionReductionRate: 0,
+  // IRC §163(h)(3)(E)(iv): no premiums paid after December 31, 2021.
+  mortgageInsurancePremiumsDeductible: false,
+  // IRC §199A(i) (P.L. 119-21 §70105) applies after 2025.
+  qbiMinimumDeduction: 0,
+  qbiMinimumDeductionQbiFloor: 0,
+  // Rev. Proc. 2024-40 §2.04; refundable $5,000 IRC §23(a)(4) (P.L. 119-21
+  // §70402); $40,000 phaseout range IRC §23(b)(2)(A)(ii).
+  adoptionCreditMax: 17_280,
+  adoptionCreditRefundableMax: 5_000,
+  adoptionPhaseoutStart: 259_190,
+  adoptionPhaseoutRange: 40_000,
+  // Rev. Proc. 2024-40 §§2.24, 2.15(2), 2.13.
+  qualifyingRelativeGrossIncomeLimit: 5_200,
+  dependentStandardDeductionFloor: 1_350,
+  dependentStandardDeductionEarnedIncomeAddOn: 450,
+  educatorExpenseLimit: 300,
+  // Notice 2025-5 §3; charitable rate IRC §170(i).
+  standardMileageRates: [
+    {
+      from: "2025-01-01",
+      business: 0.70,
+      medicalMoving: 0.21,
+      charitable: 0.14,
+    },
+  ],
+  // P.L. 119-21 §70204(e): Trump accounts apply after 2025.
+  trumpAccountContributionLimit: 0,
+  trumpAccountEmployerExclusionLimit: 0,
+  // ── Taxes and payments ───────────────────────────────────────────────────
+  // IRC §55(d)(2) before P.L. 119-21 §70107.
+  amtExemptionPhaseOutRate: 0.25,
+  // 2024 HHS poverty guidelines, used for 2025 coverage.
+  fplBaseAlaska: 18_810,
+  fplIncrementAlaska: 6_730,
+  fplBaseHawaii: 17_310,
+  fplIncrementHawaii: 6_190,
+  // IRC §36B(b)(3)(A)(iii) (ARP, extended through 2025 by P.L. 117-169).
+  ptcApplicablePercentages: [
+    { fromFplPct: 0, toFplPct: 150, initial: 0, final: 0 },
+    { fromFplPct: 150, toFplPct: 200, initial: 0, final: 200 },
+    { fromFplPct: 200, toFplPct: 250, initial: 200, final: 400 },
+    { fromFplPct: 250, toFplPct: 300, initial: 400, final: 600 },
+    { fromFplPct: 300, toFplPct: 400, initial: 600, final: 850 },
+    { fromFplPct: 400, toFplPct: Infinity, initial: 850, final: 850 },
+  ],
+  ptcIncomeLimitFplPct: null,
+  // Rev. Proc. 2024-35 §3.02.
+  ptcRequiredContributionPercentage: 0.0902,
+  // 2025 Form 8962 instructions, Table 5.
+  ptcRepaymentCaps: [
+    { maxFplPct: 200, singleCap: 375, otherCap: 750 },
+    { maxFplPct: 300, singleCap: 975, otherCap: 1_950 },
+    { maxFplPct: 400, singleCap: 1_625, otherCap: 3_250 },
+  ],
+  ptcLawfullyPresentBelow100Fpl: true,
 };

@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { assert, assertEquals, assertRejects } from "@std/assert";
 import { f1040_2025 } from "../../../../index.ts";
 import { pdfReviewFixtures } from "../../../../pdf/review-fixtures.ts";
@@ -28,7 +31,7 @@ const cases = [
   },
 ];
 for (const c of cases) {
-  Deno.test(`QBI losses with SE tax and broker net gain ${c.id}`, async () => {
+  test(`QBI losses with SE tax and broker net gain ${c.id}`, async () => {
     const status = pdfReviewFixtures.find((f) => f.id === c.fixture)!;
     const filer = status.filer;
     const original = base.inputs.schedule_c as Row[];
@@ -162,6 +165,7 @@ for (const c of cases) {
     );
     const lines = calculateScheduleCLossLines(
       inputSchema.parse(pending.form8995a),
+      2025,
     );
     assertEquals(
       lines.schedule.rows.map((r) => r.line1a),
@@ -185,7 +189,8 @@ for (const c of cases) {
     assertEquals(pending.f1040.line7_capital_gain, 2800);
     assertEquals(pending.schedule2.line12_niit, 285);
     if (c.id === "mfs") {
-      // Deferred160: public loss limit is wrong; the final filing guard must reject.
+      // Schedule D line 21 limits a married-filing-separately net capital
+      // loss to $1,500 (2025 Schedule D, line 21).
       const loss = structuredClone(inputs);
       const sales = loss.f1099b as Row[];
       sales[0].proceeds = 1000;
@@ -193,15 +198,21 @@ for (const c of cases) {
       sales[1].proceeds = 3000;
       const lossResult = f1040_2025.executeReturn(loss);
       assertEquals(lossResult.diagnostics, []);
-      await assertRejects(
-        () => f1040_2025.prepareReturn(lossResult.pending, filer),
-        Error,
-        "Form 1040 line 7",
+      const lossPending = normalizeAllPending(lossResult.pending);
+      assertEquals(lossPending.schedule_d.print_line16_combined, -2200);
+      assertEquals(lossPending.schedule_d.print_line21_loss, -1500);
+      assertEquals(lossPending.f1040.line7_capital_gain, -1500);
+      const lossPrepared = await f1040_2025.prepareReturn(
+        lossResult.pending,
+        filer,
       );
-      await assertRejects(
-        () => buildPdfBytes(lossResult.pending, filer, ".pdf-cache"),
-        Error,
-        "Form 1040 line 7",
+      assert(
+        (await buildPdfBytes(
+          lossPrepared.bundle.pending,
+          filer,
+          ".pdf-cache",
+          lossPrepared.bundle,
+        )).length > 0,
       );
     }
     const reversed = f1040_2025.executeReturn({
@@ -240,15 +251,9 @@ for (const c of cases) {
     }
     const prepared = await f1040_2025.prepareReturn(result.pending, filer);
     const projection = form8995aPdf.projectFields!(pending.form8995a, pending);
-    const permission = await Deno.permissions.query({
-      name: "env",
-      variable: "FORM8995A_LOSS_BROKERS_DIR",
-    });
-    const root = permission.state === "granted"
-      ? Deno.env.get("FORM8995A_LOSS_BROKERS_DIR")
-      : undefined;
-    const dir = root ? `${root}/${c.id}-gain` : await Deno.makeTempDir();
-    await Deno.mkdir(dir, { recursive: true });
+    const root = process.env.FORM8995A_LOSS_BROKERS_DIR;
+    const dir = root ? `${root}/${c.id}-gain` : await sys.makeTempDir();
+    await fs.mkdir(dir, { recursive: true });
     try {
       for (
         const [name, value] of Object.entries({
@@ -258,18 +263,18 @@ for (const c of cases) {
           projection,
         })
       ) {
-        await Deno.writeTextFile(
+        await fs.writeFile(
           `${dir}/${name}.json`,
           JSON.stringify(value, null, 2),
         );
       }
-      await Deno.writeTextFile(`${dir}/return.xml`, prepared.bundle.xml);
-      const check = await new Deno.Command("xmllint", {
+      await fs.writeFile(`${dir}/return.xml`, prepared.bundle.xml);
+      const check = await new sys.Command("xmllint", {
         args: [
           "--noout",
           "--schema",
           new URL(
-            "../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+            "../../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
             import.meta.url,
           ).pathname,
           `${dir}/return.xml`,
@@ -277,10 +282,10 @@ for (const c of cases) {
         stdout: "piped",
         stderr: "piped",
       }).output();
-      await Deno.writeFile(`${dir}/xsd.log`, check.stderr);
+      await fs.writeFile(`${dir}/xsd.log`, check.stderr);
       assertEquals(check.code, 0, new TextDecoder().decode(check.stderr));
       const origins: Parameters<typeof buildPdfBytes>[4] = [];
-      await Deno.writeFile(
+      await fs.writeFile(
         `${dir}/return.pdf`,
         await buildPdfBytes(
           prepared.bundle.pending,
@@ -290,7 +295,7 @@ for (const c of cases) {
           origins,
         ),
       );
-      await Deno.writeTextFile(
+      await fs.writeFile(
         `${dir}/origins.json`,
         JSON.stringify(origins, null, 2),
       );
@@ -394,7 +399,7 @@ for (const c of cases) {
         );
       }
     } finally {
-      if (!root) await Deno.remove(dir, { recursive: true });
+      if (!root) await sys.remove(dir, { recursive: true });
     }
   });
 }

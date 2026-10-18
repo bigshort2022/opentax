@@ -1,3 +1,4 @@
+import { mefTaxYear } from "../../../../support/year-config.ts";
 import { projectPassiveSCorpLossCopies } from "../../../../../domains/income/business/passive-s-corp-loss-copies.ts";
 import { currentLossFilingProjection } from "../../../../../domains/income/business/current-loss-filing-projection.ts";
 import { worksheetRatios } from "./f8582-ratios.ts";
@@ -33,6 +34,7 @@ import {
 import {
   computePropertyNet,
   inputSchema as scheduleEInputSchema,
+  isPassiveProperty,
   qualifiedEntireDispositionGain,
   qualifiedFirstYearRetainedPropertySale,
   qualifiedRetainedPropertySale,
@@ -281,7 +283,7 @@ function assertK1PoolReturn(
     );
   }
   const expected =
-    agi_aggregator.compute({ taxYear: 2025, formType: "f1040" }, finalized)
+    agi_aggregator.compute({ taxYear: mefTaxYear(context), formType: "f1040" }, finalized)
       .outputs.find((row) => row.nodeType === "f1040")!.fields;
   const f1040 = context.pending?.f1040 as Record<string, unknown> | undefined;
   for (
@@ -364,7 +366,7 @@ function linkedActivities(context: MefBuildContext): Array<{
     );
   }
   const properties = scheduleE.schedule_es.filter((item) =>
-    (item.activity_type === "A" || item.activity_type === "B") &&
+    isPassiveProperty(item) &&
     ((item.current_property_source
       ? currentPropertyPassiveAmounts(item.current_property_source)
         .passiveOperating !== 0
@@ -1617,7 +1619,6 @@ export const form8582: MefFormDescriptor<"form8582", Input> = {
     const {
       allowed: allowedByActivity,
       suspended: suspendedByActivity,
-      overallLosses,
       specialEligibleLosses,
       specialByActivity,
       postSpecialLosses,

@@ -1,15 +1,18 @@
+import * as fs from "node:fs/promises";
+import { test } from "bun:test";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { buildMefXml } from "../../../builder.ts";
 import { type FilerIdentity, FilingStatus } from "../../../types.ts";
 
 const XSD_PATH = new URL(
-  "../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+  "../../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
   import.meta.url,
 ).pathname;
 
 let xsdAvailable = false;
 try {
-  Deno.statSync(XSD_PATH);
+  sys.statSync(XSD_PATH);
   xsdAvailable = true;
 } catch {
   // The IRS schema bundle is local-only.
@@ -26,12 +29,7 @@ const filer: FilerIdentity = {
   originator: { efin: "123456", originatorType: "ERO" },
 };
 
-Deno.test({
-  name: "XSD: Form 8889 contributions, distributions, and HDHP recapture",
-  ignore: !xsdAvailable,
-  sanitizeOps: false,
-  sanitizeResources: false,
-}, async () => {
+test.skipIf(!xsdAvailable)("XSD: Form 8889 contributions, distributions, and HDHP recapture", async () => {
   const xml = buildMefXml({
     form8889: {
       forms: [{
@@ -68,26 +66,21 @@ Deno.test({
     xml,
     "<HDHPCoverageIncomeAmt>500</HDHPCoverageIncomeAmt>",
   );
-  const path = await Deno.makeTempFile({ suffix: ".xml" });
+  const path = await sys.makeTempFile({ suffix: ".xml" });
   try {
-    await Deno.writeTextFile(path, xml);
-    const result = await new Deno.Command("xmllint", {
+    await fs.writeFile(path, xml);
+    const result = await new sys.Command("xmllint", {
       args: ["--noout", "--schema", XSD_PATH, path],
       stdout: "piped",
       stderr: "piped",
     }).output();
     assertEquals(result.code, 0, new TextDecoder().decode(result.stderr));
   } finally {
-    await Deno.remove(path);
+    await sys.remove(path);
   }
 });
 
-Deno.test({
-  name: "XSD: distribution-only Form 8889 has no line 1 coverage box",
-  ignore: !xsdAvailable,
-  sanitizeOps: false,
-  sanitizeResources: false,
-}, async () => {
+test.skipIf(!xsdAvailable)("XSD: distribution-only Form 8889 has no line 1 coverage box", async () => {
   const xml = buildMefXml({
     form8889: {
       forms: [{
@@ -104,16 +97,16 @@ Deno.test({
   }, filer);
   assertEquals(xml.includes("HDHPSelfOnlyCoverageInd"), false);
   assertEquals(xml.includes("HDHPFamilyCoverageInd"), false);
-  const path = await Deno.makeTempFile({ suffix: ".xml" });
+  const path = await sys.makeTempFile({ suffix: ".xml" });
   try {
-    await Deno.writeTextFile(path, xml);
-    const result = await new Deno.Command("xmllint", {
+    await fs.writeFile(path, xml);
+    const result = await new sys.Command("xmllint", {
       args: ["--noout", "--schema", XSD_PATH, path],
       stdout: "piped",
       stderr: "piped",
     }).output();
     assertEquals(result.code, 0, new TextDecoder().decode(result.stderr));
   } finally {
-    await Deno.remove(path);
+    await sys.remove(path);
   }
 });

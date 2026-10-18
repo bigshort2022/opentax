@@ -76,7 +76,10 @@ import {
 } from "../../../../intermediate/forms/income/business/form461/index.ts";
 import { form8995 } from "../../../../intermediate/forms/deductions/business/form8995/index.ts";
 import { scheduleA } from "../../../deductions/itemized/schedule_a/index.ts";
+import { schedule_d } from "../../../../intermediate/aggregation/income/investments/schedule_d/index.ts";
 import { FilingStatus, TS } from "../../../../types.ts";
+import { CONFIG_BY_YEAR } from "../../../../config/index.ts";
+import type { F1040Config } from "../../../../config/index.ts";
 import type { NodeContext } from "../../../../../../../core/types/node-context.ts";
 import { schedule1a } from "../../../../intermediate/forms/deductions/additional/schedule1a/index.ts";
 import {
@@ -146,6 +149,12 @@ export enum DependentCreditCategory {
 }
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
+
+export const survivingSpouseJointReturnReviewSchema = z.object({
+  death_record_reference: z.string().trim().min(1),
+  no_personal_representative_appointed_verified: z.literal(true),
+  surviving_spouse_signs_verified: z.literal(true),
+}).strict();
 
 const ptcDividendSourceSchema = z.object({
   source_document_id: z.string().min(1),
@@ -282,8 +291,8 @@ export const dependentSchema = z.object({
   custodial_eitc_release_review: z.object({
     form8332_source_reference: z.string().trim().min(1),
     custody_record_reference: z.string().trim().min(1),
-    custodial_parent_for_2025: z.literal(true),
-    valid_2025_release_to_noncustodial_parent: z.literal(true),
+    custodial_parent_for_tax_year: z.literal(true),
+    valid_tax_year_release_to_noncustodial_parent: z.literal(true),
     no_competing_eitc_claim_verified: z.literal(true),
   }).strict().optional(),
   child_care_months: z.number().int().min(0).max(12).optional(), // For Form 2441
@@ -330,6 +339,8 @@ export const inputSchema = z.object({
   qbi_no_prior_loss_or_suspended_loss_confirmed: z.literal(true).optional(),
   qbi_not_patron_of_specified_cooperative_confirmed: z.literal(true)
     .optional(),
+  // The return omits Form 8995/8995-A; current-year QBI losses still need filing.
+  qbi_deduction_not_claimed: z.literal(true).optional(),
   form461_scope_review: form461ScopeReviewSchema.optional(),
   // Required for the Form 3800 line 13 limit when filing separately.
   spouse_has_business_credit: z.boolean().optional(),
@@ -339,8 +350,12 @@ export const inputSchema = z.object({
   taxpayer_middle_initial: z.string().max(1).optional(),
   taxpayer_suffix: z.string().optional(),
   taxpayer_ssn: z.string().optional(),
-  taxpayer_ssn_valid_for_employment: z.boolean().optional(),
-  taxpayer_ssn_issued_before_due_date: z.boolean().optional(),
+  taxpayer_ssn_valid_for_employment: z.boolean().optional().describe(
+    "SSN card is valid for employment. With taxpayer_ssn_issued_before_due_date it is the valid SSN that the Schedule 1-A senior deduction (Part V) and the child tax credit require",
+  ),
+  taxpayer_ssn_issued_before_due_date: z.boolean().optional().describe(
+    "SSN issued by SSA before the return's due date (including extensions); also implies taxpayer_tin_issued_by_due_date",
+  ),
   taxpayer_tin_issued_by_due_date: z.boolean().optional(),
   taxpayer_dob: z.string().optional(),
   taxpayer_form8880_student_five_months: z.boolean().optional(),
@@ -370,14 +385,20 @@ export const inputSchema = z.object({
   taxpayer_death_date: z.string().optional(), // ISO date YYYY-MM-DD
   taxpayer_ip_pin: z.string().length(6).optional(), // 6-digit IP PIN from IRS
   taxpayer_prior_year_agi: z.number().optional(),
+  // Prior-year Self-Select PIN, an alternative to prior-year AGI for signing.
+  taxpayer_prior_year_pin: z.string().regex(/^\d{5}$/).optional(),
   // Spouse identity (MFJ / MFS)
   spouse_first_name: z.string().optional(),
   spouse_last_name: z.string().optional(),
   spouse_middle_initial: z.string().max(1).optional(),
   spouse_suffix: z.string().optional(),
   spouse_ssn: z.string().optional(),
-  spouse_ssn_valid_for_employment: z.boolean().optional(),
-  spouse_ssn_issued_before_due_date: z.boolean().optional(),
+  spouse_ssn_valid_for_employment: z.boolean().optional().describe(
+    "SSN card is valid for employment. With spouse_ssn_issued_before_due_date it is the valid SSN that the Schedule 1-A senior deduction (Part V) and the child tax credit require",
+  ),
+  spouse_ssn_issued_before_due_date: z.boolean().optional().describe(
+    "SSN issued by SSA before the return's due date (including extensions); also implies spouse_tin_issued_by_due_date",
+  ),
   spouse_tin_issued_by_due_date: z.boolean().optional(),
   spouse_dob: z.string().optional(),
   spouse_form8880_student_five_months: z.boolean().optional(),
@@ -397,8 +418,13 @@ export const inputSchema = z.object({
   spouse_email: z.string().optional(),
   spouse_deceased: z.boolean().optional(),
   spouse_death_date: z.string().optional(),
+  // Pub. 559: with no personal representative, the surviving spouse files the
+  // joint return, signs it and receives the refund without Form 1310.
+  surviving_spouse_joint_return_review: survivingSpouseJointReturnReviewSchema
+    .optional(),
   spouse_ip_pin: z.string().length(6).optional(),
   spouse_prior_year_agi: z.number().optional(),
+  spouse_prior_year_pin: z.string().regex(/^\d{5}$/).optional(),
   // Mailing address
   address_line1: z.string().optional(),
   address_line2: z.string().optional(), // Apt/unit number
@@ -428,6 +454,8 @@ export const inputSchema = z.object({
   // Filing/return metadata
   extension_filed: z.boolean().optional(),
   taxpayer_signature_pin: z.string().length(5).optional(),
+  // Pub 1436: an Assurance Testing System return, held to the ATS test-identity rules.
+  ats_test_submission: z.literal(true).optional(),
   taxpayer_signature_date: z.string().date().optional(),
   spouse_signature_pin: z.string().length(5).optional(),
   spouse_signature_date: z.string().date().optional(),
@@ -441,6 +469,12 @@ export const inputSchema = z.object({
   hoh_qualifying_person_name: z.string().optional(),
   hoh_qualifying_person_relationship: z.string().optional(),
   hoh_paid_more_than_half_home_costs: z.boolean().optional(),
+  // Form 1040 dependents-section box: a married HOH filer lived apart from
+  // the spouse for the last 6 months of 2025 (Pub. 501, considered unmarried).
+  hoh_spouse_lived_apart_review: z.object({
+    lived_apart_last_six_months_of_2025_verified: z.literal(true),
+    separate_residence_record_reference: z.string().trim().min(1),
+  }).strict().optional(),
   // QSS-specific
   qss_spouse_death_year: z.number().int().optional(),
   qss_qualifying_child_ssn: z.string().optional(),
@@ -484,6 +518,7 @@ export interface HohQualifyingChild {
 
 export function qssNonclaimedChildFromGeneral(
   input: GeneralInput,
+  taxYear: number,
 ): HohQualifyingChild | undefined {
   const review = input.qss_nonclaimed_child_review;
   if (!review) {
@@ -497,7 +532,8 @@ export function qssNonclaimedChildFromGeneral(
   const ssn = input.qss_qualifying_child_ssn?.replaceAll("-", "");
   if (
     input.filing_status !== FilingStatus.QSS ||
-    ![2023, 2024].includes(input.qss_spouse_death_year ?? 0) ||
+    // IRC §2(a): the spouse died in either of the two prior tax years.
+    ![taxYear - 2, taxYear - 1].includes(input.qss_spouse_death_year ?? 0) ||
     !ssn || !/^\d{9}$/.test(ssn) ||
     ssn !== review.child_ssn.replaceAll("-", "") ||
     `${review.child_first_name} ${review.child_last_name}`.length > 35 ||
@@ -521,6 +557,7 @@ export function qssNonclaimedChildFromGeneral(
 /** The named HOH child is omitted from dependent rows after a reviewed release. */
 export function hohQualifyingChildFromGeneral(
   input: GeneralInput,
+  taxYear: number,
 ): HohQualifyingChild | undefined {
   const named = input.hoh_qualifying_person_name?.trim();
   if (!named) {
@@ -549,7 +586,7 @@ export function hohQualifyingChildFromGeneral(
     input.hoh_paid_more_than_half_home_costs !== true ||
     !child.ssn || !/^\d{3}-?\d{2}-?\d{4}$/.test(child.ssn) ||
     !dependentLivedWithFilerOverHalfYear(child) ||
-    !passesRelationshipTest(child) || !passesEitcAgeTest(child) ||
+    !passesRelationshipTest(child) || !passesEitcAgeTest(child, taxYear) ||
     !passesJointReturnTest(child) ||
     child.us_citizen_national_or_resident !== true ||
     named.length > 35 || !irsName.test(named) ||
@@ -738,9 +775,6 @@ export function ptcDependentsModifiedAgi(dependents: DependentItem[]): number {
 }
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-// Tax year-end reference date for age calculations
-const TAX_YEAR_END = new Date("2025-12-31");
-
 // Relationships that qualify for the qualifying-child test (CTC relationship test)
 // IRS Pub 501: child, stepchild, foster child, sibling (or step/half), grandchild,
 // or descendant of any of those.
@@ -756,27 +790,57 @@ const CTC_QUALIFYING_RELATIONSHIPS = new Set<DependentRelationship>([
   DependentRelationship.ChildSibling, // niece/nephew = child of sibling
 ]);
 
+// Dependent review facts whose schemas still encode TY2025 dates or limits.
+const TY2025_DATED_DEPENDENT_FACTS = [
+  "eic_birth_residency_review",
+  "eic_dated_residency_review",
+  "eic_death_residency_review",
+  "ptc_tax_return",
+] as const;
+
 // ─── Pure helpers ─────────────────────────────────────────────────────────────
 
-// Age at December 31, 2025 (tax year end).
-// Returns integer age in completed years.
-function ageAtYearEnd(dob: string): number {
+function configForYear(taxYear: number): F1040Config {
+  const cfg = CONFIG_BY_YEAR[taxYear];
+  if (!cfg) throw new Error(`No f1040 config for year ${taxYear}`);
+  return cfg;
+}
+
+function assertDependentFactsForYear(
+  deps: ReadonlyArray<DependentItem>,
+  taxYear: number,
+): void {
+  if (taxYear === 2025) return;
+  const dated = TY2025_DATED_DEPENDENT_FACTS.filter((key) =>
+    deps.some((dep) => dep[key] !== undefined)
+  );
+  if (dated.length > 0) {
+    throw new Error(
+      `TY${taxYear} does not yet support these dependent facts: ${
+        dated.join(", ")
+      }`,
+    );
+  }
+}
+
+// Age in completed years at December 31 of the tax year.
+function ageAtYearEnd(dob: string, taxYear: number): number {
+  const yearEnd = new Date(`${taxYear}-12-31`);
   const birth = new Date(dob);
-  const yearDiff = TAX_YEAR_END.getFullYear() - birth.getFullYear();
+  const yearDiff = yearEnd.getFullYear() - birth.getFullYear();
   const birthdayThisYear = new Date(
-    TAX_YEAR_END.getFullYear(),
+    yearEnd.getFullYear(),
     birth.getMonth(),
     birth.getDate(),
   );
-  // Subtract 1 if birthday hasn't occurred yet by year-end
-  return TAX_YEAR_END < birthdayThisYear ? yearDiff - 1 : yearDiff;
+  return yearEnd < birthdayThisYear ? yearDiff - 1 : yearDiff;
 }
 
 // For federal tax purposes, a person reaches age 65 on the day before their
 // 65th birthday. For TY2025, this matches the Schedule 1-A instruction to use
 // a birth date before January 2, 1961.
-// For TY2025, CTC requires an employment-valid SSN issued before the return
-// due date. An ITIN or ATIN cannot satisfy that test.
+// CTC requires an employment-valid SSN issued before the return due date
+// (IRC §24(h)(7)); an ITIN or ATIN cannot satisfy that test.
 function passesSSNTest(dep: DependentItem): boolean {
   return Boolean(dep.ssn) && !dep.itin && !dep.atin &&
     dep.ssn_valid_for_employment === true &&
@@ -786,8 +850,8 @@ function passesSSNTest(dep: DependentItem): boolean {
 
 // IRS CTC age test: under 17 at end of tax year. Disability can extend
 // qualifying-child status for ODC, but not the CTC age limit.
-function passesAgeTest(dep: DependentItem): boolean {
-  return ageAtYearEnd(dep.dob) < 17;
+function passesAgeTest(dep: DependentItem, taxYear: number): boolean {
+  return ageAtYearEnd(dep.dob, taxYear) < 17;
 }
 
 // IRS CTC residency test: lived with taxpayer MORE than 6 months.
@@ -821,11 +885,11 @@ function passesRelationshipTest(dep: DependentItem): boolean {
 // Determine whether a dependent qualifies for the Child Tax Credit.
 // A true override can account for a special residency exception; it cannot
 // waive the SSN, age, or relationship requirements.
-function isQualifyingChildForCTC(dep: DependentItem): boolean {
+function isQualifyingChildForCTC(dep: DependentItem, taxYear: number): boolean {
   if (dep.qualifying_child_for_ctc === false) return false;
   return (
     passesSSNTest(dep) &&
-    passesAgeTest(dep) &&
+    passesAgeTest(dep, taxYear) &&
     passesRelationshipTest(dep) &&
     passesJointReturnTest(dep) &&
     passesQualifyingChildSupportTest(dep) &&
@@ -844,11 +908,11 @@ function hasTin(dep: DependentItem): boolean {
 // This matches the EITC age test — broader than CTC (< 17) but narrower than hasTin alone.
 // IRC §152(c): a qualifying child who is too old for CTC but under 19 (or student < 24)
 // still qualifies as a "qualifying child" and therefore qualifies for ODC.
-function isQualifyingChildForODC(dep: DependentItem): boolean {
+function isQualifyingChildForODC(dep: DependentItem, taxYear: number): boolean {
   return (
     passesResidencyTest(dep) &&
     passesRelationshipTest(dep) &&
-    passesEitcAgeTest(dep) &&
+    passesEitcAgeTest(dep, taxYear) &&
     passesJointReturnTest(dep) &&
     passesQualifyingChildSupportTest(dep)
   );
@@ -857,7 +921,10 @@ function isQualifyingChildForODC(dep: DependentItem): boolean {
 // The ordinary qualifying-relative path requires confirmed support and gross
 // income facts. Exceptional cases such as multiple-support agreements need
 // separate facts and cannot be inferred from an unanswered question.
-function isQualifyingRelativeForODC(dep: DependentItem): boolean {
+function isQualifyingRelativeForODC(
+  dep: DependentItem,
+  taxYear: number,
+): boolean {
   if (!hasTin(dep)) return false;
   if (!passesJointReturnTest(dep)) return false;
   // Family relationships listed in Pub. 501 do not require co-residency.
@@ -870,21 +937,28 @@ function isQualifyingRelativeForODC(dep: DependentItem): boolean {
     return false;
   }
   if (dep.taxpayer_provided_over_half_support !== true) return false;
-  // The 2025 gross-income limit is $5,200. Zero is a valid explicit answer.
-  return dep.gross_income !== undefined && dep.gross_income < 5200;
+  // IRC §152(d)(1)(B) exemption amount; zero is a valid explicit answer.
+  return dep.gross_income !== undefined &&
+    dep.gross_income <
+      configForYear(taxYear).qualifyingRelativeGrossIncomeLimit;
 }
 
 /** Ordinary dependency facts reused by education ownership reconciliation. */
-export function educationDependentSourceEligible(dep: DependentItem): boolean {
+export function educationDependentSourceEligible(
+  dep: DependentItem,
+  taxYear: number,
+): boolean {
   return dep.us_citizen_national_or_resident === true &&
     dep.provided_over_half_own_support !== true &&
     dep.dependent_on_another_return !== true &&
-    (isQualifyingChildForODC(dep) || isQualifyingRelativeForODC(dep));
+    (isQualifyingChildForODC(dep, taxYear) ||
+      isQualifyingRelativeForODC(dep, taxYear));
 }
 
 export function dependentCreditCategory(
   dep: DependentItem,
   filer: FilerCreditEligibility,
+  taxYear: number,
 ): DependentCreditCategory {
   if (
     dep.us_citizen_national_or_resident !== true ||
@@ -892,13 +966,13 @@ export function dependentCreditCategory(
   ) {
     return DependentCreditCategory.None;
   }
-  if (filer.ctc && isQualifyingChildForCTC(dep)) {
+  if (filer.ctc && isQualifyingChildForCTC(dep, taxYear)) {
     return DependentCreditCategory.ChildTaxCredit;
   }
   if (
     filer.odc && (
-      (isQualifyingChildForODC(dep) && hasTin(dep)) ||
-      isQualifyingRelativeForODC(dep)
+      (isQualifyingChildForODC(dep, taxYear) && hasTin(dep)) ||
+      isQualifyingRelativeForODC(dep, taxYear)
     )
   ) {
     return DependentCreditCategory.OtherDependentCredit;
@@ -910,6 +984,7 @@ export function dependentCreditCategory(
 function dependentCounts(
   deps: DependentItem[],
   filer: FilerCreditEligibility,
+  taxYear: number,
 ): {
   qualifying_child_tax_credit_count: number;
   other_dependent_count: number;
@@ -919,7 +994,7 @@ function dependentCounts(
   let ctcCount = 0;
   let odcCount = 0;
   for (const dep of claimable) {
-    const category = dependentCreditCategory(dep, filer);
+    const category = dependentCreditCategory(dep, filer, taxYear);
     if (category === DependentCreditCategory.ChildTaxCredit) {
       ctcCount += 1;
     } else if (category === DependentCreditCategory.OtherDependentCredit) {
@@ -936,21 +1011,22 @@ function dependentCounts(
 /** Claimable dependent rows exactly as the general node sends to Form 1040. */
 export function filedDependentsFromGeneral(
   input: GeneralInput,
+  taxYear: number,
 ): DependentFiling[] {
   const filer = filerCreditEligibility(input);
   return (input.dependents ?? [])
     .filter((dep) => dep.dependent_on_another_return !== true)
     .map((dep) => ({
       ...dep,
-      credit_category: dependentCreditCategory(dep, filer),
+      credit_category: dependentCreditCategory(dep, filer, taxYear),
     }));
 }
 
 // EITC age test: under 19 at year-end, OR full-time student under 24, OR permanently disabled.
 // IRC §32(c)(3)(A); broader than CTC age test (< 17).
-function passesEitcAgeTest(dep: DependentItem): boolean {
+function passesEitcAgeTest(dep: DependentItem, taxYear: number): boolean {
   if (dep.disabled === true) return true;
-  const age = ageAtYearEnd(dep.dob);
+  const age = ageAtYearEnd(dep.dob, taxYear);
   if (age < 19) return true;
   if (dep.full_time_student === true && age < 24) return true;
   return false;
@@ -961,6 +1037,7 @@ function passesEitcAgeTest(dep: DependentItem): boolean {
 // test, and a noncustodial parent's CTC release does not confer EITC eligibility.
 function isEitcQualifyingChild(
   dep: DependentItem,
+  taxYear: number,
 ): dep is DependentItem & {
   ssn: string;
   months_lived_with_you_in_us: number;
@@ -971,15 +1048,15 @@ function isEitcQualifyingChild(
     dep.tin_issued_by_due_date === true &&
     passesJointReturnTest(dep) &&
     passesRelationshipTest(dep) &&
-    passesEitcAgeTest(dep);
+    passesEitcAgeTest(dep, taxYear);
   if (
-    qualifyingIdentity && dep.dob.startsWith("2025-") &&
+    qualifyingIdentity && dep.dob.startsWith(`${taxYear}-`) &&
     dep.months_in_home <= 6 &&
     dep.eic_birth_residency_review === undefined &&
     dep.eic_death_residency_review === undefined
   ) {
     throw new Error(
-      "EIC 2025 birth needs reviewed residence before child eligibility can be decided",
+      `EIC ${taxYear} birth needs reviewed residence before child eligibility can be decided`,
     );
   }
   const otherwiseQualified = passesResidencyTest(dep) && qualifyingIdentity;
@@ -998,6 +1075,7 @@ function isEitcQualifyingChild(
 function eitcQualifyingChildren(
   deps: DependentItem[],
   ownerSsns: ReadonlySet<string>,
+  taxYear: number,
 ): Array<
   DependentItem & {
     ssn: string;
@@ -1008,7 +1086,7 @@ function eitcQualifyingChildren(
     dep.dependent_on_another_return !== true ||
     dep.custodial_eitc_release_review !== undefined
   )
-    .filter(isEitcQualifyingChild);
+    .filter((dep) => isEitcQualifyingChild(dep, taxYear));
   const seenSsns = new Set<string>();
   for (const child of children) {
     const ssn = child.ssn.replaceAll("-", "");
@@ -1026,13 +1104,20 @@ function eitcQualifyingChildren(
 }
 
 /** The exact child rows projected by the general source into Schedule EIC. */
-export function eicChildSourceProjection(parsed: GeneralInput) {
+export function eicChildSourceProjection(
+  parsed: GeneralInput,
+  taxYear: number,
+) {
   const ownerSsns = new Set(
     [parsed.taxpayer_ssn, parsed.spouse_ssn]
       .filter((ssn): ssn is string => ssn !== undefined)
       .map((ssn) => ssn.replaceAll("-", "")),
   );
-  const children = eitcQualifyingChildren(parsed.dependents ?? [], ownerSsns);
+  const children = eitcQualifyingChildren(
+    parsed.dependents ?? [],
+    ownerSsns,
+    taxYear,
+  );
   return {
     children,
     count: Math.min(children.length, 3),
@@ -1074,10 +1159,13 @@ function addIfDefined(
 
 // Build the f1040 input object with only defined (non-undefined) fields.
 // Always includes at least filing_status.
-function buildF1040Input(input: GeneralInput): Record<string, unknown> {
+function buildF1040Input(
+  input: GeneralInput,
+  taxYear: number,
+): Record<string, unknown> {
   const deps = input.dependents ?? [];
   const filer = filerCreditEligibility(input);
-  const counts = dependentCounts(deps, filer);
+  const counts = dependentCounts(deps, filer, taxYear);
 
   const fields: Record<string, unknown> = {
     filing_status: input.filing_status,
@@ -1088,12 +1176,12 @@ function buildF1040Input(input: GeneralInput): Record<string, unknown> {
   addIfDefined(
     fields,
     "hoh_qualifying_child",
-    hohQualifyingChildFromGeneral(input),
+    hohQualifyingChildFromGeneral(input, taxYear),
   );
   addIfDefined(
     fields,
     "qss_nonclaimed_child",
-    qssNonclaimedChildFromGeneral(input),
+    qssNonclaimedChildFromGeneral(input, taxYear),
   );
   addIfDefined(
     fields,
@@ -1101,7 +1189,7 @@ function buildF1040Input(input: GeneralInput): Record<string, unknown> {
     input.spouse_has_business_credit,
   );
   if (counts.dependent_count > 0) {
-    fields.dependent_details = filedDependentsFromGeneral(input);
+    fields.dependent_details = filedDependentsFromGeneral(input, taxYear);
   }
 
   // Taxpayer personal info pass-throughs
@@ -1139,6 +1227,16 @@ function buildF1040Input(input: GeneralInput): Record<string, unknown> {
   addIfDefined(fields, "taxpayer_deceased", input.taxpayer_deceased);
   addIfDefined(fields, "taxpayer_death_date", input.taxpayer_death_date);
   addIfDefined(fields, "taxpayer_ip_pin", input.taxpayer_ip_pin);
+  addIfDefined(
+    fields,
+    "taxpayer_prior_year_agi",
+    input.taxpayer_prior_year_agi,
+  );
+  addIfDefined(
+    fields,
+    "taxpayer_prior_year_pin",
+    input.taxpayer_prior_year_pin,
+  );
 
   // Spouse info pass-throughs
   addIfDefined(fields, "spouse_first_name", input.spouse_first_name);
@@ -1166,10 +1264,18 @@ function buildF1040Input(input: GeneralInput): Record<string, unknown> {
   addIfDefined(fields, "spouse_occupation", input.spouse_occupation);
   addIfDefined(fields, "spouse_deceased", input.spouse_deceased);
   addIfDefined(fields, "spouse_death_date", input.spouse_death_date);
+  addIfDefined(
+    fields,
+    "surviving_spouse_joint_return_review",
+    input.surviving_spouse_joint_return_review,
+  );
   addIfDefined(fields, "spouse_ip_pin", input.spouse_ip_pin);
+  addIfDefined(fields, "spouse_prior_year_agi", input.spouse_prior_year_agi);
+  addIfDefined(fields, "spouse_prior_year_pin", input.spouse_prior_year_pin);
 
   // Address pass-throughs
   addIfDefined(fields, "address_line1", input.address_line1);
+  addIfDefined(fields, "address_in_care_of", input.address_in_care_of);
   addIfDefined(fields, "address_line2", input.address_line2);
   addIfDefined(fields, "address_city", input.address_city);
   addIfDefined(fields, "address_state", input.address_state);
@@ -1222,6 +1328,19 @@ function buildF1040Input(input: GeneralInput): Record<string, unknown> {
     "mfs_eitc_separation_rule",
     input.mfs_eitc_separation_review === undefined ? undefined : true,
   );
+  if (
+    input.hoh_spouse_lived_apart_review !== undefined &&
+    input.filing_status !== FilingStatus.HOH
+  ) {
+    throw new Error(
+      "HOH lived-apart spouse review needs head-of-household status",
+    );
+  }
+  addIfDefined(
+    fields,
+    "hoh_spouse_lived_apart",
+    input.hoh_spouse_lived_apart_review === undefined ? undefined : true,
+  );
   addIfDefined(
     fields,
     "mfs_spouse_lived_with_taxpayer",
@@ -1246,6 +1365,7 @@ function buildF1040Input(input: GeneralInput): Record<string, unknown> {
 
   // Signature PINs
   addIfDefined(fields, "taxpayer_signature_pin", input.taxpayer_signature_pin);
+  addIfDefined(fields, "ats_test_submission", input.ats_test_submission);
   addIfDefined(
     fields,
     "taxpayer_signature_date",
@@ -1291,6 +1411,7 @@ class GeneralNode extends TaxNode<typeof inputSchema> {
     schedule1a,
     schedule1,
     form5329,
+    schedule_d,
   ]);
 
   compute(ctx: NodeContext, input: GeneralInput): NodeResult {
@@ -1396,7 +1517,8 @@ class GeneralNode extends TaxNode<typeof inputSchema> {
         { taxpayer_age_65_or_older: taxpayerAge65 }),
       ...(spouseAge65 !== undefined && { spouse_age_65_or_older: spouseAge65 }),
     };
-    const f1040Input = buildF1040Input(effectiveInput);
+    assertDependentFactsForYear(parsed.dependents ?? [], ctx.taxYear);
+    const f1040Input = buildF1040Input(effectiveInput, ctx.taxYear);
 
     const sdInput: Record<string, unknown> = {
       filing_status: parsed.filing_status,
@@ -1450,7 +1572,7 @@ class GeneralNode extends TaxNode<typeof inputSchema> {
       dep.ptc_tax_return !== undefined
     );
     const dependentsModifiedAgi = ptcDependentsModifiedAgi(claimedDeps);
-    const eicChildProjection = eicChildSourceProjection(parsed);
+    const eicChildProjection = eicChildSourceProjection(parsed, ctx.taxYear);
     const eitcChildren = eicChildProjection.children;
     if (parsed.mfs_eitc_separation_review) {
       if (parsed.filing_status !== FilingStatus.MFS) {
@@ -1470,7 +1592,7 @@ class GeneralNode extends TaxNode<typeof inputSchema> {
       }
     }
     const filer = filerCreditEligibility(parsed);
-    const counts = dependentCounts(deps, filer);
+    const counts = dependentCounts(deps, filer, ctx.taxYear);
 
     const ableDistributions = ownedAbleDistributions(
       parsed.form8880_able_contribution_review,
@@ -1635,6 +1757,12 @@ class GeneralNode extends TaxNode<typeof inputSchema> {
         filing_status: parsed.filing_status,
         scope_review: parsed.form461_scope_review,
       }),
+      // Schedule D line 21 limits a net capital loss to $1,500 for MFS.
+      ...(parsed.filing_status === FilingStatus.MFS
+        ? [this.outputNodes.output(schedule_d, {
+          filing_status: parsed.filing_status,
+        })]
+        : []),
       // Pass filing_status to schedule_a for OBBBA SALT phase-out threshold
       this.outputNodes.output(scheduleA, {
         filing_status: parsed.filing_status,
@@ -1667,6 +1795,9 @@ class GeneralNode extends TaxNode<typeof inputSchema> {
         ...(parsed.qbi_not_patron_of_specified_cooperative_confirmed ===
             true && {
           qbi_not_patron_of_specified_cooperative_confirmed: true,
+        }),
+        ...(parsed.qbi_deduction_not_claimed === true && {
+          qbi_deduction_not_claimed: true,
         }),
         ...(taxpayerAge65 !== undefined &&
           { taxpayer_age_65_or_older: taxpayerAge65 }),

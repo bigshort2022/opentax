@@ -1,10 +1,13 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../scripts/support/sys.ts";
 import { assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
 import { PDFDocument } from "pdf-lib";
 import { assessForm540 } from "./assessment.ts";
 import { workpaperInput } from "./test-fixtures.ts";
 import { buildWorksheetPdf } from "./worksheet.ts";
 
-Deno.test("Form 540 worksheet keeps amounts and every readiness limitation visible", async () => {
+test("Form 540 worksheet keeps amounts and every readiness limitation visible", async () => {
   const assessment = assessForm540([{
     ...workpaperInput,
     review: {
@@ -16,12 +19,12 @@ Deno.test("Form 540 worksheet keeps amounts and every readiness limitation visib
       paymentsUseTaxAndPenaltyReviewed: false,
     },
   }]);
-  const tmpDir = await Deno.makeTempDir();
+  const tmpDir = await sys.makeTempDir();
   try {
     const pdfPath = `${tmpDir}/ca540-worksheet.pdf`;
     const bytes = await buildWorksheetPdf(assessment);
-    await Deno.writeFile(pdfPath, bytes);
-    const { code, stdout, stderr } = await new Deno.Command("pdftotext", {
+    await fs.writeFile(pdfPath, bytes);
+    const { code, stdout, stderr } = await new sys.Command("pdftotext", {
       args: ["-layout", pdfPath, "-"],
       stdout: "piped",
       stderr: "piped",
@@ -45,10 +48,10 @@ Deno.test("Form 540 worksheet keeps amounts and every readiness limitation visib
       assertStringIncludes(page, "Not an official Form 540");
     }
   } finally {
-    await Deno.remove(tmpDir, { recursive: true });
+    await sys.remove(tmpDir, { recursive: true });
   }
 });
 
-Deno.test("invalid input cannot produce a misleading worksheet", async () => {
+test("invalid input cannot produce a misleading worksheet", async () => {
   await assertRejects(() => buildWorksheetPdf(assessForm540([])), Error);
 });

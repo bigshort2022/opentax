@@ -1,4 +1,5 @@
-import { join } from "@std/path";
+import * as fs from "node:fs/promises";
+import { join } from "node:path";
 import { unzipSync } from "fflate";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 import { z } from "zod";
@@ -14,6 +15,10 @@ import { isValidMefPdfFilename } from "../attachments/pdf-attachment-filename.ts
 import { assertMefPdfEnvelope } from "../attachments/pdf-attachment-envelope.ts";
 import { escapeXml } from "../../../mef/xml.ts";
 import { returnDataDocuments } from "../execution/return-document-inventory.ts";
+
+async function readBytes(path: string): Promise<Uint8Array> {
+  return new Uint8Array(await fs.readFile(path));
+}
 
 const requestRecordSchema = z.object({
   messageId: z.string().min(1),
@@ -63,7 +68,10 @@ export interface A2aArchivedSubmissionEvidence
 export interface A2aSendEvidenceInput {
   readonly messageId: string;
   readonly submissionIds: ReadonlyArray<string>;
-  readonly package: MefTransmissionPackage;
+  readonly package: Pick<
+    MefTransmissionPackage,
+    "sendSubmissionsRequestXml" | "containerZipBytes"
+  >;
   readonly recordedAt: Date;
 }
 
@@ -167,18 +175,13 @@ function returnPrimarySsn(source: string): string | undefined {
   const parsed = xmlParser.parse(source) as Record<string, unknown>;
   const roots = Object.keys(parsed).filter((name) => name !== "?xml");
   if (roots.length !== 1 || roots[0] !== "Return") return undefined;
-  const returnData = (parsed.Return as Record<string, unknown> | undefined)
-    ?.ReturnData;
-  if (
-    returnData === null || Array.isArray(returnData) ||
-    typeof returnData !== "object"
-  ) return undefined;
-  const form1040 = (returnData as Record<string, unknown>).IRS1040;
-  if (
-    form1040 === null || Array.isArray(form1040) ||
-    typeof form1040 !== "object"
-  ) return undefined;
-  const primarySsn = (form1040 as Record<string, unknown>).PrimarySSN;
+  const object = (value: unknown): Record<string, unknown> | undefined =>
+    value !== null && typeof value === "object" && !Array.isArray(value)
+      ? value as Record<string, unknown>
+      : undefined;
+  // IND-052: the manifest TIN joins Return/ReturnHeader/Filer/PrimarySSN.
+  const filer = object(object(object(parsed.Return)?.ReturnHeader)?.Filer);
+  const primarySsn = filer?.PrimarySSN;
   return typeof primarySsn === "string" ? primarySsn : undefined;
 }
 
@@ -370,19 +373,15 @@ async function sha256(bytes: Uint8Array): Promise<string> {
 }
 
 async function writeSyncedFile(path: string, bytes: Uint8Array): Promise<void> {
-  const file = await Deno.open(path, {
-    write: true,
-    createNew: true,
-    mode: 0o600,
-  });
+  const file = await fs.open(path, "wx", 0o600);
   try {
     let offset = 0;
     while (offset < bytes.length) {
-      offset += await file.write(bytes.subarray(offset));
+      offset += (await file.write(bytes.subarray(offset))).bytesWritten;
     }
     await file.sync();
   } finally {
-    file.close();
+    await file.close();
   }
 }
 
@@ -394,9 +393,9 @@ async function writeRecord(
   payloads: Readonly<Record<string, Uint8Array>>,
 ): Promise<void> {
   const groupPath = join(root, group);
-  await Deno.mkdir(groupPath, { recursive: true, mode: 0o700 });
+  await fs.mkdir(groupPath, { recursive: true, mode: 0o700 });
   const stagingPath = join(groupPath, `.staging-${crypto.randomUUID()}`);
-  await Deno.mkdir(stagingPath, { mode: 0o700 });
+  await fs.mkdir(stagingPath, { mode: 0o700 });
   try {
     for (const [name, bytes] of Object.entries(payloads)) {
       await writeSyncedFile(join(stagingPath, name), bytes);
@@ -405,9 +404,9 @@ async function writeRecord(
       join(stagingPath, "record.json"),
       encoder.encode(JSON.stringify(record, null, 2)),
     );
-    await Deno.rename(stagingPath, join(groupPath, key));
+    await fs.rename(stagingPath, join(groupPath, key));
   } catch (error) {
-    await Deno.remove(stagingPath, { recursive: true }).catch(() => {});
+    await fs.rm(stagingPath, { recursive: true }).catch(() => {});
     throw error;
   }
 }
@@ -453,10 +452,10 @@ export async function readA2aSendRecord(
   const key = await sha256(encoder.encode(messageId));
   const path = join(root, "requests", key);
   const record = requestRecordSchema.parse(
-    JSON.parse(await Deno.readTextFile(join(path, "record.json"))),
+    JSON.parse(await fs.readFile(join(path, "record.json"), "utf8")),
   );
-  const requestBytes = await Deno.readFile(join(path, "request.xml"));
-  const containerBytes = await Deno.readFile(join(path, "container.zip"));
+  const requestBytes = await readBytes(join(path, "request.xml"));
+  const containerBytes = await readBytes(join(path, "container.zip"));
   if (
     record.messageId !== messageId ||
     record.requestBodySha256 !== await sha256(requestBytes) ||
@@ -497,10 +496,10 @@ export async function readA2aArchivedSubmission(
     );
   }
   const key = await sha256(encoder.encode(sendMessageId));
-  const requestBytes = await Deno.readFile(
+  const requestBytes = await readBytes(
     join(root, "requests", key, "request.xml"),
   );
-  const containerBytes = await Deno.readFile(
+  const containerBytes = await readBytes(
     join(root, "requests", key, "container.zip"),
   );
   if (
@@ -632,9 +631,9 @@ export async function readA2aInboundPayload(
   const safeRecordId = z.string().uuid().parse(recordId);
   const path = join(root, "inbound", safeRecordId);
   const record = inboundRecordSchema.parse(
-    JSON.parse(await Deno.readTextFile(join(path, "record.json"))),
+    JSON.parse(await fs.readFile(join(path, "record.json"), "utf8")),
   );
-  const rawPayload = await Deno.readFile(join(path, "payload.bin"));
+  const rawPayload = await readBytes(join(path, "payload.bin"));
   const send = await readA2aSendRecord(root, record.sendMessageId);
   if (
     record.recordId !== recordId ||

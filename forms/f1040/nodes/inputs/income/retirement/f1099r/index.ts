@@ -32,6 +32,8 @@ import {
 import { OutputNodes } from "../../../../../../../core/types/output-nodes.ts";
 import { f1040 } from "../../../../outputs/general/return-assembly/f1040/index.ts";
 import { agi_aggregator } from "../../../../intermediate/aggregation/general/return-assembly/agi_aggregator/index.ts";
+import { eitc } from "../../../../intermediate/forms/credits/earned-income/eitc/index.ts";
+import { f8812 } from "../../../credits/child/f8812/index.ts";
 import { form5329 } from "../../../../intermediate/forms/taxes/retirement/form5329/index.ts";
 import { form4972Elections } from "../../../../intermediate/forms/taxes/retirement/form4972/elections.ts";
 import {
@@ -429,8 +431,12 @@ export const itemSchema = z.object({
   direct_rollover_confirmed: z.boolean().optional(),
 
   // Disability flags
-  disability_flag: z.boolean().optional(),
-  disability_as_wages: z.boolean().optional(),
+  disability_flag: z.boolean().optional().describe(
+    "Box 7 code 3 disability distribution; a recipient under 65 may claim Schedule R (add schedule_r)",
+  ),
+  disability_as_wages: z.boolean().optional().describe(
+    "Disability pension paid before the plan's minimum retirement age: Form 1040 line 1h",
+  ),
 
   // Special treatment flags
   carry_to_5329: z.boolean().optional(),
@@ -498,6 +504,22 @@ export const itemSchema = z.object({
       path: ["nonstandard_document_review", "source_document_reference"],
       message:
         "Nonstandard 1099-R review must match the retained payer-copy reference",
+    });
+  }
+  // Instructions for Form 1040 (2025), line 1h (page 25): only a disability
+  // pension before minimum retirement age goes on line 1h; IRA payments stay
+  // on lines 4a and 4b.
+  if (
+    item.disability_as_wages === true &&
+    (item.disability_flag !== true ||
+      item.box7_distribution_code !== DistributionCode.Code3 ||
+      item.box7_ira_simple_indicator === true)
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["disability_as_wages"],
+      message:
+        "Form 1040 line 1h disability pension needs a non-IRA Form 1099-R with disability_flag and box 7 code 3",
     });
   }
 });
@@ -629,8 +651,9 @@ export function requiresIraDistributionStatement(item: R1099Item): boolean {
 
 export function iraDistributionExplanation(
   items: readonly R1099Item[],
+  taxYear: number,
 ): string | undefined {
-  assertIraRolloverEvidence(items);
+  assertIraRolloverEvidence(items, taxYear);
   const rows = items.flatMap((item, index) => {
     if (!requiresIraDistributionStatement(item)) return [];
     const rollover = item.ira_rollover;
@@ -701,8 +724,11 @@ export function iraDistributionExplanation(
   return explanation;
 }
 
-export function assertIraRolloverEvidence(items: readonly R1099Item[]): void {
-  for (const item of items) validateIraRolloverEvidence(item);
+export function assertIraRolloverEvidence(
+  items: readonly R1099Item[],
+  taxYear: number,
+): void {
+  for (const item of items) validateIraRolloverEvidence(item, taxYear);
   for (const owner of ["T", "S"] as const) {
     const dates = items.filter((item) =>
       (item.ts ?? "T") === owner &&
@@ -933,7 +959,7 @@ function validatePrivateLetterWaiver(item: R1099Item): void {
   }
 }
 
-function validateIraRolloverEvidence(item: R1099Item): void {
+function validateIraRolloverEvidence(item: R1099Item, taxYear: number): void {
   const iraRolloverCode = item.rollover_code === RolloverCode.G ||
     item.rollover_code === RolloverCode.S ||
     item.rollover_code === RolloverCode.X ||
@@ -1073,17 +1099,19 @@ function validateIraRolloverEvidence(item: R1099Item): void {
     const elapsedDays =
       (Date.parse(completed_on) - Date.parse(distributed_on)) /
       86_400_000;
-    if (!distributed_on.startsWith("2025-") || elapsedDays < 0) {
+    if (!distributed_on.startsWith(`${taxYear}-`) || elapsedDays < 0) {
       throw new Error(
-        "IRA rollover needs a 2025 distribution completed after payment",
+        `IRA rollover needs a ${taxYear} distribution completed after payment`,
       );
     }
     validateLateWaiver(item);
     if (
-      !completed_on.startsWith("2025-") &&
-      !completed_on.startsWith("2026-")
+      !completed_on.startsWith(`${taxYear}-`) &&
+      !completed_on.startsWith(`${taxYear + 1}-`)
     ) {
-      throw new Error("IRA rollover completion must be in 2025 or 2026");
+      throw new Error(
+        `IRA rollover completion must be in ${taxYear} or ${taxYear + 1}`,
+      );
     }
     if (
       item.rollover_code === RolloverCode.X &&
@@ -1107,7 +1135,7 @@ function validateIraRolloverEvidence(item: R1099Item): void {
 }
 
 // Cross-field validation for a single item
-function validateItem(item: R1099Item): void {
+function validateItem(item: R1099Item, taxYear: number): void {
   if (item.ira_recharacterization_review) reviewedIraRecharacterization(item);
   if (
     item.box7_distribution_code === DistributionCode.Code8 &&
@@ -1133,7 +1161,7 @@ function validateItem(item: R1099Item): void {
       "Non-IRA code 8 corrective distribution needs one identified 2025 Form 1099-R, owner, payer and positive taxable box 2a",
     );
   }
-  validateIraRolloverEvidence(item);
+  validateIraRolloverEvidence(item, taxYear);
   if (item.roth_owner_inventory_review &&
     (item.roth_activity_review || item.roth_distribution_evidence || item.prior_ira_basis !== undefined ||
       item.form8606_distribution_evidence || (item.rollover_code && !(item.rollover_code === "C" && item.roth_owner_inventory_review.current_conversion?.accounts.some(a => a.transfers.some(t => (t.issued_form1099r.completed_form4852_reference ?? t.issued_form1099r.source_document_reference) === item.source_document_reference)))) || item.exclude_4972 || item.qcd_full ||
@@ -1183,13 +1211,13 @@ function validateItem(item: R1099Item): void {
       item.box2a_taxable_amount !== undefined ||
       item.box2b_not_determined !== true ||
       !item.box13_date_of_payment ||
-      !/^2025-\d{2}-\d{2}$/.test(item.box13_date_of_payment) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(item.box13_date_of_payment) ||
       Number.isNaN(Date.parse(`${item.box13_date_of_payment}T00:00:00Z`)) ||
       new Date(`${item.box13_date_of_payment}T00:00:00Z`).toISOString()
           .slice(0, 10) !== item.box13_date_of_payment ||
       item.box13_date_of_payment <=
         evidence.contribution_receipt.received_on ||
-      !item.box13_date_of_payment.startsWith("2025-") ||
+      !item.box13_date_of_payment.startsWith(`${taxYear}-`) ||
       item.source_document_reference !==
         evidence.form1099r_source_document_reference ||
       item.recipient_ssn?.replace(/\D/g, "") !==
@@ -1292,8 +1320,8 @@ export function correctivePlanItems(items: R1099Items): R1099Items {
   );
 }
 
-// Disability-as-wages items: disability routing to line1a
-function disabilityWagesItems(items: R1099Items): R1099Items {
+// Disability pensions before minimum retirement age: Form 1040 line 1h.
+export function disabilityWagesItems(items: R1099Items): R1099Items {
   return items.filter(
     (item) =>
       item.disability_flag === true && item.disability_as_wages === true,
@@ -1454,7 +1482,7 @@ function pensionF1040Fields(
   qcdAnnualLimit: number,
   psoExclusionLimit: number,
 ): Record<string, number> {
-  // Exclude disability-as-wages items from pension lines (they go to line1a)
+  // Exclude disability-as-wages items from pension lines (they go to line 1h)
   const disWagesSet = new Set(disabilityWagesItems(activeItems(items)));
   const active = pensionItems(activeItems(items)).filter((item) =>
     !disWagesSet.has(item)
@@ -1474,21 +1502,18 @@ function pensionF1040Fields(
   return fields;
 }
 
-// Build f1040 line1a output for disability-as-wages items
-function disabilityWagesF1040Fields(
+// Instructions for Form 1040 (2025), line 1h (page 25): disability pensions
+// shown on Form 1099-R before the employer's minimum retirement age.
+export function disabilityPensionEarnedIncome(
   items: R1099Items,
   qcdAnnualLimit: number,
   psoExclusionLimit: number,
-): Record<string, number> {
-  const disItems = disabilityWagesItems(activeItems(items));
-  if (disItems.length === 0) return {};
-  const total = disItems.reduce(
+): number {
+  return disabilityWagesItems(activeItems(items)).reduce(
     (sum, item) =>
       sum + effectiveTaxableAmount(item, qcdAnnualLimit, psoExclusionLimit),
     0,
   );
-  if (total <= 0) return {};
-  return { line1a_wages: total };
 }
 
 function correctivePlanF1040Fields(items: R1099Items): Record<string, number> {
@@ -2045,6 +2070,8 @@ class F1099rNode extends TaxNode<typeof inputSchema> {
   readonly outputNodes = new OutputNodes([
     f1040,
     agi_aggregator,
+    eitc,
+    f8812,
     form5329,
     form4972Elections,
     form8606,
@@ -2080,7 +2107,7 @@ class F1099rNode extends TaxNode<typeof inputSchema> {
 
     // Cross-field validation
     for (const item of r1099s) {
-      validateItem(item);
+      validateItem(item, ctx.taxYear);
     }
     const corrective = correctivePlanItems(r1099s);
     const stateLocalWithholding = activeItems(r1099s).reduce(
@@ -2098,7 +2125,7 @@ class F1099rNode extends TaxNode<typeof inputSchema> {
         "TY2025 corrective plan distributions need distinct Form 1099-R source references",
       );
     }
-    assertIraRolloverEvidence(r1099s);
+    assertIraRolloverEvidence(r1099s, ctx.taxYear);
 
     const outputs: NodeOutput[] = [
       ...(stateLocalWithholding > 0
@@ -2122,13 +2149,17 @@ class F1099rNode extends TaxNode<typeof inputSchema> {
       cfg.qcdAnnualLimit,
       cfg.psoExclusionLimit,
     );
-    // Disability-as-wages fields
-    const disWagesFields = disabilityWagesF1040Fields(
-      r1099s,
-      cfg.qcdAnnualLimit,
-      cfg.psoExclusionLimit,
+    const disabilityPension = Math.max(
+      0,
+      disabilityPensionEarnedIncome(
+        r1099s,
+        cfg.qcdAnnualLimit,
+        cfg.psoExclusionLimit,
+      ),
     );
     const correctiveFields = correctivePlanF1040Fields(r1099s);
+    const line1h = disabilityPension +
+      (correctiveFields.line1h_other_earned ?? 0);
     // Withholding fields
     const withholdingFields = withholdingF1040Fields(r1099s);
 
@@ -2136,8 +2167,7 @@ class F1099rNode extends TaxNode<typeof inputSchema> {
     const f1040Fields: Partial<z.infer<typeof f1040["inputSchema"]>> = {
       ...iraFields,
       ...pensionFields,
-      ...disWagesFields,
-      ...correctiveFields,
+      ...(line1h > 0 ? { line1h_other_earned: line1h } : {}),
       ...withholdingFields,
     };
     if (r1099s.some(isPensionDirectRollover)) {
@@ -2158,7 +2188,6 @@ class F1099rNode extends TaxNode<typeof inputSchema> {
     // Route IRA/pension taxable amounts to AGI aggregator.
     // Only emit line4b_ira_taxable when > 0 to avoid accumulation conflicts with form8606,
     // which emits its own line4b_ira_taxable to agi_aggregator for items with prior_ira_basis.
-    // Also route disability-as-wages (line1a_wages) so AGI is computed correctly.
     const agiFields: Partial<z.infer<typeof agi_aggregator["inputSchema"]>> =
       {};
     if ((iraFields.line4b_ira_taxable ?? 0) > 0) {
@@ -2167,11 +2196,18 @@ class F1099rNode extends TaxNode<typeof inputSchema> {
     if (pensionFields.line5b_pension_taxable !== undefined) {
       agiFields.line5b_pension_taxable = pensionFields.line5b_pension_taxable;
     }
-    if ((disWagesFields.line1a_wages ?? 0) > 0) {
-      agiFields.line1a_wages = disWagesFields.line1a_wages;
-    }
-    if ((correctiveFields.line1h_other_earned ?? 0) > 0) {
-      agiFields.line1h_other_earned = correctiveFields.line1h_other_earned;
+    if (line1h > 0) agiFields.line1h_other_earned = line1h;
+    // Pub. 596 (2025) Rule 7, Disability Benefits: employer disability
+    // retirement benefits are earned income until minimum retirement age.
+    // 2025 Schedule 8812 instructions, Earned Income Chart — Line 18a: earned
+    // income starts from Form 1040 line 1z, which includes line 1h.
+    if (disabilityPension > 0) {
+      outputs.push(this.outputNodes.output(eitc, {
+        disability_pension_earned_income: disabilityPension,
+      }));
+      outputs.push(this.outputNodes.output(f8812, {
+        auto_disability_pension_earned_income: disabilityPension,
+      }));
     }
     if (Object.keys(agiFields).length > 0) {
       outputs.push(

@@ -1,3 +1,5 @@
+import * as fs from "node:fs/promises";
+import * as sys from "../support/sys.ts";
 import { z } from "zod";
 
 const ownerSchema = z.object({
@@ -11,17 +13,11 @@ export async function acquireFullRunLock(
   path: string,
   owner: Owner,
 ): Promise<void> {
-  const file = await Deno.open(path, {
-    write: true,
-    createNew: true,
-    mode: 0o600,
-  });
+  const file = await fs.open(path, "wx", 0o600);
   try {
-    await file.write(
-      new TextEncoder().encode(JSON.stringify(ownerSchema.parse(owner))),
-    );
+    await file.writeFile(JSON.stringify(ownerSchema.parse(owner)));
   } finally {
-    file.close();
+    await file.close();
   }
 }
 
@@ -29,10 +25,12 @@ export async function releaseFullRunLock(
   path: string,
   owner: Owner,
 ): Promise<void> {
-  const recorded = ownerSchema.parse(JSON.parse(await Deno.readTextFile(path)));
+  const recorded = ownerSchema.parse(
+    JSON.parse(await fs.readFile(path, "utf8")),
+  );
   if (
     recorded.pid !== owner.pid || recorded.evidence !== owner.evidence ||
     recorded.startedAt !== owner.startedAt
   ) throw new Error("Full-run lock ownership changed");
-  await Deno.remove(path);
+  await sys.remove(path);
 }

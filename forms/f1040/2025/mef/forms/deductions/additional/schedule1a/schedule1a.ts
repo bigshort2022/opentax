@@ -31,6 +31,7 @@ import {
   physicalPresenceFilingSchema,
 } from "../../../../../../nodes/intermediate/forms/income/foreign/form2555/calculation.ts";
 import type { MefBuildContext, MefFormDescriptor } from "../../../../form-descriptor.ts";
+import { mefTaxYear } from "../../../../support/year-config.ts";
 
 const form1040ReconciliationSchema = z.object({
   filing_status: z.nativeEnum(FilingStatus).optional(),
@@ -59,8 +60,11 @@ function buildSchedule(raw: Input, context?: MefBuildContext): string {
     throw new Error("Schedule 1-A Part I reviews cannot conflict");
   }
   if (!input.senior_zero_exclusions_review && !positive2555) {
-    const hasDeductionSource = input.taxpayer_age_65_or_older === true ||
-      input.spouse_age_65_or_older === true ||
+    // A married-filing-separately filer has no senior deduction to source.
+    const seniorSource = input.filing_status !== FilingStatus.MFS &&
+      (input.taxpayer_age_65_or_older === true ||
+        input.spouse_age_65_or_older === true);
+    const hasDeductionSource = seniorSource ||
       (input.qualified_employee_tips?.length ?? 0) > 0 ||
       (input.qualified_form4137_tips?.length ?? 0) > 0 ||
       (input.form4070_reports?.length ?? 0) > 0 ||
@@ -109,7 +113,7 @@ function buildSchedule(raw: Input, context?: MefBuildContext): string {
       .passthrough().parse(context?.pending?.form2555);
     const lines = calculatePhysicalPresence2555(
       pending2555.filing_details,
-      2025,
+      mefTaxYear(context),
     );
     if (
       lines.qualifyingDays !== 365 || lines.line45 <= 0 ||
@@ -144,7 +148,7 @@ function buildSchedule(raw: Input, context?: MefBuildContext): string {
     (input.qualified_trade_business_tips?.length ?? 0) > 0
   ) {
     const lines = calculateQualifiedTipsSchedule1A(
-      { taxYear: 2025, formType: "f1040" },
+      { taxYear: mefTaxYear(context), formType: "f1040" },
       input,
     );
     const entries = input.qualified_employee_tips ?? [];
@@ -496,7 +500,7 @@ function buildSchedule(raw: Input, context?: MefBuildContext): string {
         );
       }
       const businessOutput = scheduleC.compute(
-        { taxYear: 2025, formType: "f1040" },
+        { taxYear: mefTaxYear(context), formType: "f1040" },
         context?.pending?.schedule_c as Parameters<typeof scheduleC.compute>[1],
       ).outputs.find((item) => item.nodeType === "schedule1a");
       const businessRows = businessOutput?.fields
@@ -504,7 +508,7 @@ function buildSchedule(raw: Input, context?: MefBuildContext): string {
       const farmOutput = context?.pending?.schedule_f === undefined
         ? undefined
         : scheduleF.compute(
-          { taxYear: 2025, formType: "f1040" },
+          { taxYear: mefTaxYear(context), formType: "f1040" },
           context.pending.schedule_f as Parameters<typeof scheduleF.compute>[1],
         ).outputs.find((item) => item.nodeType === "schedule1a");
       if (
@@ -544,14 +548,18 @@ function buildSchedule(raw: Input, context?: MefBuildContext): string {
         form7206.build(actualHealth!, {
           pending: actualPending,
           filer: context?.filer ?? extractFilerIdentity(actualPending.f1040),
+          taxYear: mefTaxYear(context),
         });
         healthDeduction = calculateSingleScheduleCForm7206(
           input.qualified_tips_health_plan_source,
         ).line14;
       } else if (input.qualified_tips_health_plans_source) {
         healthDeduction =
-          assertIndependentOwnerHealthSource(actualPending, context?.filer)
-            .deduction;
+          assertIndependentOwnerHealthSource(
+            actualPending,
+            mefTaxYear(context),
+            context?.filer,
+          ).deduction;
       }
       const line15 = scheduleOne.line15_se_deduction ?? 0;
       const owned = input.qualified_tips_owner_se_source === undefined
@@ -559,6 +567,7 @@ function buildSchedule(raw: Input, context?: MefBuildContext): string {
         : context?.pending
         ? assertOwnedScheduleSE(
           normalizeAllPending(context.pending as Record<string, unknown>),
+          mefTaxYear(context),
         )
         : undefined;
       if (
@@ -633,7 +642,7 @@ function buildSchedule(raw: Input, context?: MefBuildContext): string {
   }
   if ((input.qualified_w2_overtime?.length ?? 0) > 0) {
     const lines = calculateW2OvertimeSchedule1A(
-      { taxYear: 2025, formType: "f1040" },
+      { taxYear: mefTaxYear(context), formType: "f1040" },
       input,
     );
     const statementEntries = input.qualified_w2_overtime!.filter((entry) =>
@@ -822,7 +831,7 @@ function buildSchedule(raw: Input, context?: MefBuildContext): string {
   }
   if ((input.vehicle_loans?.length ?? 0) > 0) {
     const lines = calculateVehicleInterestSchedule1A(
-      { taxYear: 2025, formType: "f1040" },
+      { taxYear: mefTaxYear(context), formType: "f1040" },
       input,
     );
     const returnSsns = [form1040.taxpayer_ssn];
@@ -872,12 +881,19 @@ function buildSchedule(raw: Input, context?: MefBuildContext): string {
       element("QualifiedCarLoanInterestDedAmt", lines.line30_vehicle_interest),
     );
   }
-  if (seniorDeduction({ taxYear: 2025, formType: "f1040" }, input) > 0) {
-    const lines = calculateSeniorOnlySchedule1A(
-      { taxYear: 2025, formType: "f1040" },
+  const seniorContext = {
+    taxYear: mefTaxYear(context),
+    formType: "f1040",
+  };
+  if (seniorDeduction(seniorContext, input) > 0) {
+    const lines = calculateSeniorOnlySchedule1A(seniorContext, input);
+    assertSchedule1ASeniorGeneralSource(
+      context?.pending?.general,
       input,
+      lines.line36a_taxpayer,
+      lines.line36b_spouse,
+      seniorContext.taxYear,
     );
-    assertSchedule1ASeniorGeneralSource(context?.pending?.general, input, lines.line36a_taxpayer, lines.line36b_spouse);
     const matchesPerson = (
       claimed: number,
       sourceSsn: string | undefined,

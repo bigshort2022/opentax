@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import {
   deriveLocalReadiness,
@@ -15,7 +16,7 @@ const passes = () =>
     diagnosticCodes: [],
   }));
 
-Deno.test("local readiness requires every mandatory gate exactly once", () => {
+test("local readiness requires every mandatory gate exactly once", () => {
   assertEquals(deriveLocalReadiness(passes()), {
     status: LocalReadiness.Ready,
     canFile: true,
@@ -36,7 +37,7 @@ Deno.test("local readiness requires every mandatory gate exactly once", () => {
   });
 });
 
-Deno.test("every mandatory non-pass prevents local readiness", () => {
+test("every mandatory non-pass prevents local readiness", () => {
   for (const id of Object.values(GateId)) {
     for (const status of Object.values(GateStatus)) {
       if (status === GateStatus.Passed) continue;
@@ -58,7 +59,7 @@ Deno.test("every mandatory non-pass prevents local readiness", () => {
   }
 });
 
-Deno.test("known failures remain blocking alongside unavailable checks", () => {
+test("known failures remain blocking alongside unavailable checks", () => {
   const result = deriveLocalReadiness(
     passes().map((gate) => ({
       ...gate,
@@ -71,7 +72,7 @@ Deno.test("known failures remain blocking alongside unavailable checks", () => {
   assertEquals(result.canFile, false);
 });
 
-Deno.test("duplicate gates cannot replace missing checks", () => {
+test("duplicate gates cannot replace missing checks", () => {
   const gates = passes();
   assertThrows(() => deriveLocalReadiness([...gates, gates[0]]), TypeError);
   assertThrows(
@@ -80,7 +81,7 @@ Deno.test("duplicate gates cannot replace missing checks", () => {
   );
 });
 
-Deno.test("serialized gates reject unknown IDs statuses and properties", () => {
+test("serialized gates reject unknown IDs statuses and properties", () => {
   const gate = passes()[0];
   assertThrows(() => gateResultSchema.parse({ ...gate, id: "custom_bypass" }));
   assertThrows(() =>
@@ -90,7 +91,7 @@ Deno.test("serialized gates reject unknown IDs statuses and properties", () => {
   assertThrows(() => gateResultSchema.parse({ ...gate, bypass: true }));
 });
 
-Deno.test("serialized readiness cannot contradict its filing boolean or missing gates", () => {
+test("serialized readiness cannot contradict its filing boolean or missing gates", () => {
   assertThrows(() =>
     readinessResultSchema.parse({
       status: LocalReadiness.Ready,

@@ -1,17 +1,19 @@
-import { assertEquals, assertThrows } from "@std/assert";
+import { test } from "bun:test";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
+import { assertThrows } from "@std/assert";
 import { buildMefXml } from "../../../builder.ts";
 import { buildPending } from "../../../execution/pending.ts";
 import { type FilerIdentity, FilingStatus } from "../../../types.ts";
 import { FilingStatus as NodeFilingStatus } from "../../../../../nodes/types.ts";
 
 const XSD_PATH = new URL(
-  "../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+  "../../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
   import.meta.url,
 ).pathname;
 
 let xsdAvailable = false;
 try {
-  Deno.statSync(XSD_PATH);
+  sys.statSync(XSD_PATH);
   xsdAvailable = true;
 } catch {
   // The IRS schema bundle is local-only.
@@ -143,27 +145,7 @@ const aocStudent = {
   },
 };
 
-async function validateXsd(xml: string): Promise<void> {
-  const tmpPath = await Deno.makeTempFile({ suffix: ".xml" });
-  try {
-    await Deno.writeTextFile(tmpPath, xml);
-    const output = await new Deno.Command("xmllint", {
-      args: ["--noout", "--schema", XSD_PATH, tmpPath],
-      stdout: "piped",
-      stderr: "piped",
-    }).output();
-    assertEquals(output.code, 0, new TextDecoder().decode(output.stderr));
-  } finally {
-    await Deno.remove(tmpPath);
-  }
-}
-
-Deno.test({
-  name: "XSD fixture: CTC and AOTC notice assertions cannot authorize filing",
-  sanitizeOps: false,
-  sanitizeResources: false,
-  ignore: !xsdAvailable,
-}, () => {
+test.skipIf(!xsdAvailable)("XSD fixture: CTC and AOTC notice assertions cannot authorize filing", () => {
   assertThrows(
     () =>
       buildMefXml(
@@ -259,11 +241,11 @@ Deno.test({
         filer,
       ),
     Error,
-    "executor-owned authentication of prior IRS notice issuance and contents",
+    "retained prior IRS notice copy with matching SHA-256",
   );
 });
 
-Deno.test("Form 8862 childless EITC return remains blocked before XSD", () => {
+test("Form 8862 childless EITC return remains blocked before XSD", () => {
   assertThrows(
     () =>
       buildMefXml(
@@ -301,11 +283,11 @@ Deno.test("Form 8862 childless EITC return remains blocked before XSD", () => {
         filer,
       ),
     Error,
-    "executor-owned authentication of prior IRS notice issuance and contents",
+    "retained prior IRS notice copy with matching SHA-256",
   );
 });
 
-Deno.test("Form 8862 income-only EITC return remains blocked before XSD", () => {
+test("Form 8862 income-only EITC return remains blocked before XSD", () => {
   assertThrows(
     () =>
       buildMefXml(
@@ -335,6 +317,6 @@ Deno.test("Form 8862 income-only EITC return remains blocked before XSD", () => 
         filer,
       ),
     Error,
-    "executor-owned authentication of prior IRS notice issuance and contents",
+    "retained prior IRS notice copy with matching SHA-256",
   );
 });

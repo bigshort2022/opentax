@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import { ct2, itemSchema } from "./index.ts";
 import { fieldsOf } from "../../../../../../../core/test-utils/output.ts";
@@ -23,7 +24,7 @@ function compute(items: Item[]) {
   return ct2.compute({ taxYear: 2025, formType: "f1040" }, { ct2s: items });
 }
 
-Deno.test("CT-2 four quarters feed Form 8959 RRTA compensation and tax paid", () => {
+test("CT-2 four quarters feed Form 8959 RRTA compensation and tax paid", () => {
   const result = compute([
     quarter(1),
     quarter(2),
@@ -42,7 +43,7 @@ Deno.test("CT-2 four quarters feed Form 8959 RRTA compensation and tax paid", ()
   );
 });
 
-Deno.test("spouse CT-2 records carry a joint-return validation fact", () => {
+test("spouse CT-2 records carry a joint-return validation fact", () => {
   const result = compute([
     quarter(1, { recipient: "spouse", recipient_ssn: "987-65-4321" }),
     quarter(2, { recipient: "spouse", recipient_ssn: "987-65-4321" }),
@@ -62,7 +63,7 @@ Deno.test("spouse CT-2 records carry a joint-return validation fact", () => {
   );
 });
 
-Deno.test("taxpayer and spouse CT-2 quarters remain distinct before annual totals", () => {
+test("taxpayer and spouse CT-2 quarters remain distinct before annual totals", () => {
   const result = compute([
     quarter(1),
     quarter(2),
@@ -84,7 +85,7 @@ Deno.test("taxpayer and spouse CT-2 quarters remain distinct before annual total
   );
 });
 
-Deno.test("CT-2 rejects different SSNs across one recipient's quarters", () => {
+test("CT-2 rejects different SSNs across one recipient's quarters", () => {
   assertThrows(
     () =>
       compute([
@@ -98,7 +99,7 @@ Deno.test("CT-2 rejects different SSNs across one recipient's quarters", () => {
   );
 });
 
-Deno.test("CT-2 rejects omitted or duplicated quarterly records", () => {
+test("CT-2 rejects omitted or duplicated quarterly records", () => {
   assertThrows(() => compute([quarter(1), quarter(2), quarter(3)]), Error);
   assertThrows(
     () => compute([quarter(1), quarter(2), quarter(3), quarter(3)]),
@@ -106,7 +107,7 @@ Deno.test("CT-2 rejects omitted or duplicated quarterly records", () => {
   );
 });
 
-Deno.test("CT-2 rejects line 3 compensation that misses the annual threshold", () => {
+test("CT-2 rejects line 3 compensation that misses the annual threshold", () => {
   assertThrows(
     () =>
       compute([
@@ -120,7 +121,7 @@ Deno.test("CT-2 rejects line 3 compensation that misses the annual threshold", (
   );
 });
 
-Deno.test("CT-2 line 3 credit needs a payment reference and full tax payment", () => {
+test("CT-2 line 3 credit needs a payment reference and full tax payment", () => {
   const base = [quarter(1), quarter(2), quarter(3)];
   const fourth = {
     line2_tier1_medicare_compensation: 70_000,
@@ -171,5 +172,31 @@ Deno.test("CT-2 line 3 credit needs a payment reference and full tax payment", (
   assertEquals(
     fieldsOf(unpaid.outputs, form8959)?.ct2_rrta_medicare_tax_paid,
     0,
+  );
+});
+
+// Draft 2026 Instructions for Form 8959: the $200,000 withholding threshold
+// isn't indexed, so 2026 quarters reconcile as in 2025.
+test("2026 CT-2 quarters feed Form 8959 and must be dated 2026", () => {
+  const items = [1, 2, 3].map((q) => quarter(q, { tax_year: 2026 })).concat(
+    quarter(4, {
+      tax_year: 2026,
+      line2_tier1_medicare_compensation: 70_000,
+      line3_additional_medicare_compensation: 20_000,
+      line3_additional_medicare_tax_paid: 180,
+      payment_reference: "EFTPS-Q4-2026-001",
+    }),
+  );
+  const result = ct2.compute({ taxYear: 2026, formType: "f1040" }, {
+    ct2s: items,
+  });
+  assertEquals(fieldsOf(result.outputs, form8959)?.ct2_rrta_wages, 220_000);
+  assertThrows(
+    () =>
+      ct2.compute({ taxYear: 2026, formType: "f1040" }, {
+        ct2s: [1, 2, 3, 4].map((q) => quarter(q)),
+      }),
+    Error,
+    "tax year 2026",
   );
 });

@@ -14,9 +14,10 @@ import { eitc } from "./credits/earned-income/eitc.ts";
 import { cccLoanStatement } from "./income/business/ccc_loan_statement.ts";
 import { cccLoanAccrualStatement } from "./income/business/ccc_loan_accrual_statement.ts";
 import { cropInsuranceDeferralStatement } from "./income/business/crop_insurance_deferral_statement.ts";
-import { jointOccupancyStatement } from "./general/return-assembly/joint_occupancy_statement.ts";
+import { jointOccupancyStatement } from "./general/filing/joint_occupancy_statement.ts";
 import { irs1040 } from "./general/return-assembly/f1040.ts";
 import { iraDistributionStatement } from "./income/retirement/ira_distribution_statement.ts";
+import { nonW2DisabilityPaymentStatement } from "./income/retirement/non_w2_disability_payment_statement.ts";
 import { f1099r } from "./income/retirement/f1099r.ts";
 import { form1116 } from "./credits/foreign/f1116/f1116.ts";
 import { form2106 } from "./adjustments/employment/f2106.ts";
@@ -125,7 +126,8 @@ import { form8978 } from "./taxes/passthrough/f8978.ts";
 import { form8978ScheduleA } from "./taxes/passthrough/f8978_schedule_a.ts";
 import { form8994 } from "./credits/business/f8994.ts";
 import { anyOtherTaxesStatement } from "./taxes/other/any_other_taxes_statement.ts";
-import { schedule1OtherIncomeStatement } from "./income/other/schedule1/schedule1_other_income_statement.ts";
+import { otherWithholdingStatement } from "./payments/withholding/other_withholding_statement.ts";
+import { schedule1OtherIncomeStatement } from "./general/return-assembly/schedule1/schedule1_other_income_statement.ts";
 import { scheduleAOtherTaxStatement } from "./deductions/itemized/schedule_a_other_tax_statement.ts";
 import { scheduleALine8bSellerStatement } from "./deductions/itemized/schedule_a_line8b_seller_statement.ts";
 import { scheduleALine16EstateStatement } from "./deductions/itemized/schedule_a_line16_estate_statement.ts";
@@ -138,7 +140,7 @@ import { form8995aScheduleA } from "./deductions/business/f8995a/f8995a_schedule
 import { form8995aScheduleB } from "./deductions/business/f8995a/f8995a_schedule_b.ts";
 import { form8995aScheduleC } from "./deductions/business/f8995a/f8995a_schedule_c.ts";
 import { form8995aScheduleD } from "./deductions/business/f8995a/f8995a_schedule_d.ts";
-import { form9000 } from "./general/return-assembly/f9000.ts";
+import { form9000 } from "./general/filing/f9000.ts";
 import { form982 } from "./income/other/f982.ts";
 import { schedule1 } from "./general/return-assembly/schedule1/schedule1.ts";
 import { schedule1a } from "./deductions/additional/schedule1a/schedule1a.ts";
@@ -153,11 +155,11 @@ import { scheduleE } from "./income/rental-passthrough/schedule_e.ts";
 import { scheduleF } from "./income/business/schedule_f.ts";
 import { scheduleH } from "./taxes/household-employment/schedule_h.ts";
 import { scheduleJ } from "./taxes/income-averaging/schedule_j.ts";
-import { scheduleLep } from "./general/return-assembly/schedule_lep.ts";
-import { scheduleR } from "./credits/individual/schedule_r.ts";
+import { scheduleLep } from "./general/filing/schedule_lep.ts";
+import { scheduleR } from "./credits/elderly-disabled/schedule_r.ts";
 import { scheduleSE } from "./taxes/self-employment/schedule_se.ts";
-import { w2 } from "./income/other/w2.ts";
-import { w2g } from "./income/other/w2g.ts";
+import { w2 } from "./income/wages/w2.ts";
+import { w2g } from "./income/gambling/w2g.ts";
 import {
   fecRecord,
   wagesNotShownSchedule,
@@ -372,10 +374,14 @@ export const ALL_MEF_FORMS = [
   scheduleALine8bSellerStatement,
   // Form 1040 line 4c IRA statement precedes other income statements.
   iraDistributionStatement,
+  // Form 1040 line 1h disability statement follows the IRA statement.
+  nonW2DisabilityPaymentStatement,
   // Schedule 1 line 8z statement precedes the Schedule 2 line 17z statement.
   schedule1OtherIncomeStatement,
   // Schedule 2 line 17z statement precedes WagesNotShownSchedule in ReturnData.
   anyOtherTaxesStatement,
+  // Form 1040 line 25b statement precedes WagesNotShownSchedule in ReturnData.
+  otherWithholdingStatement,
   wagesNotShownSchedule,
   scheduleAOtherTaxStatement,
   scheduleALine16EstateStatement,

@@ -10,6 +10,13 @@ on:
         description: "Build only, skip release creation"
         type: boolean
         default: true
+      version:
+        description: "Tag to create on the dispatched commit, e.g. v2.2.0-ca540.1 (needs dry_run off)"
+        type: string
+        default: ""
+
+env:
+  RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.version }}
 
 permissions:
   contents: write
@@ -19,19 +26,19 @@ jobs:
     strategy:
       matrix:
         include:
-          - target: x86_64-unknown-linux-gnu
+          - target: bun-linux-x64-baseline
             os: ubuntu-latest
             asset: opentax-linux-x64
-          - target: aarch64-unknown-linux-gnu
+          - target: bun-linux-arm64
             os: ubuntu-24.04-arm
             asset: opentax-linux-arm64
-          - target: x86_64-apple-darwin
+          - target: bun-darwin-x64-baseline
             os: macos-15-intel
             asset: opentax-macos-x64
-          - target: aarch64-apple-darwin
+          - target: bun-darwin-arm64
             os: macos-15
             asset: opentax-macos-arm64
-          - target: x86_64-pc-windows-msvc
+          - target: bun-windows-x64-baseline
             os: windows-latest
             asset: opentax-windows-x64.exe
 
@@ -40,15 +47,20 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: denoland/setup-deno@v2
+      - uses: oven-sh/setup-bun@v2
         with:
-          deno-version: v2.x
+          bun-version: 1.4.2
+
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
 
       - name: Set version
         shell: bash
         run: |
-          if [[ "$GITHUB_REF_NAME" == v* ]]; then
-            VERSION="${GITHUB_REF_NAME#v}"
+          if [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
+            VERSION="${RELEASE_TAG#v}"
+          elif [[ -n "$RELEASE_TAG" ]]; then
+            echo "Invalid version: $RELEASE_TAG"; exit 1
           else
             VERSION="0.0.0-dev"
           fi
@@ -60,32 +72,40 @@ jobs:
 
       - name: Compile
         run: >
-          deno compile
-          --allow-read --allow-write --allow-net --allow-env
-          --target ${{ matrix.target }}
-          --output ${{ matrix.asset }}
-          cli/main.ts
+          bun build cli/main.ts --compile
+          --target=${{ matrix.target }}
+          --outfile ${{ matrix.asset }}
 
       - name: Smoke compiled asset
         run: >
-          deno run --allow-read --allow-write --allow-run --allow-net=www.irs.gov
-          scripts/release/smoke-release-binary.ts
+          bun scripts/release/smoke-release-binary.ts
           ./${{ matrix.asset }} ${{ env.OPENTAX_RELEASE_VERSION }}
+          smoke-${{ matrix.asset }}.json
+
+      - name: Upload smoke transcript
+        uses: actions/upload-artifact@v6
+        with:
+          name: smoke-transcript-${{ matrix.asset }}
+          path: smoke-${{ matrix.asset }}.json
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.asset }}
           path: ${{ matrix.asset }}
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v') && (github.event_name != 'workflow_dispatch' || inputs.dry_run == false)
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') && (github.event_name != 'workflow_dispatch' || inputs.dry_run == false)
+      || github.event_name == 'workflow_dispatch' && inputs.dry_run == false && inputs.version != ''
+        && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
+          pattern: opentax-*
           merge-multiple: true
 
       - name: Verify assets and write checksums
@@ -98,9 +118,20 @@ jobs:
           sha256sum "${expected[@]}" > SHA256SUMS
           sha256sum --check SHA256SUMS
 
+      - name: Refuse an existing tag
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/${{ github.repository }}/git/ref/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "Tag ${RELEASE_TAG} already exists"; exit 1
+          fi
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          target_commitish: ${{ github.sha }}
           files: artifacts/*
           generate_release_notes: true
-          prerelease: ${{ contains(github.ref_name, '-checkpoint.') }}
+          prerelease: ${{ contains(env.RELEASE_TAG, '-') }}

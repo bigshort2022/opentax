@@ -1,4 +1,6 @@
-// deno-lint-ignore-file no-explicit-any
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { assert, assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { PDFDocument } from "pdf-lib";
 import { createHash } from "node:crypto";
@@ -10,10 +12,10 @@ import { normalizeAllPending } from "../../../../return-processing/pending.ts";
 import { assertScheduleJSourceReturn } from "./schedule_j_source_return.ts";
 import { calculateMixedFishingQbi } from "../../../../../nodes/intermediate/forms/deductions/business/form8995a/mixed-fishing.ts";
 
-const evidenceDir = Deno.env.get("SCHEDULE_J_JOINT_ZERO_EVIDENCE_DIR") ??
+const evidenceDir = process.env.SCHEDULE_J_JOINT_ZERO_EVIDENCE_DIR ??
   ".state/research/schedulej-joint-zero-oct6/packets";
-const xsd = Deno.env.get("SCHEDULE_J_JOINT_XSD_PATH") ??
-  ".state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd";
+const xsd = process.env.SCHEDULE_J_JOINT_XSD_PATH ??
+  "irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd";
 
 async function packet(id: string, input: Record<string, unknown>) {
   const result = f1040_2025.executeReturn(input);
@@ -30,18 +32,18 @@ async function packet(id: string, input: Record<string, unknown>) {
     origins,
   );
   const dir = `${evidenceDir}/${id}`;
-  await Deno.mkdir(dir, { recursive: true });
-  await Deno.writeTextFile(
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(
     `${dir}/source-pending.json`,
     JSON.stringify({ input, pending }, null, 2),
   );
-  await Deno.writeTextFile(`${dir}/return.xml`, prepared.bundle.xml);
-  await Deno.writeFile(`${dir}/return.pdf`, pdf);
-  await Deno.writeTextFile(
+  await fs.writeFile(`${dir}/return.xml`, prepared.bundle.xml);
+  await fs.writeFile(`${dir}/return.pdf`, pdf);
+  await fs.writeFile(
     `${dir}/origins.json`,
     JSON.stringify(origins, null, 2),
   );
-  const validation = await new Deno.Command("xmllint", {
+  const validation = await new sys.Command("xmllint", {
     args: ["--noout", "--schema", xsd, `${dir}/return.xml`],
     stderr: "piped",
   }).output();
@@ -50,7 +52,7 @@ async function packet(id: string, input: Record<string, unknown>) {
   return { result, pending, origins, xml: prepared.bundle.xml };
 }
 
-Deno.test("joint C/F above full MFJ QBI phase-out retains two zero-limited 8995-A rows", async () => {
+test("joint C/F above full MFJ QBI phase-out retains two zero-limited 8995-A rows", async () => {
   for (const fishingOwner of ["S", "T"] as const) {
     const input = scheduleJJointFishingZeroLimitInputs(fishingOwner);
     const noJInput: any = structuredClone(input);
@@ -58,7 +60,7 @@ Deno.test("joint C/F above full MFJ QBI phase-out retains two zero-limited 8995-
     const noJ = await packet(`zero-${fishingOwner}-without-j`, noJInput);
     const elected = await packet(`zero-${fishingOwner}`, input);
     const p = elected.pending;
-    const q = calculateMixedFishingQbi(p.form8995a);
+    const q = calculateMixedFishingQbi(p.form8995a, 2025);
     assertScheduleJSourceReturn(elected.result.pending);
     assertEquals(q.profits, [200_000, 400_000]);
     assertEquals(q.allocations, [13_596, 16_275]);
@@ -83,7 +85,7 @@ Deno.test("joint C/F above full MFJ QBI phase-out retains two zero-limited 8995-
   }
 });
 
-Deno.test("full-phase-out QBI requires byte-bound complete owner-specific zero-limit books", async () => {
+test("full-phase-out QBI requires byte-bound complete owner-specific zero-limit books", async () => {
   const good: any = scheduleJJointFishingZeroLimitInputs();
   const missing = structuredClone(good);
   delete missing.schedule_c[0].qbi_zero_limit_inventory;

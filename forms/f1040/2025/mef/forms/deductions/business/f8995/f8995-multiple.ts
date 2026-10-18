@@ -1,3 +1,4 @@
+import { roundWholeDollars } from "../../../../../../whole-dollars.ts";
 import {
   assertMultiBusinessInvestmentSources,
   assertMultiBusinessInvestmentTax,
@@ -6,6 +7,7 @@ import { normalizeAllPending } from "../../../../../return-processing/pending.ts
 import {
   inputSchema as cSchema,
   projectScheduleCItems,
+  scheduleCSchedule1Line3,
 } from "../../../../../../nodes/inputs/income/business/schedule_c/model.ts";
 import { reviewedMultipleScheduleCQbi } from "../../../../../../nodes/inputs/income/business/schedule_c/qbi-multiple.ts";
 import { inputSchema as qbiSchema } from "../../../../../../nodes/intermediate/forms/deductions/business/form8995/index.ts";
@@ -19,7 +21,10 @@ import type { Filed8995 } from "./f8995-route.ts";
 export function assertMultipleScheduleC8995(
   fields: Record<string, unknown>,
   rawPending: Readonly<Record<string, unknown>> | undefined,
+  taxYear: number,
 ): Filed8995 {
+  const cfg = CONFIG_BY_YEAR[taxYear];
+  if (!cfg) throw new Error(`No f1040 config for year ${taxYear}`);
   if (!rawPending) {
     throw new Error(
       "Multiple Schedule C Form 8995 needs its complete return source",
@@ -27,7 +32,7 @@ export function assertMultipleScheduleC8995(
   }
   const pending = normalizeAllPending(rawPending as Record<string, unknown>);
   const parsed = qbiSchema.parse(fields);
-  const investment = assertMultiBusinessInvestmentSources(parsed, pending);
+  const investment = assertMultiBusinessInvestmentSources(parsed, pending, taxYear);
   const c = cSchema.parse(pending.schedule_c);
   const items = projectScheduleCItems(c);
   const rows = parsed.multi_business_filing_rows;
@@ -48,15 +53,16 @@ export function assertMultipleScheduleC8995(
   const deduction = sum(parsed.se_tax_deduction);
   const amounts = reviewedMultipleScheduleCQbi(items, deduction);
   const profit = amounts.profits.reduce((sum, value) => sum + value, 0);
+  const schedule1Profit = scheduleCSchedule1Line3(amounts.profits);
   const seExpected = scheduleSELines({
     net_profit_schedule_c: profit,
     w2_ss_wages: ssWages,
-  }, CONFIG_BY_YEAR[2025].ssWageBase);
+  }, cfg.ssWageBase, cfg);
   const se = pending.schedule_se === undefined
     ? undefined
     : seSchema.parse(pending.schedule_se);
   const seActual = se
-    ? scheduleSELines(se, CONFIG_BY_YEAR[2025].ssWageBase)
+    ? scheduleSELines(se, cfg.ssWageBase, cfg)
     : undefined;
   const healthSource = pending.form7206?.schedule_c_source as {
     businesses?: Array<Record<string, unknown>>;
@@ -89,6 +95,13 @@ export function assertMultipleScheduleC8995(
     Math.abs(actual - expected) < 1e-8;
   const same = (a: unknown, b: unknown) =>
     JSON.stringify(a) === JSON.stringify(b);
+  const filedIncome = [
+    wages,
+    schedule1Profit,
+    investment.interest,
+    investment.ordinary,
+    investment.returnCapital,
+  ].reduce((sum, value) => sum + roundWholeDollars(value), 0);
   if (
     !rows || !retained || rows.length !== items.length ||
     retained.length !== items.length ||
@@ -144,8 +157,13 @@ export function assertMultipleScheduleC8995(
         number(se.w2_ss_wages) !== ssWages ||
         number(se.unreported_tips_4137) !== 0 ||
         number(se.wages_8919) !== 0)) ||
+    // Below the line 4c threshold Schedule SE holds only the Schedule C total.
     (!seExpected && se &&
-      Object.keys(se).some((key) => key !== "w2_ss_wages")) ||
+      (Object.keys(se).some((key) =>
+        key !== "w2_ss_wages" && key !== "net_profit_schedule_c"
+      ) ||
+        (se.net_profit_schedule_c !== undefined &&
+          se.net_profit_schedule_c !== profit))) ||
     !healthSource ||
     healthSource.unadjusted_source !==
       ((c.form8941_premium_reductions?.length ?? 0) === 0) ||
@@ -155,7 +173,8 @@ export function assertMultipleScheduleC8995(
       business.proprietor_recipient !== items[index].proprietor_recipient ||
       business.line31_net_profit !== amounts.profits[index]
     ) ||
-    !seSource || seSource.net_profit_schedule_c !== (seExpected ? profit : 0) ||
+    // Schedule SE receives the signed Schedule C total even below line 4c.
+    !seSource || seSource.net_profit_schedule_c !== profit ||
     number(seSource.net_profit_schedule_f) !== 0 ||
     seSource.farm_optional_method_elected !== false ||
     seSource.line13_deduction !== deduction ||
@@ -167,33 +186,29 @@ export function assertMultipleScheduleC8995(
         parsed.taxpayer_ssn!.replace(/\D/g, "") ||
       row.box13_statutory_employee === true
     ) ||
-    s1.line3_schedule_c !== profit ||
+    s1.line3_schedule_c !== schedule1Profit ||
     number(s1.line15_se_deduction) !== deduction ||
     number(s1.line16_sep_simple) !== 0 ||
     number(s1.line17_se_health_insurance) !== 0 ||
     number(pending.schedule2?.line4_se_tax) !== (seExpected?.line12 ?? 0) ||
     number(f1040.line1a_wages) !== wages ||
     number(f1040.line1z_total_wages) !== wages ||
-    f1040.line8_additional_income !== profit ||
-    !sameAmount(
-      f1040.line9_total_income,
-      wages + profit + investment.interest + investment.ordinary +
-        investment.returnCapital,
-    ) ||
+    f1040.line8_additional_income !== schedule1Profit ||
+    // Line 9 adds the whole-dollar income lines.
+    !sameAmount(f1040.line9_total_income, filedIncome) ||
     number(f1040.line10_adjustments) !== deduction ||
-    !sameAmount(
-      f1040.line11_agi,
-      wages + profit + investment.interest + investment.ordinary +
-        investment.returnCapital - deduction,
-    ) ||
+    !sameAmount(f1040.line11_agi, filedIncome - deduction) ||
     [
       "line13b_additional_deductions",
     ].some((key) => number(f1040[key]) !== 0) ||
     number(f1040.line2b_taxable_interest) !== investment.interest ||
     number(f1040.line3a_qualified_dividends) !== investment.qualified ||
     number(f1040.line3b_ordinary_dividends) !== investment.ordinary ||
+    // Schedule D sends line 7a distributions in whole dollars.
     number(f1040.line7a_cap_gain_distrib) !==
-      (pending.f1099b === undefined ? investment.capital : 0) ||
+      (pending.f1099b === undefined
+        ? roundWholeDollars(investment.capital)
+        : 0) ||
     number(f1040.line7_capital_gain) !==
       (pending.f1099b === undefined ? 0 : investment.returnCapital) ||
     typeof f1040.line12c_deduction_total !== "number"
@@ -208,7 +223,7 @@ export function assertMultipleScheduleC8995(
   const line11 = Math.round(
     Math.max(0, f1040.line11_agi - f1040.line12c_deduction_total),
   );
-  if (line11 > CONFIG_BY_YEAR[2025].qbiThresholdSingle) {
+  if (line11 > cfg.qbiThresholdSingle) {
     throw new Error(
       "Multiple Schedule C simplified QBI must remain below the Form 8995 threshold",
     );
@@ -248,7 +263,7 @@ export function assertMultipleScheduleC8995(
       "Multiple Schedule C Form 8995 signed rows, loss offset and filed lines differ from Form 1040",
     );
   }
-  assertMultiBusinessInvestmentTax(pending, investment);
+  assertMultiBusinessInvestmentTax(pending, investment, taxYear);
   return {
     businesses: rows.map((row) => ({
       businessName: row.business_name,

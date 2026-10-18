@@ -1,3 +1,5 @@
+import { test } from "bun:test";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { independentHealthFamily } from "../../../../pdf/reviews/adjustments/health/form7206-independent-owner.fixture.ts";
 import { assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { pdfReviewFixtures } from "../../../../pdf/review-fixtures.ts";
@@ -14,21 +16,21 @@ const fixtures = pdfReviewFixtures.filter((f) =>
   f.id.startsWith("owned-two-farm-health-")
 );
 const expected = [
-  [15600, 302729.86, 14546, 4800, 52033],
-  [88329, 230000.86, 0, 4800, 38233],
-  [10900, 307429.86, 15486, 4800, 52936],
-  [0, 318329.86, 17666, 4800, 55028],
-  [15600, 480053.37, 32337, 4800, 118927],
-  [15600, 995328.86, 119066, 183719, 85590],
-  [9600, 463252.37, 21189, 4800, 109884],
+  [15600, 302730, 14546, 4800, 52033],
+  [88329, 230001, 0, 4800, 38233],
+  [10900, 307430, 15486, 4800, 52936],
+  [0, 318330, 17666, 4800, 55028],
+  [15600, 480053, 32337, 4800, 118927],
+  [15600, 995329, 119066, 183719, 85590],
+  [9600, 463252, 21189, 4800, 109884],
 ];
-Deno.test("independent actual two-farm health full limited excluded phase and current-use packets validate full XSD and PDF", async () => {
+test("independent actual two-farm health full limited excluded phase and current-use packets validate full XSD and PDF", async () => {
   assertEquals(fixtures.length, 7);
   for (const [index, fixture] of fixtures.entries()) {
     const r = f1040_2025.executeReturn(fixture.inputs),
       p = normalizeAllPending(r.pending);
     assertEquals(r.diagnostics, []);
-    const health = assertIndependentOwnerHealth(p, fixture.filer);
+    const health = assertIndependentOwnerHealth(p, 2025, fixture.filer);
     assertEquals([
       health.deduction,
       p.f1040.line11_agi,
@@ -89,11 +91,11 @@ Deno.test("independent actual two-farm health full limited excluded phase and cu
       }),
     );
     const prepared = await f1040_2025.prepareReturn(r.pending, fixture.filer);
-    const child = new Deno.Command("xmllint", {
+    const child = new sys.Command("xmllint", {
       args: [
         "--noout",
         "--schema",
-        ".state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+        "irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
         "-",
       ],
       stdin: "piped",
@@ -112,7 +114,7 @@ Deno.test("independent actual two-farm health full limited excluded phase and cu
     assertEquals((await prepared.renderPdf()).length > 0, true);
   }
 });
-Deno.test("mixed two-farm health rejects actual owner issuer month business payroll and prepared source conflicts", async () => {
+test("mixed two-farm health rejects actual owner issuer month business payroll and prepared source conflicts", async () => {
   const fixture = fixtures[0];
   for (
     const mutate of [
@@ -183,7 +185,7 @@ Deno.test("mixed two-farm health rejects actual owner issuer month business payr
       const p = structuredClone(original);
       mutate(p);
       await assertRejects(() => f1040_2025.prepareReturn(p, fixture.filer));
-      assertThrows(() => assertIndependentOwnerHealth(p, fixture.filer));
+      assertThrows(() => assertIndependentOwnerHealth(p, 2025, fixture.filer));
       assertThrows(() =>
         form7206.build(p.form7206 as any, { pending: p, filer: fixture.filer })
       );
@@ -199,7 +201,7 @@ Deno.test("mixed two-farm health rejects actual owner issuer month business payr
   }
 });
 
-Deno.test("two-farm health rejects fabricated absent business kinds and loss-owner capacity", async () => {
+test("two-farm health rejects fabricated absent business kinds and loss-owner capacity", async () => {
   const fixture = fixtures[6];
   const original = normalizeAllPending(
     f1040_2025.executeReturn(fixture.inputs).pending,

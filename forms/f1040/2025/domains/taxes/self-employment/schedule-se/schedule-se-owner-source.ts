@@ -28,8 +28,11 @@ import { patronFiledBusinessLines } from "../../../../../nodes/inputs/deductions
 /** Rebuild owner computations from the actual finalized public businesses and W2s. */
 export function assertOwnedScheduleSE(
   pending: Readonly<Record<string, Record<string, unknown>>>,
+  taxYear: number,
   filer?: FilerIdentity,
 ) {
+  const cfg = CONFIG_BY_YEAR[taxYear];
+  if (!cfg) throw new Error(`No f1040 config for year ${taxYear}`);
   const general = pending.general;
   const retained = pending.schedule_se;
   if (!retained?.owner_identity) {
@@ -178,12 +181,12 @@ export function assertOwnedScheduleSE(
       });
     }
   }
-  const actual = ownedScheduleSE(source, CONFIG_BY_YEAR[2025].ssWageBase);
+  const actual = ownedScheduleSE(source, cfg.ssWageBase, cfg);
   const retainedActual = ownedScheduleSE({
     identity: retained.owner_identity,
     businesses: retained.owner_business_sources,
     wages: retained.owner_wage_sources ?? [],
-  }, CONFIG_BY_YEAR[2025].ssWageBase);
+  }, cfg.ssWageBase, cfg);
   const canonical = (value: unknown): string =>
     JSON.stringify(
       value,

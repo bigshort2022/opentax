@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { assert, assertEquals, assertRejects } from "@std/assert";
 import { f1040_2025 } from "../../../../index.ts";
 import { extractFilerIdentity } from "../../../../../mef/filer.ts";
@@ -8,7 +11,6 @@ import {
 } from "./form8995a_patron_status_fixture.ts";
 import { patronStatusExpected } from "./form8995a_patron_status_expected.ts";
 // Mutations intentionally cross the untrusted persisted-data boundary.
-// deno-lint-ignore no-explicit-any
 type Row = Record<string, any>;
 
 function mirrorSources(p: Row) {
@@ -32,7 +34,7 @@ function mirrorSources(p: Row) {
 }
 
 for (const c of patronStatusCases) {
-  Deno.test(`Patron ${c.name}: owned sources, final tax and complete packet`, async () => {
+  test(`Patron ${c.name}: owned sources, final tax and complete packet`, async () => {
     const input = patronStatusFixture(c);
     const result = f1040_2025.executeReturn(input);
     assertEquals(result.diagnostics, []);
@@ -53,23 +55,17 @@ for (const c of patronStatusCases) {
     );
     assertEquals(pending.form8995a_schedule_d, pending.form8995a);
     assert(prepared.bundle.xml.includes("<IRS8995AScheduleD "));
-    const permission = await Deno.permissions.query({
-      name: "env",
-      variable: "PATRON_STATUS_EVIDENCE",
-    });
-    const root = permission.state === "granted"
-      ? Deno.env.get("PATRON_STATUS_EVIDENCE")
-      : undefined;
-    const dir = root ? `${root}/${c.name}` : await Deno.makeTempDir();
-    await Deno.mkdir(dir, { recursive: true });
+    const root = process.env.PATRON_STATUS_EVIDENCE;
+    const dir = root ? `${root}/${c.name}` : await sys.makeTempDir();
+    await fs.mkdir(dir, { recursive: true });
     try {
-      await Deno.writeTextFile(
+      await fs.writeFile(
         `${dir}/source.json`,
         JSON.stringify({ input, filer, pending }, null, 2),
       );
-      await Deno.writeTextFile(`${dir}/return.xml`, prepared.bundle.xml);
+      await fs.writeFile(`${dir}/return.xml`, prepared.bundle.xml);
       const origins: Parameters<typeof buildPdfBytes>[4] = [];
-      await Deno.writeFile(
+      await fs.writeFile(
         `${dir}/return.pdf`,
         await buildPdfBytes(
           pending,
@@ -79,16 +75,16 @@ for (const c of patronStatusCases) {
           origins,
         ),
       );
-      await Deno.writeTextFile(
+      await fs.writeFile(
         `${dir}/origins.json`,
         JSON.stringify(origins, null, 2),
       );
-      const xsd = await new Deno.Command("xmllint", {
+      const xsd = await new sys.Command("xmllint", {
         args: [
           "--noout",
           "--schema",
           new URL(
-            "../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+            "../../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
             import.meta.url,
           ).pathname,
           `${dir}/return.xml`,
@@ -96,7 +92,7 @@ for (const c of patronStatusCases) {
         stdout: "piped",
         stderr: "piped",
       }).output();
-      await Deno.writeFile(`${dir}/xsd.log`, xsd.stderr);
+      await fs.writeFile(`${dir}/xsd.log`, xsd.stderr);
       assertEquals(xsd.code, 0, new TextDecoder().decode(xsd.stderr));
       const kinds = [
         "payer",
@@ -177,7 +173,7 @@ for (const c of patronStatusCases) {
           buildPdfBytes(pending, changedFiler, ".pdf-cache")
         );
       }
-      await Deno.writeTextFile(
+      await fs.writeFile(
         `${dir}/checks.json`,
         JSON.stringify(
           {
@@ -190,12 +186,12 @@ for (const c of patronStatusCases) {
         ),
       );
     } finally {
-      if (!root) await Deno.remove(dir, { recursive: true });
+      if (!root) await sys.remove(dir, { recursive: true });
     }
   });
 }
 
-Deno.test("patron public status review requires MFS property evidence and rejects it for other statuses", () => {
+test("patron public status review requires MFS property evidence and rejects it for other statuses", () => {
   for (const c of patronStatusCases) {
     const input = patronStatusFixture(c);
     if (c.status === "mfs") {

@@ -1,3 +1,4 @@
+import { assertExcessBusinessLoss8995 } from "./f8995-excess-business-loss.ts";
 import { projectPassiveSCorpLossCopies } from "../../../../../domains/income/business/passive-s-corp-loss-copies.ts";
 import { assertCurrentPropertyQbi } from "./f8995-current-property.ts";
 import { assertCurrentK1Qbi } from "./f8995-current-k1.ts";
@@ -17,6 +18,8 @@ import {
 import { assertFarmWotcReturn } from "../../../../../domains/deductions/business/form8995/form8995_farm_wotc_reconciliation.ts";
 import { patronFiledBusinessLines } from "../../../../../../nodes/inputs/deductions/business/qbi_patron/calculation.ts";
 import { assertJointOwner8995 } from "./f8995-joint-owner.ts";
+import { assertMultiBusinessInvestmentSources } from "./f8995-investment.ts";
+import { inputSchema as form8995InputSchema } from "../../../../../../nodes/intermediate/forms/deductions/business/form8995/index.ts";
 import { assertMultipleScheduleC8995 } from "./f8995-multiple.ts";
 import {
   allocateSharedSeDeduction,
@@ -75,11 +78,13 @@ const lineNumbers = [
 /** A zero deduction cannot discard a required loss carryforward workpaper. */
 export function assertNoUnfiled8995Loss(
   fields: Readonly<Record<string, unknown>>,
-  pending?: Readonly<Record<string, unknown>>,
+  pending: Readonly<Record<string, unknown>> | undefined,
+  taxYear: number,
 ): void {
   const tipExclusions = assertQualifiedTipQbiSource(
     fields as Record<string, unknown>,
     pending,
+    taxYear,
   );
   const parent = pending?.form8995a as Record<string, unknown> | undefined;
   if (
@@ -87,7 +92,7 @@ export function assertNoUnfiled8995Loss(
     pending?.form8995a_schedule_c !== undefined &&
     fields.qbi_deduction === undefined && fields.line15 === undefined
   ) {
-    assertFarmWotcReturn(parent, pending);
+    assertFarmWotcReturn(parent, pending, taxYear);
     const companion = pending?.form8995a_schedule_c;
     if (companion && isDeepStrictEqual(companion, parent)) return;
     throw new Error("Farm WOTC delegation needs its actual loss companion");
@@ -407,6 +412,7 @@ export function qualifiedReitDividends(
 export function assertOneScheduleC8995(
   fields: Record<string, unknown>,
   rawPending: Readonly<Record<string, unknown>> | undefined,
+  taxYear: number,
 ): Filed8995 {
   if (!rawPending) {
     throw new Error(
@@ -414,7 +420,7 @@ export function assertOneScheduleC8995(
     );
   }
   const pending = normalizeAllPending(rawPending as Record<string, unknown>);
-  const tipExclusions = assertQualifiedTipQbiSource(fields, pending);
+  const tipExclusions = assertQualifiedTipQbiSource(fields, pending, taxYear);
   const source = scheduleCInputSchema.safeParse(pending.schedule_c);
   const sourceInput = source.success ? source.data : undefined;
   const businesses = source.success ? projectScheduleCItems(source.data) : [];
@@ -436,7 +442,7 @@ export function assertOneScheduleC8995(
   }
   const additionalXml = pending.schedule1a === undefined
     ? ""
-    : schedule1aNative.build(pending.schedule1a, { pending });
+    : schedule1aNative.build(pending.schedule1a, { pending, taxYear });
   if (additionalDeduction > 0 && !additionalXml.includes("IRS1040Schedule1A")) {
     throw new Error(
       "Form8995 additional deductions need actual Schedule1A source reconciliation",
@@ -455,9 +461,25 @@ export function assertOneScheduleC8995(
     "sep_retirement",
   ] as const;
   const form7206 = pending.form7206;
-  let sourcedCapitalGain = 0;
-  let sourcedFiledCapital: number | undefined;
-  if (pending.schedule_d !== undefined) {
+  // Without REIT dividends, ordinary interest, dividends and capital sales
+  // replay from their copies, Schedule B and Schedule D (i8995 line 12).
+  const investment = fields.reit_dividend_sources === undefined &&
+      [pending.f1099int, pending.f1099div, pending.f1099b, pending.schedule_d]
+        .some((item) => item !== undefined)
+    ? assertMultiBusinessInvestmentSources(
+      form8995InputSchema.parse(fields),
+      pending,
+      taxYear,
+      false,
+      general?.filing_status === "mfj" && typeof general.spouse_ssn === "string"
+        ? general.spouse_ssn
+        : undefined,
+      false,
+    )
+    : undefined;
+  let sourcedCapitalGain = investment?.capitalGain ?? 0;
+  let sourcedFiledCapital: number | undefined = investment?.returnCapital;
+  if (pending.schedule_d !== undefined && investment === undefined) {
     if (
       pending.f1099k === undefined && pending.f1099b === undefined &&
       pending.f8949 === undefined
@@ -466,7 +488,7 @@ export function assertOneScheduleC8995(
         "ScheduleC QBI capital sales need retained issued or direct sale sources",
       );
     }
-    assertCapitalSaleSourceRows(pending);
+    assertCapitalSaleSourceRows(pending, taxYear);
     const d = scheduleDSourceSchema.parse(pending.schedule_d);
     for (
       const key of [
@@ -486,7 +508,7 @@ export function assertOneScheduleC8995(
       );
     }
     const replay = scheduleDNode.compute(
-      { taxYear: 2025, formType: "f1040" },
+      { taxYear, formType: "f1040" },
       d,
     );
     sourcedCapitalGain = Number(
@@ -516,8 +538,10 @@ export function assertOneScheduleC8995(
       );
     }
   }
-  const qualifiedDividends = (pending.f1099div !== undefined &&
-      !zeroOrAbsent(f1040?.line3a_qualified_dividends))
+  const qualifiedDividends = investment
+    ? { ordinary: investment.ordinary, qualified: investment.qualified }
+    : (pending.f1099div !== undefined &&
+        !zeroOrAbsent(f1040?.line3a_qualified_dividends))
     ? qualifiedDividendSource(
       pending.f1099div,
       fields.reit_dividend_sources,
@@ -531,7 +555,7 @@ export function assertOneScheduleC8995(
       qualifiedDividends.qualified,
     );
   if (
-    pending.f1099div !== undefined &&
+    pending.f1099div !== undefined && investment === undefined &&
     fields.reit_dividend_sources === undefined &&
     zeroOrAbsent(fields.net_capital_gain)
   ) {
@@ -718,11 +742,11 @@ export function assertOneScheduleC8995(
       reit + qualifiedDividends.ordinary ||
     (sourcedFiledCapital === undefined
       ? !zeroOrAbsent(f1040.line7_capital_gain)
-      : f1040.line7_capital_gain !== sourcedFiledCapital) ||
+      : (f1040.line7_capital_gain ?? 0) !== sourcedFiledCapital) ||
     !zeroOrAbsent(f1040.line7a_cap_gain_distrib) ||
     (fields.net_capital_gain ?? 0) !==
       qualifiedDividends.qualified + sourcedCapitalGain ||
-    reit + qualifiedDividends.ordinary > 1_500 ||
+    (investment === undefined && reit + qualifiedDividends.ordinary > 1_500) ||
     typeof f1040.line11_agi !== "number" ||
     typeof f1040.line12c_deduction_total !== "number" ||
     Math.round(
@@ -743,7 +767,8 @@ export function assertOneScheduleC8995(
     fields,
     f1040,
     reit,
-    qualifiedDividends.qualified + sourcedCapitalGain,
+    investment?.filedQbiCapitalLimit ??
+      qualifiedDividends.qualified + sourcedCapitalGain,
   );
   return {
     businesses: [{
@@ -830,12 +855,16 @@ export function assertTwoSmallScheduleC8995(
       business.proprietor_recipient !== items[index]?.proprietor_recipient ||
       business.line31_net_profit !== profits[index]
     ) ||
+    // Schedule SE receives the combined Schedule C total and stops at line 4c.
     (scheduleSe !== undefined &&
-      (Object.keys(scheduleSe).some((key) => key !== "w2_ss_wages") ||
+      (Object.keys(scheduleSe).some((key) =>
+        key !== "w2_ss_wages" && key !== "net_profit_schedule_c"
+      ) ||
+        scheduleSe.net_profit_schedule_c !== total ||
         scheduleSe.w2_ss_wages !== wage.box3_ss_wages)) ||
     (scheduleSe !== undefined && scheduleSeSource === undefined) ||
     (scheduleSeSource !== undefined &&
-      (scheduleSeSource.net_profit_schedule_c !== 0 ||
+      (scheduleSeSource.net_profit_schedule_c !== total ||
         scheduleSeSource.net_profit_schedule_f !== 0 ||
         scheduleSeSource.farm_optional_method_elected !== false ||
         scheduleSeSource.line13_deduction !== 0)) ||
@@ -1208,6 +1237,7 @@ function assertReitOnly8995(
 function assertMixedScheduleCF8995(
   fields: Record<string, unknown>,
   rawPending: Readonly<Record<string, unknown>> | undefined,
+  taxYear: number,
 ): Filed8995 {
   if (!rawPending) throw new Error("Mixed C/F QBI needs actual filed sources");
   const pending = normalizeAllPending(rawPending as Record<string, unknown>);
@@ -1231,7 +1261,7 @@ function assertMixedScheduleCF8995(
   }
   const additionalXml = pending.schedule1a === undefined
     ? ""
-    : schedule1aNative.build(pending.schedule1a, { pending });
+    : schedule1aNative.build(pending.schedule1a, { pending, taxYear });
   if (additionalDeduction > 0 && !additionalXml.includes("IRS1040Schedule1A")) {
     throw new Error(
       "Mixed C/F QBI needs actual Schedule1A source reconciliation",
@@ -1249,7 +1279,7 @@ function assertMixedScheduleCF8995(
     net_profit_schedule_c: cProfit,
     net_profit_schedule_f: fProfit,
     w2_ss_wages: 0,
-  }, CONFIG_BY_YEAR[2025].ssWageBase);
+  }, CONFIG_BY_YEAR[taxYear].ssWageBase);
   const half = seLines?.line13 ?? 0;
   const allocations = allocateSharedSeDeduction(profits, half);
   const qbi = profits.map((profit, index) =>
@@ -1364,7 +1394,7 @@ function assertMixedScheduleCF8995(
     );
   }
   return {
-    businesses: rows.map((row, index) => ({
+    businesses: rows.map((_row, index) => ({
       businessName: names[index]!,
       tin: { kind: "ein" as const, value: eins[index]! },
       qbi: qbi[index],
@@ -1382,6 +1412,7 @@ function assertMixedScheduleCF8995(
 export function assertPositive8995(
   fields: Record<string, unknown>,
   pending: Readonly<Record<string, unknown>> | undefined,
+  taxYear: number,
 ): Filed8995 {
   if (fields.current_passive_s_corp_loss !== undefined) {
     if (!pending || !isDeepStrictEqual(fields, pending.form8995)) {
@@ -1418,19 +1449,22 @@ export function assertPositive8995(
     fields.owned_s_corp_loss_source !== undefined ||
     fields.owned_s_corp_loss_sources !== undefined
   ) return assertOwnedSCorpLoss8995(fields, pending);
-  assertFarmWotcReturn(fields, pending);
+  assertFarmWotcReturn(fields, pending, taxYear);
   if (
     fields.multi_business_filing_rows !== undefined &&
     fields.schedule_c_qbi_businesses !== undefined &&
     fields.schedule_f_qbi_businesses !== undefined
   ) {
-    return assertMixedScheduleCF8995(fields, pending);
+    return assertMixedScheduleCF8995(fields, pending, taxYear);
   }
   if (fields.joint_owner_filing_rows !== undefined) {
-    return assertJointOwner8995(fields, pending);
+    return assertJointOwner8995(fields, pending, taxYear);
+  }
+  if (fields.excess_business_loss_filing_row !== undefined) {
+    return assertExcessBusinessLoss8995(fields, pending);
   }
   if (fields.multi_business_filing_rows !== undefined) {
-    return assertMultipleScheduleC8995(fields, pending);
+    return assertMultipleScheduleC8995(fields, pending, taxYear);
   }
   if (fields.schedule_f_qbi_businesses !== undefined) {
     return assertOneScheduleF8995(fields, pending);
@@ -1440,7 +1474,7 @@ export function assertPositive8995(
       Array.isArray(fields.schedule_c_qbi_businesses) &&
       fields.schedule_c_qbi_businesses.length === 2
     ) return assertTwoSmallScheduleC8995(fields, pending);
-    return assertOneScheduleC8995(fields, pending);
+    return assertOneScheduleC8995(fields, pending, taxYear);
   }
   return assertReitOnly8995(fields, pending);
 }

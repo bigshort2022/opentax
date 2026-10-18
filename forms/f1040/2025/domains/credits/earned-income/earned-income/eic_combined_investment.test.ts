@@ -1,3 +1,5 @@
+import * as fs from "node:fs/promises";
+import { test } from "bun:test";
 import { assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
 import { combinedInvestmentInputs } from "./eic_combined_investment.fixture.ts";
 import { f1040_2025 } from "../../../../index.ts";
@@ -7,9 +9,9 @@ import { buildMefBundle } from "../../../../mef/builder.ts";
 import { buildPdfBytes } from "../../../../pdf/builder.ts";
 import { extractFilerIdentity } from "../../../../../mef/filer.ts";
 
-Deno.test("combined investment categories calculate the EIC boundary but keep the unreconciled royalty/PAL filing guarded", async () => {
-  const flag = Deno.args.indexOf("--write-review-artifacts");
-  const artifactRoot = flag < 0 ? undefined : Deno.args[flag + 1];
+test("combined investment categories calculate the EIC boundary but keep the unreconciled royalty/PAL filing guarded", async () => {
+  const flag = process.argv.slice(2).indexOf("--write-review-artifacts");
+  const artifactRoot = flag < 0 ? undefined : process.argv.slice(2)[flag + 1];
   for (const above of [false, true]) {
     const inputs = combinedInvestmentInputs(above);
     const result = f1040_2025.executeReturn(inputs);
@@ -48,11 +50,7 @@ Deno.test("combined investment categories calculate the EIC boundary but keep th
     );
     if (artifactRoot) {
       const path = `${artifactRoot}/combined-${above ? 11951 : 11950}.json`;
-      const handle = await Deno.open(path, {
-        write: true,
-        createNew: true,
-        mode: 0o600,
-      });
+      const handle = await fs.open(path, "wx", 0o600);
       try {
         await handle.write(new TextEncoder().encode(JSON.stringify(
           {
@@ -75,13 +73,13 @@ Deno.test("combined investment categories calculate the EIC boundary but keep th
           2,
         )));
       } finally {
-        handle.close();
+        await handle.close();
       }
     }
   }
 });
 
-Deno.test("combined royalty and retained passive sale preserve the per-property reconciliation guard", () => {
+test("combined royalty and retained passive sale preserve the per-property reconciliation guard", () => {
   const result = f1040_2025.executeReturn(
     combinedInvestmentInputs(false, true),
   );

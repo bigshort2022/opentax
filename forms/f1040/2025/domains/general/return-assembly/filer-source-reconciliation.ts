@@ -10,6 +10,7 @@ import {
   eicChildSourceProjection,
   filedDependentsFromGeneral,
   inputSchema as generalInputSchema,
+  survivingSpouseJointReturnReviewSchema,
 } from "../../../../nodes/inputs/general/filing/general/index.ts";
 import { inputSchema as form1099gSchema } from "../../../../nodes/inputs/income/other/f1099g/index.ts";
 import { inputSchema as form1099necSchema } from "../../../../nodes/inputs/income/business/f1099nec/index.ts";
@@ -251,6 +252,7 @@ export function assertKWithholdingSourceIdentity(
 export function assertKPersonalSaleSources(
   pending: Record<string, unknown>,
   filer: FilerIdentity,
+  taxYear: number,
 ): void {
   const k =
     (pending.f1099k as { f1099ks?: Array<Record<string, unknown>> } | undefined)
@@ -298,7 +300,7 @@ export function assertKPersonalSaleSources(
         typeof sale.date_sold !== "string" ||
         Number.isNaN(sold.getTime()) ||
         sold.toISOString().slice(0, 10) !== sale.date_sold ||
-        !sale.date_sold.startsWith("2025-") || acquired >= sold ||
+        !sale.date_sold.startsWith(`${taxYear}-`) || acquired >= sold ||
         typeof sale.proceeds !== "number" ||
         !Number.isSafeInteger(sale.proceeds) ||
         sale.proceeds <= 0 || typeof sale.cost_basis !== "number" ||
@@ -415,6 +417,7 @@ export function assertF1040SourceIdentity(
 export function assertEitcChildSources(
   pending: Record<string, unknown>,
   filer: FilerIdentity,
+  taxYear: number,
 ): void {
   const eitc = pending.eitc as Record<string, unknown> | undefined;
   const credit = eitc?.credit_amount;
@@ -433,7 +436,10 @@ export function assertEitcChildSources(
   ) {
     throw new Error("Schedule EIC child source differs from the filed credit");
   }
-  const projected = eicChildSourceProjection(generalInputSchema.parse(general));
+  const projected = eicChildSourceProjection(
+    generalInputSchema.parse(general),
+    taxYear,
+  );
   if (
     count !== projected.count ||
     rows.some((value, index) =>
@@ -495,8 +501,8 @@ export function assertEitcChildSources(
           !release.form8332_source_reference.trim() ||
           typeof release.custody_record_reference !== "string" ||
           !release.custody_record_reference.trim() ||
-          release.custodial_parent_for_2025 !== true ||
-          release.valid_2025_release_to_noncustodial_parent !== true ||
+          release.custodial_parent_for_tax_year !== true ||
+          release.valid_tax_year_release_to_noncustodial_parent !== true ||
           release.no_competing_eitc_claim_verified !== true)) ||
       (dep.dependent_on_another_return !== true && release !== undefined)
     ) {
@@ -1622,6 +1628,42 @@ export function assertF1040FinalHeader(
   }
 }
 
+/**
+ * A joint return whose only deceased filer is the spouse, dead in 2025, signed
+ * by the reviewed surviving spouse with no personal representative.
+ */
+export function isReviewedSurvivingSpouseJointReturn(
+  fields?: Record<string, unknown>,
+  general?: Record<string, unknown>,
+  filer?: FilerIdentity,
+): boolean {
+  const sources = [fields, general].filter((
+    source,
+  ): source is Record<string, unknown> => source !== undefined);
+  const deathDate = sources[0]?.spouse_death_date ?? filer?.spouse?.deathDate;
+  if (
+    typeof deathDate !== "string" || !/^2025-\d{2}-\d{2}$/.test(deathDate) ||
+    Number.isNaN(Date.parse(deathDate))
+  ) {
+    return false;
+  }
+  const sourced = sources.length > 0 && sources.every((source) =>
+    source.filing_status === "mfj" &&
+    source.spouse_deceased === true &&
+    source.spouse_death_date === deathDate &&
+    source.taxpayer_deceased !== true &&
+    source.taxpayer_death_date === undefined &&
+    survivingSpouseJointReturnReviewSchema.safeParse(
+      source.surviving_spouse_joint_return_review,
+    ).success
+  );
+  return sourced && (filer === undefined || (
+    filer.filingStatus === FilingStatus.MarriedFilingJointly &&
+    filer.deceased !== true && !filer.deathDate &&
+    filer.spouse?.deathDate === deathDate
+  ));
+}
+
 /** Deceased returns need signer, representative, and refund review before export. */
 export function assertNoUnsupportedDeceasedReturn(
   fields?: Record<string, unknown>,
@@ -1635,9 +1677,10 @@ export function assertNoUnsupportedDeceasedReturn(
     (typeof source?.spouse_death_date === "string" &&
       source.spouse_death_date.trim().length > 0);
   if (
-    hasDeceasedFacts(fields) || hasDeceasedFacts(general) ||
-    filer?.deceased === true || Boolean(filer?.deathDate) ||
-    filer?.spouse?.deceased === true || Boolean(filer?.spouse?.deathDate)
+    (hasDeceasedFacts(fields) || hasDeceasedFacts(general) ||
+      filer?.deceased === true || Boolean(filer?.deathDate) ||
+      filer?.spouse?.deceased === true || Boolean(filer?.spouse?.deathDate)) &&
+    !isReviewedSurvivingSpouseJointReturn(fields, general, filer)
   ) {
     throw new Error(
       "TY2025 deceased Form 1040 needs reviewed signer, representative, and refund facts before filing",
@@ -1703,11 +1746,12 @@ export function assertDigitalAssetDispositionAnswer(
 /** Detect a changed or omitted dependent row after general input projection. */
 export function assertGeneral1040DependentSource(
   pending: Record<string, unknown>,
+  taxYear: number,
 ): void {
   if (pending.general === undefined || pending.f1040 === undefined) return;
   const source = generalInputSchema.parse(pending.general);
   const filed = pending.f1040 as Record<string, unknown>;
-  const expected = filedDependentsFromGeneral(source);
+  const expected = filedDependentsFromGeneral(source, taxYear);
   const actual = dependentFilingSchema.array().parse(
     filed.dependent_details ?? [],
   );

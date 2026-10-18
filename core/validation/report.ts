@@ -66,7 +66,7 @@ export function formatDiagnosticsText(
   lines.push(`  ${sep}`);
   lines.push("  SUMMARY");
   lines.push(`  ${sep}`);
-  lines.push(`  Rules checked:  ${padNum(report.summary.total)}`);
+  lines.push(`  Rules:          ${padNum(report.summary.total)}`);
   lines.push(`  Passed:         ${padNum(report.summary.passed)}`);
   lines.push(
     `  Errors:         ${padNum(report.summary.rejected)}${
@@ -74,7 +74,9 @@ export function formatDiagnosticsText(
     }`,
   );
   lines.push(`  Warnings:       ${padNum(report.summary.alerts)}`);
-  lines.push(`  Skipped (stub): ${padNum(report.summary.skipped)}`);
+  lines.push(
+    `  Not checked:    ${padNum(report.summary.skipped)}    (not applicable to this return)`,
+  );
   lines.push(`  ${sep}`);
 
   const status = report.canFile

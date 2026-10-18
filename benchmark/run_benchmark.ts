@@ -1,10 +1,14 @@
-#!/usr/bin/env -S deno run --allow-read --allow-write --allow-run
+#!/usr/bin/env bun
+import { writeSync } from "node:fs";
+import * as fs from "node:fs/promises";
+import * as sys from "../scripts/support/sys.ts";
 /**
  * run_benchmark.ts — Run all cases through the tax engine and compare to correct values.
- * Run: deno run --allow-read --allow-write --allow-run benchmark/run_benchmark.ts
+ * Run: bun benchmark/run_benchmark.ts
  */
 
-import { dirname, fromFileUrl, join } from "@std/path";
+import { basename, dirname, join } from "node:path";
+import { fileURLToPath as fromFileUrl } from "node:url";
 import {
   benchmarkExpectedSchema,
   benchmarkInputSchema,
@@ -12,6 +16,7 @@ import {
   benchmarkSourceIssues,
   createdReturnSchema,
   discoverBenchmarkCases,
+  readCaseBaseline,
 } from "./harness.ts";
 import { runCaBenchmark } from "./ca540.ts";
 
@@ -19,7 +24,7 @@ const SCRIPT_DIR = dirname(fromFileUrl(import.meta.url));
 const TAX_DIR = join(SCRIPT_DIR, "..");
 
 // ── CLI flags ─────────────────────────────────────────────────────────────────
-const args = Deno.args;
+const args = process.argv.slice(2);
 
 function getFlag(flag: string, defaultVal: string): string {
   const i = args.indexOf(flag);
@@ -29,12 +34,21 @@ function getFlag(flag: string, defaultVal: string): string {
 const formFlag = getFlag("--form", "f1040");
 const yearFlag = getFlag("--year", "2025");
 const jsonFlag = args.includes("--json");
+const caseFlag = getFlag("--case", "");
+if (
+  args.includes("--case") &&
+  (!caseFlag || caseFlag.startsWith("--") || basename(caseFlag) !== caseFlag ||
+    caseFlag === "." || caseFlag === "..")
+) {
+  throw new Error("--case requires one case directory name");
+}
 if (import.meta.main && formFlag === "ca540") {
   if (yearFlag !== "2025") {
     throw new Error(`Unsupported California benchmark year: ${yearFlag}`);
   }
   const report = await runCaBenchmark(
     join(SCRIPT_DIR, "cases", "ca540", yearFlag),
+    caseFlag || undefined,
   );
   console.log(
     jsonFlag ? JSON.stringify(report) : [
@@ -46,7 +60,7 @@ if (import.meta.main && formFlag === "ca540") {
       `${report.pass} passed, ${report.fail} failed; CA workpaper evidence only, exact dollars; no filing authorization`,
     ].join("\n"),
   );
-  Deno.exit(report.total > 0 && report.fail === 0 ? 0 : 1);
+  process.exit(report.total > 0 && report.fail === 0 ? 0 : 1);
 }
 
 const CASES_DIR = join(SCRIPT_DIR, "cases", formFlag, yearFlag);
@@ -66,7 +80,7 @@ export function taxCommandOutputOrThrow(
 ): string {
   if (code !== 0) {
     throw new Error(
-      `opentax command failed (${code}): deno run cli/main.ts ${
+      `opentax command failed (${code}): bun cli/main.ts ${
         args.join(" ")
       }\n${stderrText}${stdoutText}`,
     );
@@ -78,11 +92,8 @@ export function taxCommandOutputOrThrow(
 }
 
 async function tax(...args: string[]): Promise<string> {
-  const { code, stdout, stderr } = await new Deno.Command("deno", {
+  const { code, stdout, stderr } = await new sys.Command(process.execPath, {
     args: [
-      "run",
-      "--allow-read",
-      "--allow-write",
       join(TAX_DIR, "cli/main.ts"),
       ...args,
     ],
@@ -135,8 +146,9 @@ export function benchmarkActualLines(
   const owed = actual.line37_amount_owed;
   const noRefund = !("line35a_refund" in actual);
   const noOwed = !("line37_amount_owed" in actual);
-  if (noRefund && isFiniteNumber(owed) && owed > 0) actual.line35a_refund = 0;
-  if (noOwed && isFiniteNumber(refund) && refund > 0) {
+  // A return has a refund or an amount owed, never both; the blank side is zero.
+  if (noRefund && isFiniteNumber(owed) && owed >= 0) actual.line35a_refund = 0;
+  if (noOwed && isFiniteNumber(refund) && refund >= 0) {
     actual.line37_amount_owed = 0;
   }
   if (
@@ -225,6 +237,7 @@ const SUMMARY_FIELDS = new Set([
 ]);
 const RAW_FIELDS = new Set([
   "line1a_wages",
+  "line7_capital_gain",
   "line10_adjustments",
   "line27_eitc",
 ]);
@@ -343,9 +356,9 @@ async function runCase(name: string): Promise<CaseResult> {
   const inputFile = join(caseDir, "input.json");
   const correctFile = join(caseDir, "correct.json");
   const caseData = benchmarkInputSchema.parse(
-    JSON.parse(await Deno.readTextFile(inputFile)),
+    JSON.parse(await fs.readFile(inputFile, "utf8")),
   );
-  const correct = JSON.parse(await Deno.readTextFile(correctFile));
+  const correct = JSON.parse(await fs.readFile(correctFile, "utf8"));
   benchmarkExpectedSchema.parse(correct);
   const rid = createdReturnSchema.parse(JSON.parse(
     await tax(
@@ -447,7 +460,7 @@ function resultRow(r: CaseResult, idx: number): string {
 // ── Progress + streaming output (all on stdout) ───────────────────────────────
 
 const encoder = new TextEncoder();
-const write = (s: string) => Deno.stdout.writeSync(encoder.encode(s));
+const write = (s: string) => writeSync(1, encoder.encode(s));
 
 function progressLine(done: number, total: number, running: number): string {
   const BAR_W = 30;
@@ -515,7 +528,15 @@ async function runAll(caseNames: string[]): Promise<CaseResult[]> {
 }
 
 if (import.meta.main) {
-  const paths = await discoverBenchmarkCases(CASES_DIR);
+  const paths = await discoverBenchmarkCases(
+    caseFlag ? join(CASES_DIR, caseFlag) : CASES_DIR,
+    undefined,
+    {
+      casesRoot: join(SCRIPT_DIR, "cases"),
+      baseline: await readCaseBaseline(join(SCRIPT_DIR, "..")),
+      today: new Date().toISOString().slice(0, 10),
+    },
+  );
   const names = paths.map((path) => path.slice(CASES_DIR.length + 1));
 
   const results = await runAll(names);
@@ -559,6 +580,6 @@ if (import.meta.main) {
   }
 
   if (fail > 0 || skipped > 0 || emptyCaseSet) {
-    Deno.exit(1);
+    process.exit(1);
   }
 }

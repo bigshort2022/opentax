@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import {
   assertEquals,
   assertRejects,
@@ -47,7 +50,7 @@ const inputs = {
   },
 };
 
-Deno.test("reviewed nonclaimed QSS child reaches native Form 1040 and filled PDF", async () => {
+test("reviewed nonclaimed QSS child reaches native Form 1040 and filled PDF", async () => {
   const result = f1040_2025.executeReturn(inputs);
   assertEquals(result.diagnostics, []);
   const pending = buildPending(result.pending);
@@ -67,13 +70,13 @@ Deno.test("reviewed nonclaimed QSS child reaches native Form 1040 and filled PDF
     "<QualifyingPersonSSN>444556666</QualifyingPersonSSN>",
   );
   const xsd = new URL(
-    "../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+    "../../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
     import.meta.url,
   ).pathname;
-  const xmlPath = await Deno.makeTempFile({ suffix: ".xml" });
+  const xmlPath = await sys.makeTempFile({ suffix: ".xml" });
   try {
-    await Deno.writeTextFile(xmlPath, xml);
-    const validation = await new Deno.Command("xmllint", {
+    await fs.writeFile(xmlPath, xml);
+    const validation = await new sys.Command("xmllint", {
       args: ["--noout", "--schema", xsd, xmlPath],
       stderr: "piped",
     }).output();
@@ -83,13 +86,13 @@ Deno.test("reviewed nonclaimed QSS child reaches native Form 1040 and filled PDF
       new TextDecoder().decode(validation.stderr),
     );
   } finally {
-    await Deno.remove(xmlPath);
+    await sys.remove(xmlPath);
   }
   const pdf = await f1040_2025.buildPdfBytes(pending, filer);
-  const pdfPath = await Deno.makeTempFile({ suffix: ".pdf" });
+  const pdfPath = await sys.makeTempFile({ suffix: ".pdf" });
   try {
-    await Deno.writeFile(pdfPath, pdf);
-    const extracted = await new Deno.Command("pdftotext", {
+    await fs.writeFile(pdfPath, pdf);
+    const extracted = await new sys.Command("pdftotext", {
       args: ["-layout", pdfPath, "-"],
     }).output();
     assertEquals(extracted.code, 0);
@@ -98,11 +101,11 @@ Deno.test("reviewed nonclaimed QSS child reaches native Form 1040 and filled PDF
       "Avery Child",
     );
   } finally {
-    await Deno.remove(pdfPath);
+    await sys.remove(pdfPath);
   }
 });
 
-Deno.test("both exporters reject a changed QSS child identity", async () => {
+test("both exporters reject a changed QSS child identity", async () => {
   const result = f1040_2025.executeReturn(inputs);
   assertEquals(result.diagnostics, []);
   const pending = buildPending(result.pending);
@@ -140,7 +143,7 @@ Deno.test("both exporters reject a changed QSS child identity", async () => {
   );
 });
 
-Deno.test("QSS child review rejects a wrong year, status, duplicate dependent, or missing review", () => {
+test("QSS child review rejects a wrong year, status, duplicate dependent, or missing review", () => {
   const source = inputs.general;
   const variants = [
     { ...source, qss_spouse_death_year: 2025 },
@@ -163,7 +166,7 @@ Deno.test("QSS child review rejects a wrong year, status, duplicate dependent, o
   ];
   for (const variant of variants) {
     assertThrows(
-      () => qssNonclaimedChildFromGeneral(generalInputSchema.parse(variant)),
+      () => qssNonclaimedChildFromGeneral(generalInputSchema.parse(variant), 2025),
       Error,
       "QSS nonclaimed child needs matching status",
     );
@@ -173,7 +176,7 @@ Deno.test("QSS child review rejects a wrong year, status, duplicate dependent, o
       qssNonclaimedChildFromGeneral(generalInputSchema.parse({
         ...source,
         qss_nonclaimed_child_review: undefined,
-      })),
+      }), 2025),
     Error,
     "QSS qualifying child SSN needs a reviewed nondependent child route",
   );

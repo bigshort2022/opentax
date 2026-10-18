@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import { Command, makeTempDir, remove } from "../../scripts/support/sys.ts";
+import { readFile, writeFile } from "node:fs/promises";
 import {
   assert,
   assertEquals,
@@ -7,11 +10,11 @@ import {
 import { createReturnCommand, getReturnCommand } from "./return.ts";
 import { formAddCommand } from "./form.ts";
 import { validateReturnCommand } from "./validate.ts";
-import { exportMefCommand, exportPdfCommand } from "./export.ts";
+import { exportMefCommand, exportPdfCommand, prepareMefSubmissionArchive } from "./export.ts";
 import { isStateDiagnosticsReport } from "../../core/validation/state-report.ts";
 
-Deno.test("CA Form 540 return routes through calculation, review, and worksheet export", async () => {
-  const baseDir = await Deno.makeTempDir();
+test("CA Form 540 return routes through calculation, review, and worksheet export", async () => {
+  const baseDir = await makeTempDir();
   try {
     const { returnId } = await createReturnCommand({
       year: 2025,
@@ -102,8 +105,21 @@ Deno.test("CA Form 540 return routes through calculation, review, and worksheet 
         "MeF export is not available for California Form 540",
       );
     }
+    // The new upstream archive/transmitter route must never make CA e-fileable.
+    await assertRejects(
+      () => prepareMefSubmissionArchive({ returnId, baseDir }),
+      Error,
+      "MeF submission export requires a TY2025 Form 1040",
+    );
+    for (const flags of [{ force: true }, { draft: true }, { force: true, draft: true }]) {
+      await assertRejects(
+        () => prepareMefSubmissionArchive({ returnId, baseDir, ...flags }),
+        Error,
+        "MeF submission export cannot bypass filing checks or export a draft",
+      );
+    }
     const outputPath = await exportPdfCommand({ returnId, baseDir });
-    const { code, stdout } = await new Deno.Command("pdftotext", {
+    const { code, stdout } = await new Command("pdftotext", {
       args: [outputPath, "-"],
       stdout: "piped",
       stderr: "piped",
@@ -114,12 +130,12 @@ Deno.test("CA Form 540 return routes through calculation, review, and worksheet 
       "Not an official Form 540",
     );
   } finally {
-    await Deno.remove(baseDir, { recursive: true });
+    await remove(baseDir, { recursive: true });
   }
 });
 
-Deno.test("CA missing input produces diagnostics without fabricated output or replacement", async () => {
-  const baseDir = await Deno.makeTempDir();
+test("CA missing input produces diagnostics without fabricated output or replacement", async () => {
+  const baseDir = await makeTempDir();
   try {
     const { returnId } = await createReturnCommand({
       year: 2025,
@@ -134,13 +150,13 @@ Deno.test("CA missing input produces diagnostics without fabricated output or re
     );
     await assertRejects(() => getReturnCommand({ returnId, baseDir }), Error);
     const outputPath = `${baseDir}/preserved.pdf`;
-    await Deno.writeTextFile(outputPath, "existing-output");
+    await writeFile(outputPath, "existing-output");
     await assertRejects(
       () => exportPdfCommand({ returnId, baseDir, outputPath }),
       Error,
     );
-    assertEquals(await Deno.readTextFile(outputPath), "existing-output");
+    assertEquals(await readFile(outputPath, "utf8"), "existing-output");
   } finally {
-    await Deno.remove(baseDir, { recursive: true });
+    await remove(baseDir, { recursive: true });
   }
 });

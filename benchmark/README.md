@@ -10,7 +10,8 @@ For folder layout and file formats, see
 
 ## Cases
 
-133 scenarios covering the common return types:
+Federal TY2025 scenarios cover the common return types below; inspect the
+canonical case inventory and current benchmark report for the exact count:
 
 | Range | Filing status | Key features tested                                                                                                                                      |
 | ----- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -61,22 +62,19 @@ itself proof that every reported discrepancy is a tax-engine arithmetic error.
 ## How to run
 
 ```bash
-# Full benchmark
-cd benchmark && deno run --allow-read --allow-write --allow-run run_benchmark.ts
+# Every case in cases/<form>/<year>/<case>/ (defaults: f1040, 2025)
+bun run bench --form f1040 --year 2025
 
-# Single case
-deno run --allow-read --allow-write --allow-run run_case.ts cases/02-single-w2-basic/
-
-# Regenerate all output.json
-deno run --allow-read --allow-write --allow-run run_all.ts
+# Machine-readable totals and per-case failures
+bun run bench --form f1040 --year 2025 --json
 
 # Validate every case's inputs and sources without running the engine
-deno task check:cases
+bun run check:cases
 ```
 
 ## California case contract
 
-`deno task bench --form ca540 --year 2025 --json` runs canonical cases under `cases/ca540/2025/`. `line31` cases compare one tax value; `workpaper` cases exercise create/add/get/validate, the permitted worksheet, and force/draft MeF refusal. `complete_return` cases are explicitly unsupported in this milestone. Exact whole-dollar CA comparisons do not inherit the federal $5 legacy tolerance.
+`bun run bench --form ca540 --year 2025 --json` runs canonical cases under `cases/ca540/2025/`. `line31` cases compare one tax value; `workpaper` cases exercise create/add/get/validate, the permitted worksheet, and force/draft MeF refusal. `complete_return` cases are explicitly unsupported in this milestone. Exact whole-dollar CA comparisons do not inherit the federal $5 legacy tolerance.
 
 Each case has strict `input.json`, `correct.json`, and `sources.json` records. Inputs declare product, year, and kind. Workpaper expectations include selected numeric lines, stable diagnostic dispositions, every local gate, readiness, required/produced document sets, and external-check limitations. A deliberately blocked workpaper can pass its scenario assertions while its `canFile` remains false. Missing expected lines never default to zero.
 
@@ -84,7 +82,7 @@ Each case has strict `input.json`, `correct.json`, and `sources.json` records. I
 
 For CA, `ledger.json` records typed assertion paths, before/after values, authority kind/citation, contributor review identity/date, and provenance. Numeric amounts, typed gate/readiness/document assertions, input/source changes, and manifest deletions are checked. This is evidence change control, not automatic human signoff. Missing sources, unknown typed paths, stale evidence, malformed cases, and an empty inventory fail validation.
 
-The old standalone CA vector runner is removed. `check:cases`, `check:oracle`, and all canonical runners now use product-aware CA contracts while retaining federal defaults and evidence conventions. `deno task test:ca540` explicitly executes CA product and evidence tests; the ordinary unit selection alone does not prove CA coverage.
+The old standalone CA vector runner is removed. `check:cases`, `check:oracle`, and the canonical benchmark runner use product-aware CA contracts while retaining federal defaults and evidence conventions. `bun run test:ca540` explicitly executes CA product and evidence tests; the ordinary unit selection alone does not prove CA coverage.
 
 No benchmark here establishes official FTB schema/business-rule validation, PATS qualification, provider import compatibility, or agency acceptance.
 
@@ -97,7 +95,7 @@ automatically, or create `cases/{form}/{year}/NN-description/input.json` and
 
 ## Changing expected values
 
-`deno task check:oracle` compares every `correct.json` with `origin/main`
+`bun run check:oracle` compares every `correct.json` with `origin/main`
 (`--base <ref>` to choose another). Each changed scored value needs an entry in
 `benchmark/cases/<form>/<year>/ledger.json` stating `case`, `line`, `before`,
 `after`, a `source` that cites a publication, `approvedBy` and `on`; a removed
@@ -122,7 +120,7 @@ input and expected-value schemas, the product read from `<form>/<year>/<case>`,
 each form entry against the node schema `form add` applies (unknown fields
 rejected, required fields named), and any `source`, which must cite a
 publication and never the engine. Every invalid case is reported in one error;
-`deno task check:cases` runs only this step, without the engine, allowing the
+`bun run check:cases` runs only this step, without the engine, allowing the
 known-invalid cases listed in `benchmark/cases/baseline.json` (with a reason,
 an expiry and an approver) until their entry expires. Empty or
 incomplete directories and malformed fixtures terminate with an error; no
@@ -139,5 +137,5 @@ fixtures against published TY2025 tables and worksheet arithmetic. The
 [change ledger](./reference/2025/issue77-changes.json) preserves prior values
 and calculation assumptions. A fixture's `reconciliation.source_limitations` are
 reported as errors: matching a conditional expectation is not a passing result.
-Source facts and eligibility gaps remain visible; historical `output.json` files
-were not regenerated into expected values.
+Source facts and eligibility gaps remain visible; historical engine outputs were
+not regenerated into expected values.

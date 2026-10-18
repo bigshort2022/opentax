@@ -32,6 +32,7 @@ import {
 } from "../mef/builder.ts";
 import { assertPreparedAttachmentManifest } from "../mef/attachments/prepared-attachment-manifest.ts";
 import { assertW2GPayerCopyContents } from "../mef/identity/w2g-payer-copy.ts";
+import { assertForm8874CdeStatusEvidence } from "../domains/credits/business/form8874/form8874_cde_status_evidence.ts";
 import {
   preparedSourceSha256,
   sha256Hex,
@@ -71,8 +72,8 @@ import { assertBox11Line10Sources } from "../../nodes/inputs/income/rental-passt
 import { assertForm8915FSourceLinks } from "../../nodes/inputs/income/retirement/f8915f/index.ts";
 import { assertExtensionPaymentSource } from "../domains/payments/settlement/extension-payment-reconciliation.ts";
 import { assert1099RRecipientOwner } from "../domains/income/retirement/f1099r/f1099r-recipient-owner.ts";
-import { assertNecWithholdingRecipient } from "../domains/payments/withholding/f1099n/f1099nec-withholding-owner.ts";
-import { assert1099BRecipientOwner } from "../domains/income/other/f1099b/f1099b-recipient-owner.ts";
+import { assertNecWithholdingRecipient } from "../domains/payments/withholding/f1099nec/f1099nec-withholding-owner.ts";
+import { assert1099BRecipientOwner } from "../domains/income/investments/f1099b/f1099b-recipient-owner.ts";
 import {
   assertCapitalSaleSourceRows,
   assertNoRepeatedBrokerSaleSources,
@@ -80,7 +81,7 @@ import {
 import {
   assertPatrIssuedCopies,
   assertPatrWithholdingRecipient,
-} from "../domains/payments/withholding/f1099p/f1099patr-withholding-owner.ts";
+} from "../domains/payments/withholding/f1099patr/f1099patr-withholding-owner.ts";
 import {
   assertForm4852FilingRoute,
   assertLine1aWageSource,
@@ -121,7 +122,7 @@ import {
   assertFinalBalanceProjection,
   assertQualifiedDividendSubset,
 } from "../return-processing/return-wide-arithmetic.ts";
-import { assertDividendIncomeSources } from "../domains/income/other/f1099d/f1099div-income-reconciliation.ts";
+import { assertDividendIncomeSources } from "../domains/income/investments/f1099div/f1099div-income-reconciliation.ts";
 import {
   assertScheduleBInterestJoin,
   assertScheduleBPreparedProjection,
@@ -133,7 +134,7 @@ import {
 } from "../domains/income/retirement/ssa-benefits-reconciliation.ts";
 import { assertRrb1099rPensionSource } from "../domains/income/retirement/rrb1099r-pension-reconciliation.ts";
 import { assertIra1099rIncomeSource } from "../domains/income/retirement/ira1099r-income-reconciliation.ts";
-import { assertPositiveW2GRecipient } from "../mef/forms/income/other/w2g.ts";
+import { assertPositiveW2GRecipient } from "../mef/forms/income/gambling/w2g.ts";
 import { assertForm1098IssuerCopies } from "../../nodes/inputs/deductions/mortgage/f1098/issuer_copy.ts";
 import {
   hasForm8994Claim,
@@ -143,6 +144,7 @@ import {
   assertPublicForm8839Attachments,
   hasForm8839Claim,
 } from "../../nodes/intermediate/forms/credits/individual/form8839/public_source.ts";
+import { mefTaxYear } from "../mef/support/year-config.ts";
 
 /** Diagnostic origin of a page in a prepared filled-PDF review packet. */
 export interface PdfPageOrigin {
@@ -586,23 +588,30 @@ async function buildPdfBytesInternal(
   await assertForm1098IssuerCopies(pending);
   const normalized = normalizeAllPending(pending);
   assertEmployeeContributionReturn(normalized);
-  assertScheduleJSourceReturn(pending, executeComposedSourceReturn);
-  assertSingleFarmQbiReturn(normalized);
+  assertScheduleJSourceReturn(
+    pending,
+    (inputs) =>
+      executeComposedSourceReturn(inputs, {
+        taxYear: mefTaxYear(),
+        formType: "f1040",
+      }),
+  );
+  assertSingleFarmQbiReturn(normalized, mefTaxYear());
   if (normalized.f1040) {
     assertF1040FinalHeader(normalized.f1040, filer);
-    assertLine1hSupportedSource(normalized.f1040, normalized, filer);
+    assertLine1hSupportedSource(normalized.f1040, 2025, normalized, filer);
   }
   assertGeneral1040HeaderSource(normalized);
-  assertGeneral1040DependentSource(normalized);
+  assertGeneral1040DependentSource(normalized, 2025);
   assertGeneral1040DepositSource(normalized, filer);
   if (filer) assert1098EInterestSource(normalized, filer);
   assertExtensionPaymentSource(normalized, filer);
-  assert1099RRecipientOwner(normalized.f1099r, filer);
-  assertPositiveW2GRecipient(normalized.w2g, filer);
+  assert1099RRecipientOwner(normalized.f1099r, filer, 2025);
+  assertPositiveW2GRecipient(normalized.w2g, filer, 2025);
   assertNecWithholdingRecipient(normalized.f1099nec, filer);
-  assert1099BRecipientOwner(normalized.f1099b, filer);
+  assert1099BRecipientOwner(normalized.f1099b, filer, mefTaxYear());
   assertNoRepeatedBrokerSaleSources(normalized.f1099b, normalized.f8949);
-  assertCapitalSaleSourceRows(normalized);
+  assertCapitalSaleSourceRows(normalized, 2025);
   assertPatrIssuedCopies(normalized.f1099patr);
   assertPatrWithholdingRecipient(normalized.f1099patr, filer);
   assertLine1bHouseholdWageSource(normalized);
@@ -615,6 +624,11 @@ async function buildPdfBytesInternal(
     normalized,
     filer,
     preparedBundle?.retainedSourceDocuments ?? [],
+  );
+  await assertForm8874CdeStatusEvidence(
+    normalized,
+    preparedBundle?.retainedSourceDocuments ?? [],
+    mefTaxYear(),
   );
   reconcileForm8606RothInventories(normalized, filer);
   reconcileForm8606RothActivity(normalized, filer);
@@ -636,13 +650,13 @@ async function buildPdfBytesInternal(
   assertSchedule2W2Line13Sources(normalized);
   assertSchedule2W2Line17KSource(normalized);
   assertSchedule2Line17HSources(normalized, filer);
-  assertSchedule2Form4137Tax(normalized);
-  assertLine1cForm4137Income(normalized);
-  assertSchedule2Form8919Tax(normalized);
-  assertLine1gForm8919Wages(normalized);
-  assertSchedule2ScheduleHTax(normalized);
+  assertSchedule2Form4137Tax(normalized, 2025);
+  assertLine1cForm4137Income(normalized, 2025);
+  assertSchedule2Form8919Tax(normalized, 2025);
+  assertLine1gForm8919Wages(normalized, 2025);
+  assertSchedule2ScheduleHTax(normalized, 2025);
   assertSchedule2Form8960Tax(normalized);
-  assertSchedule2ScheduleSETax(normalized);
+  assertSchedule2ScheduleSETax(normalized, 2025);
   assertSchedule2Form8828Tax(normalized);
   assertSchedule2Form8936Repayment(normalized);
   assertSchedule3Form8859Credit(normalized);
@@ -653,17 +667,17 @@ async function buildPdfBytesInternal(
   assertF8288WithholdingOwner(normalized.f8288, filer);
   assertSocialSecurityBenefitSource(normalized);
   assertBenefitStatementOwner(normalized, filer);
-  assertRrb1099rPensionSource(normalized, filer);
-  assertIra1099rIncomeSource(normalized);
+  assertRrb1099rPensionSource(normalized, filer, 2025);
+  assertIra1099rIncomeSource(normalized, 2025);
   assertForm8915FSourceLinks(normalized);
   assertKIncomeClassification(normalized);
   if (filer) {
-    assertEitcChildSources(pending, filer);
+    assertEitcChildSources(pending, filer, 2025);
     assertKReportedErrorSources(normalized, filer);
     assertScheduleCReceiptSourceIdentity(normalized, filer);
     assertScheduleCStatutoryW2Sources(normalized, filer);
     assertKWithholdingSourceIdentity(normalized, filer);
-    assertKPersonalSaleSources(pending, filer);
+    assertKPersonalSaleSources(pending, filer, 2025);
     assertSchedule1Box3SourceIdentity(normalized, filer);
     assertSchedule1Box8SourceIdentity(normalized, filer);
     assertSchedule1Form8814Source(normalized);
@@ -899,6 +913,7 @@ async function buildPdfBytesInternal(
       filer,
       normalized,
       preparedBundle?.form3800Parts,
+      preparedBundle?.retainedSourceSha256ByReference,
     ) ??
       [projectedFields];
     for (const instance of instances) {

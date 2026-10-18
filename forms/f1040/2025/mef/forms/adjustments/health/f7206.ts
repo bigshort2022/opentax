@@ -1,4 +1,7 @@
-import { reconcileHealthPolicyRecords } from "../../../../../nodes/intermediate/forms/adjustments/health/form7206/policy-records.ts";
+import {
+  assertPremiumRecordsInYear,
+  reconcileHealthPolicyRecords,
+} from "../../../../../nodes/intermediate/forms/adjustments/health/form7206/policy-records.ts";
 import {
   assertIndependentOwnerHealth,
   assertOwnedSepContext,
@@ -29,6 +32,7 @@ import type {
 import { assertForm7206SpouseCoverage } from "../../../../domains/adjustments/health/form7206/form7206_spouse_coverage.ts";
 import { TS } from "../../../../../nodes/types.ts";
 import { assertScheduleCReceiptSourceIdentity } from "../../../../domains/general/return-assembly/filer-source-reconciliation.ts";
+import { mefTaxYear } from "../../../support/year-config.ts";
 
 type Input = Partial<
   Form7206Lines & {
@@ -71,6 +75,7 @@ function buildIRS7206(
   if (fields.independent_schedule_c_plans !== undefined) {
     const family = assertIndependentOwnerHealth(
       context?.pending,
+      mefTaxYear(context),
       context?.filer,
       fields,
     );
@@ -85,7 +90,12 @@ function buildIRS7206(
     );
   }
   if (fields.owned_sep_plans !== undefined) {
-    assertOwnedSepContext(context?.pending, context?.filer, fields);
+    assertOwnedSepContext(
+      context?.pending,
+      mefTaxYear(context),
+      context?.filer,
+      fields,
+    );
     return "";
   }
   if (!FIELD_MAP.some(([key]) => fields[key] !== undefined)) {
@@ -126,6 +136,7 @@ function buildIRS7206(
       ? source.spouse_identity!.ssn
       : source.taxpayer_identity.ssn,
   );
+  assertPremiumRecordsInYear([source], mefTaxYear(context));
   const lines = form7206LinesSchema.parse(fields);
   const expected = calculateSingleScheduleCForm7206(source);
   if (
@@ -202,7 +213,7 @@ function buildIRS7206(
   const scheduleSE = scheduleSEInputSchema.parse(pending?.schedule_se);
   const computedSELine13 = z.number().parse(
     schedule_se.compute(
-      { taxYear: 2025, formType: "f1040" },
+      { taxYear: mefTaxYear(context), formType: "f1040" },
       scheduleSE,
     ).outputs.find((row) => row.nodeType === "schedule1")?.fields
       .line15_se_deduction ?? 0,

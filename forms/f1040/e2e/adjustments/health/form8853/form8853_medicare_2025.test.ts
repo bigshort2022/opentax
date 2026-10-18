@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../scripts/support/sys.ts";
 import {
   centsLedger,
   deathLedger,
@@ -27,10 +30,9 @@ import { form8853 as native } from "../../../../2025/mef/forms/adjustments/healt
 import { extractFilerIdentity } from "../../../../mef/filer.ts";
 import {
   calculateMedicareLedger,
-  type MedicareDistributionLedger,
 } from "../../../../nodes/intermediate/forms/adjustments/health/form8853/medicare_distributions.ts";
 
-Deno.test("Medicare worksheet uses balance less60% deductible without reducing taxable income", () => {
+test("Medicare worksheet uses balance less60% deductible without reducing taxable income", () => {
   assertEquals(calculateMedicareLedger(priorBalanceLedger).worksheet, {
     line1: 8000,
     hadAccountAtEnd2024: true,
@@ -60,7 +62,7 @@ Deno.test("Medicare worksheet uses balance less60% deductible without reducing t
   assertEquals(calculateMedicareLedger(zeroPenalty).line13b, 0);
   assertEquals(calculateMedicareLedger(zeroPenalty).line13a, false);
 });
-Deno.test("Medicare worksheet and source rejects absent review, duplicate distributions and missing holder bills", () => {
+test("Medicare worksheet and source rejects absent review, duplicate distributions and missing holder bills", () => {
   assertThrows(
     () => calculateMedicareLedger({ ...noPriorLedger, prior_year: undefined }),
     Error,
@@ -91,7 +93,7 @@ for (
     ["nonspouse death transfer", deathLedger, 4000, 0],
   ] as const
 ) {
-  Deno.test(`Medicare MSA ${name} source→1040→native XSD and filled PDF`, async () => {
+  test(`Medicare MSA ${name} source→1040→native XSD and filled PDF`, async () => {
     const result = execute(
       buildExecutionPlan(registry),
       registry,
@@ -137,14 +139,14 @@ for (
       lines.deathTransfer,
     );
     const xsd = new URL(
-      "../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+      "../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
       import.meta.url,
     ).pathname;
-    const xmlPath = await Deno.makeTempFile({ suffix: ".xml" });
-    const pdfPath = await Deno.makeTempFile({ suffix: ".pdf" });
+    const xmlPath = await sys.makeTempFile({ suffix: ".xml" });
+    const pdfPath = await sys.makeTempFile({ suffix: ".pdf" });
     try {
-      await Deno.writeTextFile(xmlPath, xml);
-      const validation = await new Deno.Command("xmllint", {
+      await fs.writeFile(xmlPath, xml);
+      const validation = await new sys.Command("xmllint", {
         args: ["--noout", "--schema", xsd, xmlPath],
         stderr: "piped",
       }).output();
@@ -153,8 +155,8 @@ for (
         0,
         new TextDecoder().decode(validation.stderr),
       );
-      await Deno.writeFile(pdfPath, await buildPdfBytes(result.pending, filer));
-      const output = await new Deno.Command("pdftotext", {
+      await fs.writeFile(pdfPath, await buildPdfBytes(result.pending, filer));
+      const output = await new sys.Command("pdftotext", {
         args: ["-layout", pdfPath, "-"],
         stdout: "piped",
         stderr: "piped",
@@ -185,8 +187,8 @@ for (
         ledger.owner === "spouse" ? "222334444" : "111223333",
       );
     } finally {
-      await Deno.remove(xmlPath);
-      await Deno.remove(pdfPath);
+      await sys.remove(xmlPath);
+      await sys.remove(pdfPath);
     }
     const projected = form8853Pdf.instances?.(
       result.pending.form8853!,
@@ -221,7 +223,7 @@ for (
   });
 }
 
-Deno.test("Medicare estate final-return source retains existing full-return blocker", async () => {
+test("Medicare estate final-return source retains existing full-return blocker", async () => {
   const ledger = structuredClone(deathLedger);
   if (ledger.source.kind !== "death_transfer") {
     throw new Error("fixture source");
@@ -282,7 +284,7 @@ Deno.test("Medicare estate final-return source retains existing full-return bloc
   );
 });
 
-Deno.test("Form8853 medicare rejects reused medical expense references through native and PDF export", async () => {
+test("Form8853 medicare rejects reused medical expense references through native and PDF export", async () => {
   const result = execute(
     buildExecutionPlan(registry),
     registry,
