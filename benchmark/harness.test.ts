@@ -345,3 +345,21 @@ test("the runners skip a baselined invalid case until its entry expires, and sti
     discoverBenchmarkCases(year, undefined, { ...known, today: "2027-02-01" })
   );
 });
+
+test("published-line oracles require explicit scope, authority and disclosed synthetic inputs", () => {
+  const published = {
+    oracle_scope: "published_lines",
+    source: "IRS 2023 Form 1040 Tax Table, page 3 Example",
+    synthetic_inputs: "Synthetic wages bridge the published taxable income through the real CLI; no return balance is an oracle",
+    correct: { line15_taxable_income: 25300, line16_income_tax: 2599 },
+  };
+  assertEquals(benchmarkExpectedSchema.parse(published), published.correct);
+  for (const invalid of [
+    { correct: published.correct },
+    { ...published, source: "" },
+    { ...published, synthetic_inputs: undefined },
+    { ...published, correct: {} },
+    { ...published, correct: { line16_income_tax: NaN } },
+  ]) assertThrows(() => benchmarkExpectedSchema.parse(invalid));
+  assertThrows(() => benchmarkExpectedSchema.parse({ correct: { line24_total_tax: 100, line37_amount_owed: 100 } }));
+});

@@ -1,3 +1,5 @@
+import { assertHistoricalCapitalSource, HistoricalForm8949Part } from "../../../../forms/income/investments/form8949/historical-source.ts";
+import { openingLossSourceSchema } from "./carryover.ts";
 import {
   isDirectCapitalSale,
   roundCapitalAmount,
@@ -103,6 +105,7 @@ export const inputSchema = z.object({
   // Carryovers from prior year (entered as positive; treated as loss in computation)
   line_6_carryover: z.number().nonnegative().optional(),
   line_14_carryover: z.number().nonnegative().optional(),
+  opening_loss_source: openingLossSourceSchema.optional(),
   // Capital gain distributions from d_screen (Line 13 of Schedule D — same line as line13_cap_gain_distrib)
   line_12_cap_gain_dist: z.number().nonnegative().optional(),
   // Undistributed LT gains (Form 2439, Form 4797 Part I, etc.) — Line 11
@@ -134,6 +137,15 @@ export const inputSchema = z.object({
   // Collectibles gain from Form 2439 — flows to 28% Rate Gain Worksheet line 4
   // IRC §1(h)(5); max 28% tax rate applies
   collectibles_gain_form2439: z.number().nonnegative().optional(),
+});
+
+export const historicalScheduleDInputSchema = inputSchema.extend({
+  transaction: accumulable(transactionSchema.extend({
+    part: z.nativeEnum(HistoricalForm8949Part),
+  })).optional(),
+  transactions: z.array(dScreenTransactionSchema.extend({
+    part: z.nativeEnum(HistoricalForm8949Part),
+  })).optional(),
 });
 
 type ScheduleDInput = z.infer<typeof inputSchema>;
@@ -316,6 +328,13 @@ class ScheduleDIntermediateNode extends TaxNode<typeof inputSchema> {
 
   compute(_ctx: NodeContext, rawInput: ScheduleDInput): NodeResult {
     const input = inputSchema.parse(rawInput);
+    for (const tx of [...normalizeArray(input.transaction), ...(input.transactions ?? [])]) {
+      assertHistoricalCapitalSource(tx, _ctx.taxYear);
+    }
+    if (input.opening_loss_source && (input.opening_loss_source.tax_year !== _ctx.taxYear - 1 ||
+      input.line_6_carryover === undefined || input.line_14_carryover === undefined)) {
+      throw new Error("Capital opening losses need both known character amounts and consecutive source year");
+    }
     if (input.k1_partnership_box11_code_s_sources?.length) {
       const hasContribution = (
         line: number | number[] | undefined,

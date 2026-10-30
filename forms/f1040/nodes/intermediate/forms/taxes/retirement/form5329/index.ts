@@ -128,7 +128,7 @@ export const ownerEntrySchema = z.object({
   hsa_part_vii: z.object({
     line42_prior_excess: z.number().nonnegative(),
     prior_year_source: z.object({
-      tax_year: z.literal(2024),
+      tax_year: z.number().int(),
       filed_form5329_reference: z.string().trim().min(1),
       filed_return_reviewed: z.literal(true),
       owner_ssn: z.string().regex(/^\d{3}-?\d{2}-?\d{4}$/),
@@ -368,8 +368,15 @@ class Form5329Node extends TaxNode<typeof inputSchema> {
   readonly inputSchema = inputSchema;
   readonly outputNodes = new OutputNodes([schedule2]);
 
-  compute(_ctx: NodeContext, rawInput: Form5329Collection): NodeResult {
-    const result = calculateOwnerForms(inputSchema.parse(rawInput));
+  compute(ctx: NodeContext, rawInput: Form5329Collection): NodeResult {
+    const parsed = inputSchema.parse(rawInput);
+    for (const entry of entriesOf(parsed)) {
+      const prior = entry.hsa_part_vii?.prior_year_source;
+      if (prior && prior.tax_year !== ctx.taxYear - 1) {
+        throw new Error("Form 5329 HSA source must be from the immediately preceding tax year");
+      }
+    }
+    const result = calculateOwnerForms(parsed);
     return {
       outputs: [
         ...schedule2Output(result.total, result.chapter1Tax),
@@ -540,7 +547,7 @@ export function reconcileHsaOwnerForms(
             )
       ) {
         throw new Error(
-          `Form 5329 ${owner} prior HSA excess needs its reviewed filed 2024 owner source`,
+          `Form 5329 ${owner} prior HSA excess needs its reviewed filed prior-year owner source`,
         );
       }
     } else if (prior) {

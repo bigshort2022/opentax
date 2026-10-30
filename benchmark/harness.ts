@@ -9,6 +9,10 @@ import {
   rejectUnknownFields,
 } from "../cli/commands/form.ts";
 
+export enum BenchmarkOracleScope {
+  PublishedLines = "published_lines",
+}
+
 export const benchmarkInputSchema = z.object({
   year: z.number().int(),
   scenario: z.string().optional(),
@@ -22,12 +26,27 @@ const requiredValues = z.object({
   line35a_refund: z.number().finite(),
   line37_amount_owed: z.number().finite(),
 }).catchall(z.number().finite());
-export const benchmarkExpectedSchema = z.union([
-  z.object({ correct: requiredValues }).passthrough(),
+const fullReturnExpectedSchema = z.union([
+  z.object({ correct: requiredValues, oracle_scope: z.never().optional() }).passthrough(),
   requiredValues,
 ]).transform((value) =>
   requiredValues.parse("correct" in value ? value.correct : value)
 );
+const publishedLinesExpectedSchema = z.object({
+  oracle_scope: z.nativeEnum(BenchmarkOracleScope),
+  source: z.string().trim().min(1),
+  synthetic_inputs: z.string().trim().min(1),
+  correct: z.record(z.number().finite()).refine(
+    (lines) => Object.keys(lines).length > 0,
+    "A published-line oracle must score at least one published value",
+  ),
+}).passthrough().transform((value) => value.correct);
+
+/** Partial publication examples never weaken the complete-return contract. */
+export const benchmarkExpectedSchema = z.union([
+  fullReturnExpectedSchema,
+  publishedLinesExpectedSchema,
+]);
 
 /** A conditional calculation is not a passing, source-backed oracle. */
 export function benchmarkSourceIssues(
@@ -159,11 +178,11 @@ function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-async function parseFile<T>(
+async function parseFile<Output, Input>(
   directory: string,
   name: string,
-  schema: z.ZodType<T>,
-): Promise<{ raw: unknown; parsed: T }> {
+  schema: z.ZodType<Output, z.ZodTypeDef, Input>,
+): Promise<{ raw: unknown; parsed: Output }> {
   const raw = JSON.parse(await fs.readFile(join(directory, name), "utf8"));
   try {
     return { raw, parsed: schema.parse(raw) };

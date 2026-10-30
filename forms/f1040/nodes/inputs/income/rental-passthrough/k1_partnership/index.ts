@@ -14,6 +14,8 @@ import {
 } from "../../../taxes/credit-recapture/f8611/partnership-source.ts";
 import { z } from "zod";
 import { ty2025IrsCountryCodeSchema } from "../../../../irs_country_code.ts";
+import { isHistoricalTaxYear } from "../../../../config/index.ts";
+import { form461, historicalOwnerBusinessOutputs } from "../../../../intermediate/forms/income/business/form461/index.ts";
 import type {
   NodeOutput,
   NodeResult,
@@ -90,7 +92,7 @@ export const itemSchema = z.object({
   partnership_name: z.string().min(1),
   partnership_ein: z.string().regex(/^\d{9}$/).optional(),
   source_document_reference: z.string().trim().min(1).optional(),
-  source_tax_year: z.literal(2025).optional(),
+  source_tax_year: z.number().int().optional(),
   recipient_tin: z.string().regex(/^\d{9}$/).optional(),
   // Box 15 code Z is the partner's orphan-drug credit, not a generic credit.
   box15_code_z_orphan_drug_credit: z.number().int().positive().optional(),
@@ -119,6 +121,15 @@ export const itemSchema = z.object({
   box3_other_rental: z.number().optional(),
   eic_passive_activity_review: k1PassiveEicReviewSchema.optional(),
   passive_income_source: k1PassiveIncomeSourceSchema.optional(),
+  ordinary_loss_limitations: z.object({
+    tax_year: z.number().int(),
+    source_reference: z.string().trim().min(1),
+    basis_available_for_loss: z.number().nonnegative(),
+    at_risk_available_for_loss: z.number().nonnegative(),
+    materially_participated: z.literal(true),
+    no_prior_suspended_losses: z.literal(true),
+    no_other_loss_or_deduction_items: z.literal(true),
+  }).strict().optional(),
   qualified_business_income_source: currentK1QbiSourceSchema.optional(),
 
   // Box 4a — Guaranteed payments for services → Schedule E + Schedule SE
@@ -1047,6 +1058,7 @@ class K1PartnershipNode extends TaxNode<typeof inputSchema> {
   readonly inputSchema = inputSchema;
   readonly outputNodes = new OutputNodes([
     schedule1,
+    form461,
     agi_aggregator,
     schedule_b,
     f1040,
@@ -1070,11 +1082,58 @@ class K1PartnershipNode extends TaxNode<typeof inputSchema> {
     scheduleE,
   ]);
 
-  compute(_ctx: NodeContext, input: z.infer<typeof inputSchema>): NodeResult {
+  compute(ctx: NodeContext, input: z.infer<typeof inputSchema>): NodeResult {
     const { k1_partnerships } = inputSchema.parse(input);
+    for (const item of k1_partnerships) {
+      for (const year of [item.source_tax_year, item.passive_income_source?.tax_year,
+        item.qualified_business_income_source?.tax_year, item.ordinary_loss_limitations?.tax_year]) {
+        if (year !== undefined && year !== ctx.taxYear) {
+          throw new Error("Partnership K-1 source must match the return tax year");
+        }
+      }
+      if (isHistoricalTaxYear(ctx.taxYear) &&
+        [item.box2_rental_re, item.box3_other_rental, item.box7_royalties,
+          item.box4a_guaranteed_services, item.box4b_guaranteed_capital,
+          item.box8_net_st_cap_gain, item.box9a_net_lt_cap_gain,
+          item.box9b_collectibles_gain, item.box10_net_1231]
+          .some((amount) => (amount ?? 0) < 0)) {
+        throw new Error("Historical partnership K-1 loss character requires separately reviewed basis, at-risk, passive and character-specific limitation sources");
+      }
+      const loss = -(item.box1_ordinary_business ?? 0);
+      const limitations = item.ordinary_loss_limitations;
+      if (loss > 0 && isHistoricalTaxYear(ctx.taxYear) && !limitations) {
+        throw new Error("Partnership ordinary loss needs reviewed loss limitations: basis, at-risk, and participation");
+      }
+      if (limitations) {
+        if (loss <= 0 || !item.partnership_ein || !item.recipient_tin ||
+            !item.source_document_reference || item.source_tax_year !== ctx.taxYear ||
+            item.eic_passive_activity_review?.box1 === "passive" ||
+            item.passive_income_source ||
+            [item.box2_rental_re, item.box3_other_rental, item.box8_net_st_cap_gain,
+              item.box9a_net_lt_cap_gain, item.box9b_collectibles_gain,
+              item.box10_net_1231].some((amount) => (amount ?? 0) < 0) ||
+            (item.box12_section_179 ?? 0) > 0 || (item.box13_deductions ?? 0) > 0 ||
+            item.box13_code_i_royalty_deduction !== undefined ||
+            item.box13_code_h_investment_interest !== undefined ||
+            [item.pre2018_basis_ordinary_loss, item.pre2018_basis_st_cap_loss,
+              item.pre2018_basis_lt_cap_loss, item.pre2018_basis_other_loss,
+              item.pre2018_atrisk_ordinary_loss].some((amount) => (amount ?? 0) > 0)) {
+          throw new Error("Partnership ordinary loss limitations require one sourced nonpassive ordinary loss without competing deductions");
+        }
+        if (loss > limitations.basis_available_for_loss) {
+          throw new Error("Partnership basis-limited loss requires a reviewed character-allocated basis carryover");
+        }
+        if (loss > limitations.at_risk_available_for_loss) {
+          throw new Error("Partnership at-risk-limited loss requires Form 6198 and a separate at-risk carryover");
+        }
+      }
+    }
 
     const recaptures = issuedPartnershipRecaptures(k1_partnerships);
     const outputs: NodeOutput[] = [
+      ...historicalOwnerBusinessOutputs(ctx.taxYear, k1_partnerships.reduce(
+        (total, item) => total + (item.box1_ordinary_business ?? 0) +
+          (item.box4a_guaranteed_services ?? 0) + (item.box4b_guaranteed_capital ?? 0), 0)),
       ...(recaptures.length ? [output(f8611, { f8611s: recaptures })] : []),
       ...schedule1Output(k1_partnerships),
       ...royaltyScheduleEOutputs(k1_partnerships),

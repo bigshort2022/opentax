@@ -218,3 +218,22 @@ test("ext.compute: smoke — all fields populated, schedule3 gets line_7 amount"
   assertEquals(schedule3Fields(result)?.line10_amount_paid_extension, 5000);
   assertEquals(result.outputs.length, 1);
 });
+
+test("historical extension payments retain accepted following-year dates and reject another return year", () => {
+  const input = inputSchema.parse({
+    produce_4868: "X",
+    line_7_amount_paying: 1500,
+    payment_evidence: {
+      ...paymentEvidence(1500),
+      tax_year: 2021,
+      payment_date: "2022-04-18",
+    },
+  });
+  const result = ext.compute({ taxYear: 2021, formType: "f1040" }, input);
+  assertEquals(fieldsOf(result.outputs, schedule3)?.line10_amount_paid_extension, 1500);
+  assertThrows(() => ext.compute({ taxYear: 2022, formType: "f1040" }, input));
+  assertThrows(() => inputSchema.parse({
+    ...input,
+    payment_evidence: { ...input.payment_evidence, payment_date: "2022-02-30" },
+  }));
+});

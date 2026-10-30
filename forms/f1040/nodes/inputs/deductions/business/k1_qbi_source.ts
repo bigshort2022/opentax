@@ -8,7 +8,7 @@ import {
   currentPassiveLine10Activities,
 } from "../../income/rental-passthrough/k1_partnership/box11_line10.ts";
 export const currentK1QbiSourceSchema = z.object({
-  tax_year: z.literal(2025),
+  tax_year: z.number().int(),
   issuer_ein: z.string().regex(/^\d{9}$/),
   recipient_tin: z.string().regex(/^\d{9}$/),
   issued_k1_reference: z.string().trim().min(1),

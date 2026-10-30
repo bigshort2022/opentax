@@ -10,6 +10,7 @@ import * as sys from "../scripts/support/sys.ts";
 import { dirname, join } from "node:path";
 import { fileURLToPath as fromFileUrl } from "node:url";
 import {
+  BenchmarkOracleScope,
   benchmarkExpectedSchema,
   benchmarkInputSchema,
   benchmarkReturnSchema,
@@ -210,6 +211,7 @@ const RAW_FIELDS = new Set([
   "line1a_wages",
   "line7_capital_gain",
   "line10_adjustments",
+  "line16_income_tax",
   "line27_eitc",
 ]);
 const METADATA_FIELDS = new Set([
@@ -320,6 +322,7 @@ type CaseResult = {
   unsupportedChecks: UnsupportedCheck[];
   errors: string[];
   ok: boolean;
+  oracleScope?: BenchmarkOracleScope;
 };
 
 async function runCase(name: string): Promise<CaseResult> {
@@ -372,7 +375,7 @@ async function runCase(name: string): Promise<CaseResult> {
     correct,
   );
   const lineFailures = Object.keys(c).length > 0
-    ? compareExpectedNumericLines(actualLines, c)
+    ? compareExpectedNumericLines(actualLines, c, correct.oracle_scope === BenchmarkOracleScope.PublishedLines ? 0 : ROUNDING_TOLERANCE)
     : [];
   if (Object.keys(c).length === 0 && unsupportedChecks.length === 0) {
     errors.push("No numeric expected benchmark values");
@@ -393,6 +396,7 @@ async function runCase(name: string): Promise<CaseResult> {
     unsupportedChecks,
     errors,
     ok,
+    ...(correct.oracle_scope === BenchmarkOracleScope.PublishedLines ? { oracleScope: BenchmarkOracleScope.PublishedLines } : {}),
   };
 }
 
@@ -512,6 +516,10 @@ if (import.meta.main) {
   write(
     `\n  ${GRN}${pass} PASS${RST}  ${RED}${fail} FAIL${RST}  ${YEL}${skipped} SKIP${RST}  ${DIM}out of ${results.length} runnable cases  ·  green = within $${ROUNDING_TOLERANCE} legacy benchmark tolerance${RST}\n\n`,
   );
+  const publishedLineCases = results.filter((result) => result.oracleScope === BenchmarkOracleScope.PublishedLines);
+  if (publishedLineCases.length > 0) {
+    write(`  ${publishedLineCases.length} published-line cases score only their cited lines, with exact dollar equality; unscored return balances are not IRS oracles.\n\n`);
+  }
   if (emptyCaseSet) {
     console.error(
       "No runnable benchmark cases found; failing instead of reporting an empty success.",
@@ -534,6 +542,7 @@ if (import.meta.main) {
         fail,
         failing,
         failures,
+        publishedLineCases: publishedLineCases.map((result) => ({ name: result.name, scoredLines: Object.keys(result.correct) })),
       }),
     );
   }

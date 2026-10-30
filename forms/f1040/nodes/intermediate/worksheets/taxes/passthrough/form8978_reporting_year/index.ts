@@ -24,6 +24,9 @@ type Input = z.infer<typeof inputSchema>;
 class Form8978ReportingYearNode extends TaxNode<typeof inputSchema> {
   readonly nodeType = "form8978_reporting_year";
   readonly inputSchema = inputSchema;
+  override readonly contextFields = Object.keys(inputSchema.shape).filter(
+    (field) => field !== "negative_form8978_line14",
+  );
   readonly outputNodes = new OutputNodes([f1040, schedule3]);
 
   compute(_ctx: NodeContext, rawInput: Input): NodeResult {

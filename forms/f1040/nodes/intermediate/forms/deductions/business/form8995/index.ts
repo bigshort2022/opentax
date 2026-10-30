@@ -1,3 +1,4 @@
+import { nonitemizerCharitableDeduction } from "../../../../worksheets/deductions/standard/standard_deduction/deduction-limits-2026.ts";
 import { assertSstbServiceClassification } from "../../../../../inputs/income/business/schedule_c/sstb-classification.ts";
 import { passiveSCorpLossBundleSchema } from "../../../../../inputs/income/rental-passthrough/k1_s_corp_passive_loss_source.ts";
 import { passiveSCorpLossQbiLines } from "./passive-s-corp-loss.ts";
@@ -234,6 +235,8 @@ export const inputSchema = z.object({
   // Schedule 1-A reduces taxable income before the section 199A income cap.
   additional_deductions: z.number().nonnegative().optional(),
   itemized_deductions: z.number().nonnegative().optional(),
+  nonitemizer_charitable_cash: z.number().nonnegative().optional(),
+  nonitemizer_charitable_cash_unclassified: z.boolean().optional(),
   force_itemized: z.boolean().optional(),
   mfs_spouse_itemizing: z.boolean().optional(),
   qualified_tip_qbi_source: qualifiedTipQbiSourceSchema.optional(),
@@ -326,9 +329,21 @@ function standardDeductionAmount(
 
 function sourceDeductionAmount(input: Form8995Input, cfg: F1040Config): number {
   const itemized = input.itemized_deductions ?? 0;
-  return input.force_itemized === true || input.mfs_spouse_itemizing === true
-    ? itemized
-    : Math.max(itemized, standardDeductionAmount(input, cfg));
+  if (input.force_itemized === true || input.mfs_spouse_itemizing === true) {
+    return itemized;
+  }
+  const charitable = input.filing_status === undefined ? 0
+    : nonitemizerCharitableDeduction(
+      cfg, input.filing_status, input.nonitemizer_charitable_cash ?? 0,
+    );
+  const standard = standardDeductionAmount(input, cfg) + charitable;
+  if (
+    standard >= itemized && cfg.nonitemizerCharitableLimit > 0 &&
+    input.nonitemizer_charitable_cash_unclassified === true
+  ) {
+    throw new Error("QBI taxable income needs classified nonitemizer charitable cash");
+  }
+  return Math.max(itemized, standard);
 }
 
 function incomeLimitBase(

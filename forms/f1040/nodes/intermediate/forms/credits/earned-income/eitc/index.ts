@@ -40,10 +40,30 @@ export const qualifyingChildDetailSchema = z.object({
 });
 export type QualifyingChildDetail = z.infer<typeof qualifyingChildDetailSchema>;
 
+const historical2021EicAgeCategory = z.enum([
+  "regular", "specified_student", "qualified_former_foster_youth",
+  "qualified_homeless_youth",
+]);
+
 export const childlessEicReviewSchema = z.object({
   not_qualifying_child_of_another_taxpayer_verified: z.literal(true),
   qualifying_child_status_record_reference: z.string().trim().min(1),
   hoh_unmarried_at_year_end_verified: z.literal(true).optional(),
+  // Pub. 596 (2021), Rule 11. Required below age 24: age alone cannot
+  // establish whether the 19, 24, or qualified-youth 18 minimum applies.
+  historical_2021_age_review: z.object({
+    taxpayer: historical2021EicAgeCategory,
+    spouse: historical2021EicAgeCategory.optional(),
+    source_reference: z.string().trim().min(1),
+  }).strict().optional(),
+  // ARPA §9626 / Pub. 596 (2021), Election to use prior year earned income.
+  // For a joint 2021 return this must reconcile both spouses' 2019 amounts,
+  // even when they did not file jointly in 2019. It does not replace 2021 AGI.
+  historical_2021_earned_income_election: z.object({
+    earned_income_2019: z.number().nonnegative(),
+    joint_2019_earned_income_reconciled: z.literal(true),
+    source_reference: z.string().trim().min(1),
+  }).strict().optional(),
 }).strict();
 
 export const childEicFilerReviewSchema = z.object({
@@ -182,13 +202,55 @@ function clampChildren(children: number): number {
   return Math.min(children, 3);
 }
 
-// IRC §32(c)(1)(A)(ii)(II): at least 25 but under 65 at the end of the year.
+// Pub. 596 (2021), Rule 11; ARPA §9621.
+type HistoricalEicAgeCategory = z.infer<typeof historical2021EicAgeCategory>;
+
+function meets2021ChildlessAgeTest(
+  dob: string,
+  deathDate: string | undefined,
+  category: HistoricalEicAgeCategory | undefined,
+): boolean | undefined {
+  const minimumAge = category === "specified_student" ? 24
+    : category === "qualified_former_foster_youth" ||
+        category === "qualified_homeless_youth" ? 18 : 19;
+  const ageDate = (age: number) => new Date(Date.UTC(
+    Number(dob.slice(0, 4)) + age,
+    Number(dob.slice(5, 7)) - 1,
+    Number(dob.slice(8, 10)) - 1,
+  )).toISOString().slice(0, 10);
+  const asOf = deathDate ?? "2021-12-31";
+  if (deathDate && !deathDate.startsWith("2021-")) return false;
+  if (asOf < ageDate(18)) return false;
+  if (category === undefined && asOf < ageDate(24)) return undefined;
+  return asOf >= ageDate(minimumAge);
+}
+
+/** The 2021 Form1040 line27a checkbox certifies both youth status and DOB. */
+function qualifiesFor2021YouthIndicator(
+  dob: string | undefined,
+  deathDate: string | undefined,
+  category: HistoricalEicAgeCategory | undefined,
+): boolean {
+  if (dob === undefined || dob <= "1998-01-01" || dob >= "2004-01-02") {
+    return false;
+  }
+  if (
+    category !== "qualified_former_foster_youth" &&
+    category !== "qualified_homeless_youth"
+  ) return false;
+  return meets2021ChildlessAgeTest(dob, deathDate, category) === true;
+}
+
 function meetsChildlessAgeTest(
   dob: string | undefined,
   deathDate: string | undefined,
   taxYear: number,
-): boolean {
+  historicalCategory?: HistoricalEicAgeCategory,
+): boolean | undefined {
   if (dob === undefined) return false;
+  if (taxYear === 2021) {
+    return meets2021ChildlessAgeTest(dob, deathDate, historicalCategory);
+  }
   if (deathDate === undefined) {
     return dob > `${taxYear - 65}-12-31` && dob < `${taxYear - 24}-01-02`;
   }
@@ -216,12 +278,25 @@ export function childlessEicEligible(
     input.filing_status === FilingStatus.MFS
   ) return false;
   const isJoint = isJointFiler(input.filing_status);
-  const ageEligible = meetsChildlessAgeTest(
+  const taxpayerAgeEligible = meetsChildlessAgeTest(
     input.taxpayer_dob,
     input.taxpayer_death_date,
     taxYear,
-  ) || (isJoint &&
-    meetsChildlessAgeTest(input.spouse_dob, input.spouse_death_date, taxYear));
+    input.childless_eic_review?.historical_2021_age_review?.taxpayer,
+  );
+  const spouseAgeEligible = isJoint
+    ? meetsChildlessAgeTest(
+      input.spouse_dob, input.spouse_death_date, taxYear,
+      input.childless_eic_review?.historical_2021_age_review?.spouse,
+    )
+    : false;
+  const ageEligible = taxpayerAgeEligible === true || spouseAgeEligible === true;
+  if (
+    !ageEligible &&
+    (taxpayerAgeEligible === undefined || spouseAgeEligible === undefined)
+  ) {
+    throw new Error("2021 childless EIC below age 24 needs the reviewed student or qualified-youth age category");
+  }
   if (!ageEligible || input.main_home_in_us_over_half_year !== true) {
     return false;
   }
@@ -277,12 +352,14 @@ export function eicTaxResidencyEligible(input: EitcInput): boolean {
 
 type EicLookup = (amount: number, children: number, joint: boolean) => number;
 
-// TY2025 uses the published EIC Table. Later years build the table from the
-// year's §32(b) amounts by the same $50-row method until the IRS publishes it.
+// Annual config supplies the table's maximum-credit rounding convention.
+// The published 2025 lookup remains authoritative for that year.
 function eicLookupForYear(taxYear: number, cfg: F1040Config): EicLookup {
   if (taxYear === 2025) return lookupEic2025;
   return (amount, children, joint) =>
-    lookupEicFromParameters(cfg.eitcByChildren, amount, children, joint);
+    lookupEicFromParameters(
+      cfg.eitcByChildren, amount, children, joint, cfg.eitcMaximumRounding,
+    );
 }
 
 // EIC Worksheet A line 4 / Worksheet B line 6: AGI is looked up only from the
@@ -347,10 +424,19 @@ function tentativeEitc(
   taxYear: number,
 ): number {
   if (input.do_not_claim_eic === true) return 0;
-  const earnedIncome = (input.earned_income ?? 0) +
+  const currentEarnedIncome = (input.earned_income ?? 0) +
     (input.disability_pension_earned_income ?? 0) +
     (input.se_net_profit ?? 0) - (input.se_tax_deduction ?? 0);
-  const agi = input.agi ?? earnedIncome;
+  const priorIncomeElection =
+    input.childless_eic_review?.historical_2021_earned_income_election;
+  if (
+    priorIncomeElection &&
+    priorIncomeElection.earned_income_2019 <= currentEarnedIncome
+  ) {
+    throw new Error("2021 EIC prior-year election requires 2019 earned income greater than 2021 earned income");
+  }
+  const earnedIncome = priorIncomeElection?.earned_income_2019 ?? currentEarnedIncome;
+  const agi = input.agi ?? currentEarnedIncome;
   const children = clampChildren(input.qualifying_children ?? 0);
   const isJoint = isJointFiler(input.filing_status);
 
@@ -408,6 +494,13 @@ class EitcNode extends TaxNode<typeof inputSchema> {
 
     const input = inputSchema.parse(rawInput);
     assertResidencyReviewForYear(input, ctx.taxYear);
+    if (
+      ctx.taxYear !== 2021 &&
+      (input.childless_eic_review?.historical_2021_age_review ||
+        input.childless_eic_review?.historical_2021_earned_income_election)
+    ) {
+      throw new Error("Historical EIC age and 2019 earned-income elections are only available in 2021");
+    }
     const credit = computeEitc(
       input,
       cfg.eitcInvestmentIncomeLimit,
@@ -425,6 +518,24 @@ class EitcNode extends TaxNode<typeof inputSchema> {
             investment_income_floor: input.investment_income_floor ?? 0,
             qualifying_children: input.qualifying_children ?? 0,
             qualifying_child_details: input.qualifying_child_details ?? [],
+            ...(ctx.taxYear === 2021 &&
+                input.childless_eic_review?.historical_2021_earned_income_election
+              ? {
+                historical_2021_elected_earned_income:
+                  input.childless_eic_review.historical_2021_earned_income_election.earned_income_2019,
+              }
+              : {}),
+            ...(ctx.taxYear === 2021 && credit > 0 &&
+                (qualifiesFor2021YouthIndicator(
+                  input.taxpayer_dob, input.taxpayer_death_date,
+                  input.childless_eic_review?.historical_2021_age_review?.taxpayer,
+                ) || (isJointFiler(input.filing_status) &&
+                  qualifiesFor2021YouthIndicator(
+                    input.spouse_dob, input.spouse_death_date,
+                    input.childless_eic_review?.historical_2021_age_review?.spouse,
+                  )))
+              ? { historical_2021_qualified_youth: true }
+              : {}),
           },
         },
       ],

@@ -15,6 +15,12 @@ export type EitcParameters = {
   readonly phaseoutEndMfj: number;
 };
 
+/** Maximum-credit precision used by the year's published EIC table. */
+export type EitcMaximumRounding =
+  | "unrounded"
+  | "rounded"
+  | "rounded-including-terminal";
+
 /** Standard mileage rates in dollars per mile, from `from` (ISO date) on. */
 export type MileagePeriod = {
   readonly from: string;
@@ -141,13 +147,15 @@ export interface F1040Config {
   // ── QBI ───────────────────────────────────────────────────────────────────
   qbiThresholdSingle: number;
   qbiThresholdMfj: number;
-  /** Equal to the single amount through TY2025; $25 above it in TY2026. */
+  /** Filing-status-specific amount (e.g. $25 above single in 2021 and 2026). */
   qbiThresholdMfs: number;
   /** Section 199A phase-in range for joint returns; other statuses use half. */
   qbiPhaseInRange: number;
 
   // ── EITC ──────────────────────────────────────────────────────────────────
   eitcInvestmentIncomeLimit: number;
+  /** "rounded" retains the unrounded maximum in split terminal bands. */
+  eitcMaximumRounding: EitcMaximumRounding;
   /** Indexed by qualifying children: 0, 1, 2, 3 or more. */
   eitcByChildren: readonly [
     EitcParameters,
@@ -301,7 +309,7 @@ export interface F1040Config {
   vehicleLoanInterestPhaseoutPerThousand: number;
 
   // ── Charitable and itemized-deduction limits ─────────────────────────────
-  /** 1040 line 12f; zero when the year has no non-itemizer deduction. */
+  /** Nonitemizer cash deduction: 2021 line 12b / 2026 line 12f; zero otherwise. */
   nonitemizerCharitableLimit: number;
   nonitemizerCharitableLimitMfj: number;
   /** Share of the contribution base disallowed under IRC §170(b)(1)(I). */

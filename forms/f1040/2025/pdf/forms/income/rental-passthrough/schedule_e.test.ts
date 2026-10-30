@@ -2,7 +2,7 @@ import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import { scheduleEPdf } from "./schedule_e.ts";
 import { scheduleE } from "../../../../mef/forms/income/rental-passthrough/schedule_e.ts";
-import { inputSchema as scheduleEInputSchema } from "../../../../../nodes/inputs/income/rental-passthrough/schedule_e/index.ts";
+import { inputSchema as scheduleEInputSchema, scheduleE as scheduleENode } from "../../../../../nodes/inputs/income/rental-passthrough/schedule_e/index.ts";
 import { fillFormPdf } from "../../../builder.ts";
 import { testFiler } from "../../../../mef/execution/test-filer.ts";
 
@@ -495,4 +495,67 @@ test("Schedule E PDF fails closed on unprojected paths and Schedule 1 mismatch",
     Error,
     "entire-interest overall-loss",
   );
+});
+
+test("Schedule E 2025 paper projects source expenses before ownership and rejects another year's source", () => {
+  const raw = scheduleEInputSchema.parse({schedule_es:[{
+    tsj:"T",activity_id:"allocated-rental",property_description:"Synthetic rental",
+    property_type:1,activity_type:"B",fair_rental_days:365,personal_use_days:0,
+    rent_income:12000,ownership_percent:50,form_1099_payments_made:false,
+    street_address:"12 Main Street",city:"Austin",state:"TX",zip:"78701",
+    expense_allocation_source:{
+      tax_year:2025,activity_id:"allocated-rental",source_reference:"Synthetic expense ledger",
+      use_pattern:"rental-only",rental_period:{from:"2025-01-01",through:"2025-12-31"},
+      no_personal_use_during_rental_period:true,amounts_before_ownership_allocation:true,
+      expenses:[{expense_id:"insurance",category:"expense_insurance",transaction_kind:"expense",
+        source_amount:4000,source_reference:"Synthetic insurer",paid_on:"2025-01-01",
+        expense_period:{from:"2025-01-01",through:"2025-12-31"},
+        method:"documented-share",rental_share:0.5,method_reference:"Reviewed rental-unit share"}],
+    },
+  }]});
+  const before = JSON.stringify(raw);
+  const projected = scheduleEPdf.projectFields?.(raw, {
+    schedule_e:raw,schedule1:{line5_schedule_e:5000},
+  });
+  assertEquals(projected?.line26,5000);
+  assertEquals(JSON.stringify(raw),before);
+  const wrongYear = scheduleEInputSchema.parse({schedule_es:raw.schedule_es.map(item=>({
+    ...item,expense_allocation_source:{...item.expense_allocation_source,tax_year:2026},
+  }))});
+  assertThrows(()=>scheduleEPdf.projectFields?.(wrongYear,{schedule_e:wrongYear}),
+    Error,"allocation year/activity");
+});
+
+test("current Schedule E paper and MeF retain an inactive PAL offset against another rental", () => {
+  const inactive = {
+    tsj:"T",activity_id:"inactive",property_description:"Former rental",
+    property_type:1,activity_type:"B",fair_rental_days:0,personal_use_days:365,
+    rent_income:0,form_1099_payments_made:false,main_home_or_second_home:true,occupancy_percent:100,
+    street_address:"12 Main Street",city:"Austin",state:"TX",zip:"78701",
+    prior_unallowed_passive_operating:410,
+    prior_unallowed_passive_4797_part1:0,prior_unallowed_passive_4797_part2:0,
+    reconstructed_prior_loss_source:{
+      tax_year:2024,activity_id:"inactive",provenance:"calculated-unfiled",
+      evidence_reference:"Reviewed synthetic prior PAL",operating:410,form4797_part1:0,form4797_part2:0,
+    },
+    loss_limitations_review:{
+      basis_resolved:true,at_risk_resolved:true,qbi_transition_resolved:true,
+      evidence_reference:"Reviewed synthetic limitations",
+    },
+  };
+  const profit = {
+    tsj:"T",activity_id:"profitable",property_description:"Current rental",
+    property_type:1,activity_type:"B",fair_rental_days:365,personal_use_days:0,
+    rent_income:1000,form_1099_payments_made:false,
+    street_address:"14 Main Street",city:"Austin",state:"TX",zip:"78701",
+  };
+  for (const rows of [[inactive,profit],[profit,inactive]]) {
+    const raw = scheduleEInputSchema.parse({schedule_es:rows});
+    const computed = scheduleENode.compute({taxYear:2025,formType:"f1040"},raw);
+    const passive = computed.outputs.find(output=>output.nodeType==="form8582")!.fields;
+    const pending = {schedule_e:raw,form8582:passive,schedule1:{line5_schedule_e:590}};
+    const xml = scheduleE.build(raw,{pending,taxYear:2025});
+    assertEquals(xml.includes("<DedRentalRealEstateLossAmt>410</DedRentalRealEstateLossAmt>"),true);
+    assertEquals(scheduleEPdf.projectFields?.(raw,pending)?.line26,590);
+  }
 });

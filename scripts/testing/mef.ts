@@ -7,7 +7,8 @@ import { sha256Hex } from "../../forms/f1040/2025/return-processing/prepared-sou
 import type { Form4852RetainedDocument } from "../../forms/f1040/2025/domains/income/wages/form4852/form4852_source.ts";
 import { f1040_2025 } from "../../forms/f1040/2025/index.ts";
 import { f1040_2026 } from "../../forms/f1040/2026/index.ts";
-import type { FormDefinition } from "../../core/types/form-definition.ts";
+import type { MefFormDefinition } from "../../core/types/form-definition.ts";
+import type { ExecuteResult } from "../../core/runtime/executor.ts";
 import {
   type PdfReviewFixture,
   pdfReviewFixtures,
@@ -34,7 +35,7 @@ export const SAMPLE_TAX_YEAR = 2025;
  * TY2025 samples with their dated facts a year later and 2027 signatures.
  */
 export const SAMPLE_YEARS: Readonly<
-  Record<number, { form: FormDefinition; baseline: string; reasons: boolean }>
+  Record<number, { form: MefFormDefinition; baseline: string; reasons: boolean }>
 > = {
   2025: { form: f1040_2025, baseline: BASELINE_FILE, reasons: false },
   2026: {
@@ -379,7 +380,7 @@ export async function returnFindings(
     documents,
     taxYear,
   );
-  let result: ReturnType<FormDefinition["executeReturn"]>;
+  let result: ExecuteResult;
   try {
     result = form.executeReturn(signedForYear(sample.inputs, taxYear));
   } catch (error) {

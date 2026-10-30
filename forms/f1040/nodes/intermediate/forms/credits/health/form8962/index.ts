@@ -10,9 +10,9 @@ import { schedule2 } from "../../../../aggregation/taxes/other/schedule2/index.t
 import { form6251 } from "../../../taxes/amt/form6251/index.ts";
 import { FilingStatus, filingStatusSchema } from "../../../../../types.ts";
 import type { NodeContext } from "../../../../../../../../core/types/node-context.ts";
-import { CONFIG_BY_YEAR } from "../../../../../config/index.ts";
+import { CONFIG_BY_YEAR, isHistoricalTaxYear } from "../../../../../config/index.ts";
 import type { F1040Config } from "../../../../../config/index.ts";
-import { attributableSpecifiedPtc } from "../../../adjustments/health/form7206/pub974_attribution.ts";
+import { attributableAnnualSpecifiedPtc, attributableSpecifiedPtc } from "../../../adjustments/health/form7206/pub974_attribution.ts";
 
 // Form 8962 line 7: the applicable figure for the integer line 5 percentage,
 // interpolated within the year's IRC §36B(b)(3)(A) band and rounded to four
@@ -136,6 +136,31 @@ export const alternativeMarriageSchema = z.object({
   spouse: alternativeMarriageCoverageSchema.optional(),
 }).strict();
 
+export const qsehraSourceSchema = z.object({
+  tax_year: z.number().int(),
+  employer_ein: z.string().regex(/^\d{9}$/),
+  notice_reference: z.string().trim().min(1),
+  benefit_start_date: z.string().date(),
+  benefit_end_date: z.string().date(),
+}).strict();
+
+export function assertQsehraSourceYear(
+  source: z.infer<typeof qsehraSourceSchema> | undefined,
+  taxYear: number,
+  hasBenefit: boolean,
+): void {
+  if (!source) {
+    if (isHistoricalTaxYear(taxYear) && hasBenefit) throw new Error("Historical QSEHRA requires the written benefit-period source");
+    return;
+  }
+  if (source.tax_year !== taxYear ||
+      source.benefit_start_date.slice(0, 4) !== String(taxYear) ||
+      source.benefit_end_date.slice(0, 4) !== String(taxYear) ||
+      source.benefit_start_date > source.benefit_end_date) {
+    throw new Error("QSEHRA benefit period must match the return tax year");
+  }
+}
+
 export const inputSchema = z.object({
   // Household size for FPL calculation
   household_size: z.number().int().positive().optional(),
@@ -231,7 +256,7 @@ export const inputSchema = z.object({
     fpl_region: z.enum(["contiguous", "alaska", "hawaii"]),
     filing_status: filingStatusSchema,
     total_premium_tax_credit: z.number().nonnegative(),
-    worksheet_x_repayment_limit: z.number().nonnegative(),
+    worksheet_x_repayment_limit: z.number().nonnegative().optional(),
     specified_premiums: z.number().nonnegative(),
     attributable_specified_ptc: z.number().nonnegative(),
     specified_deduction: z.number().nonnegative(),
@@ -241,6 +266,7 @@ export const inputSchema = z.object({
   // Monthly notice facts are needed separately for Pub. 974 Worksheets N/Q.
   qsehra_amount_offered: z.number().nonnegative().optional(),
   qsehra_w2_reported_benefit: z.number().nonnegative().optional(),
+  qsehra_source: qsehraSourceSchema.optional(),
   qsehra_monthly_facts: z.array(
     z.object({
       self_only_slcsp: z.number().nonnegative(),
@@ -248,6 +274,14 @@ export const inputSchema = z.object({
       permitted_benefit: z.number().nonnegative(),
     }).strict().nullable(),
   ).length(12).optional(),
+  // ARPA §9663: a taxpayer (or joint-return spouse), not a dependent, who
+  // received or was approved for unemployment in 2021 uses 133% on line 5.
+  unemployment_compensation_2021: z.object({
+    recipient: z.enum(["taxpayer", "spouse"]),
+    received_or_approved: z.literal(true),
+    source_reference: z.string().trim().min(1),
+    no_one_can_claim_recipient: z.literal(true),
+  }).strict().optional(),
 
   // Filing status — Table 5 has a Single cap and a cap for every other status.
   filing_status: filingStatusSchema.optional(),
@@ -721,6 +755,15 @@ class Form8962Node extends TaxNode<typeof inputSchema> {
     const cfg = CONFIG_BY_YEAR[ctx.taxYear];
     if (!cfg) throw new Error(`No f1040 config for year ${ctx.taxYear}`);
     const input = inputSchema.parse(rawInput);
+    assertQsehraSourceYear(input.qsehra_source, ctx.taxYear,
+      (input.qsehra_amount_offered ?? input.qsehra_w2_reported_benefit ?? 0) > 0);
+    const unemployment = input.unemployment_compensation_2021;
+    if (unemployment && ctx.taxYear !== 2021) {
+      throw new Error("Form 8962 unemployment special treatment applies only to 2021");
+    }
+    if (unemployment?.recipient === "spouse" && input.filing_status !== FilingStatus.MFJ) {
+      throw new Error("Form 8962 spouse unemployment special treatment requires a joint return");
+    }
     if (
       !cfg.ptcLawfullyPresentBelow100Fpl &&
       input.below_100_fpl_status?.basis === "lawfully_present"
@@ -904,7 +947,8 @@ class Form8962Node extends TaxNode<typeof inputSchema> {
       input.fpl_region,
       cfg,
     );
-    const incomePct = income > 4 * fpl ? 401 : Math.floor(income / fpl * 100);
+    const actualIncomePct = income > 4 * fpl ? 401 : Math.floor(income / fpl * 100);
+    const incomePct = unemployment ? 133 : actualIncomePct;
     const baseFields = {
       household_size: input.household_size,
       taxpayer_modified_agi: taxpayerMagi,
@@ -913,6 +957,7 @@ class Form8962Node extends TaxNode<typeof inputSchema> {
       federal_poverty_line: fpl,
       fpl_region: input.fpl_region,
       federal_poverty_pct: incomePct,
+      ...(unemployment ? { unemployment_compensation_ind: true } : {}),
     };
     const mfsStatus = input.filing_status === FilingStatus.MFS
       ? input.mfs_ptc_status
@@ -1105,6 +1150,12 @@ class Form8962Node extends TaxNode<typeof inputSchema> {
       );
     }
     if (qsehraFacts) {
+      const source = input.qsehra_source;
+      if (source && qsehraFacts.some((facts, index) => facts !== null &&
+          (index + 1 < Number(source.benefit_start_date.slice(5, 7)) ||
+            index + 1 > Number(source.benefit_end_date.slice(5, 7))))) {
+        throw new Error("QSEHRA monthly benefits fall outside the sourced benefit period");
+      }
       const monthlyBenefit = qsehraFacts.reduce(
         (sum, facts) => sum + (facts?.permitted_benefit ?? 0),
         0,
@@ -1221,13 +1272,16 @@ class Form8962Node extends TaxNode<typeof inputSchema> {
     if (
       pub974 && (
         line24 !== pub974.total_premium_tax_credit ||
-        !monthlyRows ||
         Math.abs(
-            attributableSpecifiedPtc(
+            (monthlyRows ? attributableSpecifiedPtc(
               monthlyRows,
               new Set(pub974.specified_policy_months.map((row) => row.month)),
               new Set(pub974.form1095a_policy_months.map((row) => row.month)),
-            ) - pub974.attributable_specified_ptc,
+            ) : attributableAnnualSpecifiedPtc(
+              line24,
+              new Set(pub974.specified_policy_months.map((row) => row.month)),
+              new Set(pub974.form1095a_policy_months.map((row) => row.month)),
+            )) - pub974.attributable_specified_ptc,
           ) >= 0.01 ||
         pub974.specified_deduction + pub974.attributable_specified_ptc >
           pub974.specified_premiums + 0.01
@@ -1245,6 +1299,14 @@ class Form8962Node extends TaxNode<typeof inputSchema> {
     }
     const line26 = alternativeMarriage ? 0 : Math.max(0, line24 - line25);
     const line27 = Math.max(0, line25 - line24);
+    if (
+      pub974 && cfg.ptcRepaymentCaps.length > 0 &&
+      pub974.worksheet_x_repayment_limit === undefined
+    ) {
+      throw new Error(
+        "Publication 974 reconciliation requires the return-year Worksheet X repayment limit",
+      );
+    }
     if (
       pub974?.worksheet_x_repayment_limit !== undefined &&
       cfg.ptcRepaymentCaps.length === 0

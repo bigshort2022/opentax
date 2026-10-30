@@ -2,7 +2,7 @@ import { test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath as fromFileUrl } from "node:url";
-import { assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import * as sys from "../../../../scripts/support/sys.ts";
 import { catalog } from "../../../../catalog.ts";
 import { signed } from "../../../../scripts/testing/mef.ts";
@@ -41,6 +41,7 @@ function signedInput(): Record<string, unknown> {
 
 async function exported() {
   const def = catalog["f1040:2026"];
+  assert(def.preparationMode === "mef");
   const result = def.executeReturn(signedInput());
   const pending = normalizeAllPending(result.pending);
   // ReturnTs is the processing date: pin it to the 2027 signature date so

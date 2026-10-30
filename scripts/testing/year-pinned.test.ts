@@ -78,6 +78,9 @@ test("shared code is scanned; tests, fixtures and the year config are not", () =
   assert(yearScanned("forms/f1040/nodes/config/types.ts"));
   assert(!yearScanned("forms/f1040/nodes/config/2025.ts"));
   assert(!yearScanned("forms/f1040/nodes/config/2026.ts"));
+  assert(!yearScanned("forms/f1040/nodes/config/2021.ts"));
+  assert(!yearScanned("forms/f1040/nodes/config/2024.ts"));
+  assert(yearScanned("forms/f1040/nodes/config/historical.ts"));
   assert(!yearScanned(node.replace("index.ts", "index.test.ts")));
   assert(
     !yearScanned("forms/f1040/2025/domains/credits/business/form3800/form8911_bonus_fixture.ts"),

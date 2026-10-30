@@ -187,10 +187,11 @@ const k1IdentityFactsSchema = z.object({
   entity: z.nativeEnum(EntityType),
 });
 export function assertForm8886K1Identity(
-  facts: z.infer<typeof k1IdentityFactsSchema>,
+  rawFacts: unknown,
   link: Link,
   disclosure: Disclosure,
 ) {
+  const facts = k1IdentityFactsSchema.parse(rawFacts);
   if (facts.source_tax_year !== 2025) {
     throw new Error("Form 8886 K-1 needs a retained 2025 source year");
   }

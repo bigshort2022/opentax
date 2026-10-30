@@ -19,6 +19,7 @@ test("the $50-row EIC method reproduces the published TY2025 table", () => {
           amount,
           children,
           joint,
+          config2025.eitcMaximumRounding,
         );
         const published = lookupEic2025(amount, children, joint);
         if (derived !== published) {
@@ -36,22 +37,23 @@ test("the $50-row EIC method reproduces the published TY2025 table", () => {
 // $65,899 / $70,244 joint).
 test("the TY2026 EIC table follows the Rev. Proc. 2025-32 amounts", () => {
   const table = config2026.eitcByChildren;
-  assertEquals(lookupEicFromParameters(table, 15_000, 1, false), 4_427);
-  assertEquals(lookupEicFromParameters(table, 20_000, 2, false), 7_316);
-  assertEquals(lookupEicFromParameters(table, 20_000, 3, true), 8_231);
-  assertEquals(lookupEicFromParameters(table, 9_000, 0, false), 664);
+  const rounding = config2026.eitcMaximumRounding;
+  assertEquals(lookupEicFromParameters(table, 15_000, 1, false, rounding), 4_427);
+  assertEquals(lookupEicFromParameters(table, 20_000, 2, false, rounding), 7_316);
+  assertEquals(lookupEicFromParameters(table, 20_000, 3, true, rounding), 8_231);
+  assertEquals(lookupEicFromParameters(table, 9_000, 0, false, rounding), 664);
   // Row $10,000-$10,050: 34% of the $10,025 midpoint, $3,408.50.
-  assertEquals(lookupEicFromParameters(table, 10_010, 1, false), 3_409);
+  assertEquals(lookupEicFromParameters(table, 10_010, 1, false, rounding), 3_409);
   for (const [children, end, endJoint] of [
     [0, 19_540, 26_820],
     [1, 51_593, 58_863],
     [2, 58_629, 65_899],
     [3, 62_974, 70_244],
   ]) {
-    assertEquals(lookupEicFromParameters(table, end, children, false), 0);
-    assertEquals(lookupEicFromParameters(table, endJoint, children, true), 0);
+    assertEquals(lookupEicFromParameters(table, end, children, false, rounding), 0);
+    assertEquals(lookupEicFromParameters(table, endJoint, children, true, rounding), 0);
     assertEquals(
-      lookupEicFromParameters(table, end - 1, children, false) > 0,
+      lookupEicFromParameters(table, end - 1, children, false, rounding) > 0,
       true,
     );
   }

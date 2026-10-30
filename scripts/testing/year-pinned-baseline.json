@@ -21,16 +21,6 @@
   },
   {
     "path": "forms/f1040/2025/domains/adjustments/health/form8889/form8889_employer_postyear_source.ts",
-    "pattern": "year-identifier",
-    "count": 4
-  },
-  {
-    "path": "forms/f1040/2025/domains/adjustments/health/form8889/form8889_employer_postyear_source.ts",
-    "pattern": "year-value",
-    "count": 1
-  },
-  {
-    "path": "forms/f1040/2025/domains/adjustments/health/form8889/form8889_employer_postyear_source.ts",
     "pattern": "z-literal",
     "count": 1
   },
@@ -48,16 +38,6 @@
     "path": "forms/f1040/2025/domains/adjustments/health/form8889/form8889_employer_return_source.ts",
     "pattern": "z-literal",
     "count": 1
-  },
-  {
-    "path": "forms/f1040/2025/domains/adjustments/health/form8889/form8889_postyear_single_reconciliation.ts",
-    "pattern": "year-identifier",
-    "count": 2
-  },
-  {
-    "path": "forms/f1040/2025/domains/adjustments/health/form8889/form8889_spouse_reconciliation.ts",
-    "pattern": "year-identifier",
-    "count": 14
   },
   {
     "path": "forms/f1040/2025/domains/credits/amt/form8801/form8801_calculation.ts",
@@ -655,11 +635,6 @@
     "count": 2
   },
   {
-    "path": "forms/f1040/2025/mef/forms/credits/health/f8962/f8962.ts",
-    "pattern": "year-identifier",
-    "count": 11
-  },
-  {
     "path": "forms/f1040/2025/mef/forms/credits/individual/f8862.ts",
     "pattern": "year-identifier",
     "count": 1
@@ -863,11 +838,6 @@
     "path": "forms/f1040/2025/pdf/forms/credits/foreign/f1116/f1116_single_source.ts",
     "pattern": "year-identifier",
     "count": 4
-  },
-  {
-    "path": "forms/f1040/2025/pdf/forms/credits/health/f8962.ts",
-    "pattern": "year-identifier",
-    "count": 1
   },
   {
     "path": "forms/f1040/2025/pdf/forms/credits/individual/f2441.ts",
@@ -1290,11 +1260,6 @@
     "count": 1
   },
   {
-    "path": "forms/f1040/nodes/inputs/deductions/business/k1_qbi_source.ts",
-    "pattern": "z-literal",
-    "count": 1
-  },
-  {
     "path": "forms/f1040/nodes/inputs/deductions/business/qbi_patron/independent.ts",
     "pattern": "config-index",
     "count": 3
@@ -1437,7 +1402,7 @@
   {
     "path": "forms/f1040/nodes/inputs/general/filing/general/index.ts",
     "pattern": "year-identifier",
-    "count": 15
+    "count": 11
   },
   {
     "path": "forms/f1040/nodes/inputs/general/foreign/f5471/index.ts",
@@ -1650,16 +1615,6 @@
     "count": 2
   },
   {
-    "path": "forms/f1040/nodes/inputs/income/rental-passthrough/k1_partnership/index.ts",
-    "pattern": "z-literal",
-    "count": 1
-  },
-  {
-    "path": "forms/f1040/nodes/inputs/income/rental-passthrough/k1_passive_source.ts",
-    "pattern": "z-literal",
-    "count": 2
-  },
-  {
     "path": "forms/f1040/nodes/inputs/income/rental-passthrough/k1_s_corp_passive_loss_source.ts",
     "pattern": "z-literal",
     "count": 4
@@ -1668,11 +1623,6 @@
     "path": "forms/f1040/nodes/inputs/income/rental-passthrough/k1_s_corp/index.ts",
     "pattern": "year-identifier",
     "count": 2
-  },
-  {
-    "path": "forms/f1040/nodes/inputs/income/rental-passthrough/k1_s_corp/index.ts",
-    "pattern": "z-literal",
-    "count": 1
   },
   {
     "path": "forms/f1040/nodes/inputs/income/rental-passthrough/k1_trust/index.ts",
@@ -1702,7 +1652,7 @@
   {
     "path": "forms/f1040/nodes/inputs/income/rental-passthrough/schedule_e/index.ts",
     "pattern": "year-identifier",
-    "count": 15
+    "count": 13
   },
   {
     "path": "forms/f1040/nodes/inputs/income/retirement/f1099r/index.ts",
@@ -1825,21 +1775,6 @@
     "count": 3
   },
   {
-    "path": "forms/f1040/nodes/intermediate/forms/adjustments/health/form7206/index.ts",
-    "pattern": "year-comparison",
-    "count": 1
-  },
-  {
-    "path": "forms/f1040/nodes/intermediate/forms/adjustments/health/form7206/pub974_worksheets.ts",
-    "pattern": "year-identifier",
-    "count": 4
-  },
-  {
-    "path": "forms/f1040/nodes/intermediate/forms/adjustments/health/form7206/pub974_worksheets.ts",
-    "pattern": "year-value",
-    "count": 1
-  },
-  {
     "path": "forms/f1040/nodes/intermediate/forms/adjustments/health/form8853/archer_contributions.ts",
     "pattern": "date-pinned",
     "count": 3
@@ -1868,26 +1803,6 @@
     "path": "forms/f1040/nodes/intermediate/forms/adjustments/health/form8853/ltc.ts",
     "pattern": "z-literal",
     "count": 1
-  },
-  {
-    "path": "forms/f1040/nodes/intermediate/forms/adjustments/health/form8889/employer-postyear-evidence-schema.ts",
-    "pattern": "year-identifier",
-    "count": 3
-  },
-  {
-    "path": "forms/f1040/nodes/intermediate/forms/adjustments/health/form8889/index.ts",
-    "pattern": "year-comparison",
-    "count": 7
-  },
-  {
-    "path": "forms/f1040/nodes/intermediate/forms/adjustments/health/form8889/index.ts",
-    "pattern": "year-identifier",
-    "count": 4
-  },
-  {
-    "path": "forms/f1040/nodes/intermediate/forms/adjustments/health/form8889/index.ts",
-    "pattern": "z-literal",
-    "count": 6
   },
   {
     "path": "forms/f1040/nodes/intermediate/forms/credits/business/form8582cr/carryforward-ledger.ts",
@@ -2362,11 +2277,6 @@
   {
     "path": "forms/f1040/nodes/intermediate/forms/taxes/retirement/form4972/participant-collection.ts",
     "pattern": "date-pinned",
-    "count": 1
-  },
-  {
-    "path": "forms/f1040/nodes/intermediate/forms/taxes/retirement/form5329/index.ts",
-    "pattern": "z-literal",
     "count": 1
   },
   {

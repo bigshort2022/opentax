@@ -182,6 +182,9 @@ function reconcileCurrentYear(source: ScheduleJCalculationInput): void {
 class ScheduleJCalculationNode extends TaxNode<typeof inputSchema> {
   readonly nodeType = "schedule_j_calculation";
   readonly inputSchema = inputSchema;
+  override readonly contextFields = Object.keys(inputSchema.shape).filter(
+    (field) => field !== "elected_farm_income",
+  );
   readonly outputNodes = new OutputNodes([income_tax_calculation]);
 
   compute(

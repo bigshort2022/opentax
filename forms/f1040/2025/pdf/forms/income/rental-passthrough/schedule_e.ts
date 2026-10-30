@@ -8,6 +8,8 @@ import {
   computeExpenses,
   computePropertyNet,
   inputSchema,
+  isInactivePersonalCarryover,
+  projectScheduleEItems,
   qualifiedEntireDispositionGain,
   qualifiedEntireDispositionLoss,
   qualifiedFirstYearRetainedPropertySale,
@@ -261,7 +263,9 @@ export const scheduleEPdf: PdfFormDescriptor = {
   projectFields(raw, allPending) {
     const k1Rows = scheduleEK1Part2Rows(allPending);
     if (Object.keys(raw).length === 0 && k1Rows.length === 0) return {};
-    const input = inputSchema.parse(raw);
+    const parsed = inputSchema.parse(raw);
+    // This descriptor and its retained IRS template are explicitly TY2025.
+    const input = {...parsed, schedule_es:projectScheduleEItems(parsed.schedule_es, 2025)};
     const trustRows = input.estate_trust_rows ?? [];
     let partIIFields: Record<string, unknown> | undefined;
     let k1Total = 0;
@@ -419,8 +423,10 @@ export const scheduleEPdf: PdfFormDescriptor = {
       items.some((item) =>
         (item.property_type === 6 && !item.k1_royalty_source &&
           !item.f1099m_royalty_source) ||
-        item.personal_use_days !== 0 ||
-        item.main_home_or_second_home === true ||
+        (item.personal_use_days !== 0 && !item.expense_allocation_source &&
+          !isInactivePersonalCarryover(item, 365)) ||
+        (item.main_home_or_second_home === true && (item.occupancy_percent ?? 0) > 0 &&
+          !isInactivePersonalCarryover(item, 365)) ||
         ((item.royalties_income ?? 0) > 0 && !item.k1_royalty_source &&
           !item.f1099m_royalty_source) ||
         (item.ownership_percent ?? 100) <= 0 ||

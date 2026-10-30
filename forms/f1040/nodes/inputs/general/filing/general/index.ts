@@ -437,13 +437,16 @@ export const inputSchema = z.object({
   // Affirmative reviewed zero-income spouse inventory for joint family PTC.
   ptc_spouse_income_review: ptcSpouseIncomeReviewSchema.optional(),
   ptc_joint_income_review: ptcJointIncomeReviewSchema.optional(),
-  // Distinct 2025 residence states for the Form 8962 poverty table.
-  ptc_residence_states_2025: z.array(z.string().regex(/^[A-Z]{2}$/)).min(1)
+  // Distinct return-year residence states for the Form 8962 poverty table.
+  ptc_residence_states: z.array(z.string().regex(/^[A-Z]{2}$/)).min(1)
     .optional(),
   // January through December residence. Required with a multi-state list so
   // a policy switch can be tied to the taxpayer's actual state each month.
-  ptc_residence_months_2025: z.array(z.string().regex(/^[A-Z]{2}$/)).length(12)
+  ptc_residence_months: z.array(z.string().regex(/^[A-Z]{2}$/)).length(12)
     .optional(),
+  // Reject retired source keys before Zod could silently strip residence.
+  ptc_residence_states_2025: z.never().optional(),
+  ptc_residence_months_2025: z.never().optional(),
   address_zip: z.string().optional(),
   address_foreign_country: z.string().optional(),
   address_foreign_province_state: z.string().optional(),
@@ -1741,12 +1744,12 @@ class GeneralNode extends TaxNode<typeof inputSchema> {
           .filter((dep) => dep.ptc_tax_return?.filing === "form8814")
           .map((dep) => dep.ssn?.replaceAll("-", "") ?? ""),
         dependent_income_complete: dependentIncomeComplete,
-        fpl_region: parsed.ptc_residence_states_2025?.includes("AK") ||
-            parsed.ptc_residence_months_2025?.includes("AK") ||
+        fpl_region: parsed.ptc_residence_states?.includes("AK") ||
+            parsed.ptc_residence_months?.includes("AK") ||
             parsed.address_state === "AK"
           ? "alaska"
-          : parsed.ptc_residence_states_2025?.includes("HI") ||
-              parsed.ptc_residence_months_2025?.includes("HI") ||
+          : parsed.ptc_residence_states?.includes("HI") ||
+              parsed.ptc_residence_months?.includes("HI") ||
               parsed.address_state === "HI"
           ? "hawaii"
           : "contiguous",

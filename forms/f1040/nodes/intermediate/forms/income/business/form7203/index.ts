@@ -20,6 +20,7 @@ import {
   totalCurrentDebtAdvances,
 } from "./debt-note.ts";
 import { reviewedStockLossLedgerSchema } from "./stock-ledger.ts";
+import { form461, historicalOwnerBusinessOutputs } from "../form461/index.ts";
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -178,7 +179,7 @@ class Form7203Node extends TaxNode<typeof inputSchema> {
   // Disallowed basis losses are added back to schedule1 as a positive adjustment,
   // reversing the upstream-posted S-corp loss (from k1_s_corp → schedule1 line5_schedule_e)
   // to the extent it exceeds the shareholder's adjusted stock + debt basis.
-  readonly outputNodes = new OutputNodes([schedule1, agi_aggregator]);
+  readonly outputNodes = new OutputNodes([schedule1, agi_aggregator, form461]);
 
   compute(ctx: NodeContext, rawInput: Form7203Input): NodeResult {
     const input = inputSchema.parse(rawInput);
@@ -354,6 +355,7 @@ class Form7203Node extends TaxNode<typeof inputSchema> {
     const stockBasis = tentativeStockBasis(stockAfterDistrib, input);
     const debtBasis = tentativeDebtBasis(input);
     const disallowed = disallowedLoss(pool, stockBasis, debtBasis);
+    const ownerLossOutputs = historicalOwnerBusinessOutputs(ctx.taxYear, disallowed - pool);
 
     const accountCarry = currentOpenAccountCarry(
       note,
@@ -362,7 +364,7 @@ class Form7203Node extends TaxNode<typeof inputSchema> {
     // Loss fully within basis — no further limitation outputs needed
     if (disallowed === 0) {
       return {
-        outputs: [],
+        outputs: ownerLossOutputs,
         ...(Object.keys(accountCarry).length
           ? { carryforwards: accountCarry }
           : {}),
@@ -373,6 +375,7 @@ class Form7203Node extends TaxNode<typeof inputSchema> {
     // (reduces the net S-corp loss already posted by the k1_s_corp upstream node)
     return {
       outputs: [
+        ...ownerLossOutputs,
         this.outputNodes.output(schedule1, {
           basis_disallowed_add_back: disallowed,
         }),

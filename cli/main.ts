@@ -30,6 +30,17 @@ import {
   exportPdfCommand,
 } from "./commands/export.ts";
 import { validateReturnCommand } from "./commands/validate.ts";
+import { catalog } from "../catalog.ts";
+import {
+  applyCarryoverCommand,
+  previewCarryoverCommand,
+  reviewCarryoverCommand,
+  reviewReturnSourcesCommand,
+} from "./commands/carryover.ts";
+import {
+  carryoverReviewArgsSchema,
+  reviewReturnSourcesArgsSchema,
+} from "./store/carryovers.ts";
 import { attachSourceFileCommand } from "./commands/return-source-files.ts";
 import {
   mefAcksCommand,
@@ -136,21 +147,41 @@ const MEF_TARGET_OPTIONS = [
   },
 ] as const;
 
+const CARRYOVER_LOCATION_OPTIONS = [
+  { flag: "--source-returnId", description: "Reviewed prior-year return", required: true },
+  { flag: "--target-returnId", description: "Same taxpayer's immediately following return", required: true },
+] as const;
+
+const SOURCE_REVIEW_OPTIONS = [
+  { flag: "--evidence-reference", description: "Reference to the reviewed source inventory or outside return", required: true },
+  { flag: "--provenance", description: "calculated-unfiled or reviewed-outside-evidence; never implies IRS acceptance", required: true },
+  { flag: "--source-complete", description: "Explicitly affirm complete income, deductions, payments and applicable opening-loss evidence", required: true },
+] as const;
+
+function carryoverLocation(args: ParsedArgs) {
+  return {
+    sourceReturnId: requireArg("source-returnId", args["source-returnId"]),
+    targetReturnId: requireArg("target-returnId", args["target-returnId"]),
+    baseDir: RETURNS_DIR,
+  };
+}
+
 const COMMANDS: readonly CommandDef[] = [
   {
     cmd: "node",
     sub: "list",
-    description: "List all registered nodes",
-    usage: "opentax node list",
-    handler: async (_args) => {
-      await run(() => Promise.resolve(nodeListCommand()));
+    description: "List source inputs and nodes for a selected year",
+    usage: "opentax node list [--year <year>]",
+    options: [{ flag: "--year", description: "Tax year (default: 2025)" }],
+    handler: async (args) => {
+      await run(() => Promise.resolve(nodeListCommand({ year: args.year === undefined ? undefined : Number(args.year) })));
     },
   },
   {
     cmd: "node",
     sub: "inspect",
     description: "Inspect a node's input schema and output nodes",
-    usage: "opentax node inspect --node_type <type>",
+    usage: "opentax node inspect --node_type <type> [--year <year>]",
     options: [
       {
         flag: "--node_type",
@@ -158,12 +189,13 @@ const COMMANDS: readonly CommandDef[] = [
         required: true,
       },
       { flag: "--json", description: "Output as JSON" },
+      { flag: "--year", description: "Tax year (default: 2025)" },
     ],
     handler: async (args) => {
       const nodeType = requireArg("node_type", args.node_type);
       await run(() =>
         Promise.resolve(
-          nodeInspectCommand({ nodeType, json: args.json === true }),
+          nodeInspectCommand({ nodeType, json: args.json === true, year: args.year === undefined ? undefined : Number(args.year) }),
         )
       );
     },
@@ -201,6 +233,70 @@ const COMMANDS: readonly CommandDef[] = [
         }))
       );
     },
+  },
+  {
+    cmd: "return",
+    sub: "supported",
+    description: "List supported federal form/years and preparation capabilities",
+    usage: "opentax return supported",
+    handler: async () => {
+      await run(() => Promise.resolve(Object.values(catalog)
+        .sort((left, right) => left.formType.localeCompare(right.formType) || left.taxYear - right.taxYear)
+        .map((definition) => ({
+          form: definition.formType,
+          year: definition.taxYear,
+          paperPreparation: definition.paperAvailable,
+          electronicPreparation: definition.preparationMode === "mef",
+          inputKeys: definition.inputNodes.map((entry) => entry.inputKey ?? entry.node.nodeType),
+        }))));
+    },
+  },
+  {
+    cmd: "return",
+    sub: "review",
+    description: "Bind an explicit complete-source review to the saved financial inputs",
+    usage: "opentax return review --returnId <id> --evidence-reference <ref> --provenance <kind> --source-complete",
+    options: [{ flag: "--returnId", description: "Return identifier", required: true }, ...SOURCE_REVIEW_OPTIONS],
+    handler: async (args) => {
+      await run(() => reviewReturnSourcesCommand(reviewReturnSourcesArgsSchema.parse({
+        returnId: requireArg("returnId", args.returnId),
+        baseDir: RETURNS_DIR,
+        evidenceReference: requireArg("evidence-reference", args["evidence-reference"]),
+        provenance: requireArg("provenance", args.provenance),
+        sourceComplete: flag(args["source-complete"]),
+      })));
+    },
+  },
+  {
+    cmd: "carryover",
+    sub: "preview",
+    description: "Read-only capital/passive-loss worksheet and transfer blockers",
+    usage: "opentax carryover preview --source-returnId <id> --target-returnId <id>",
+    options: CARRYOVER_LOCATION_OPTIONS,
+    handler: async (args) => { await run(() => previewCarryoverCommand(carryoverLocation(args))); },
+  },
+  {
+    cmd: "carryover",
+    sub: "review",
+    description: "Review a source calculation and its next-year transfer; does not apply balances",
+    usage: "opentax carryover review --source-returnId <id> --target-returnId <id> --evidence-reference <ref> --provenance <kind> --source-complete",
+    options: [...CARRYOVER_LOCATION_OPTIONS, ...SOURCE_REVIEW_OPTIONS],
+    handler: async (args) => {
+      await run(() => reviewCarryoverCommand(carryoverReviewArgsSchema.parse({
+        ...carryoverLocation(args),
+        evidenceReference: requireArg("evidence-reference", args["evidence-reference"]),
+        provenance: requireArg("provenance", args.provenance),
+        sourceComplete: flag(args["source-complete"]),
+      })));
+    },
+  },
+  {
+    cmd: "carryover",
+    sub: "apply",
+    description: "Explicitly apply reviewed balances; rejects stale sources or conflicting target facts",
+    usage: "opentax carryover apply --source-returnId <id> --target-returnId <id>",
+    options: CARRYOVER_LOCATION_OPTIONS,
+    handler: async (args) => { await run(() => applyCarryoverCommand(carryoverLocation(args))); },
   },
   {
     cmd: "return",
@@ -581,7 +677,7 @@ const COMMANDS: readonly CommandDef[] = [
   {
     cmd: "return",
     sub: "validate",
-    description: "Validate a return against MeF business rules",
+    description: "Validate preparation requirements or the selected product's MeF business rules",
     usage: "opentax return validate --returnId <id> [--format text|json]",
     options: [
       { flag: "--returnId", description: "Return identifier", required: true },
@@ -613,7 +709,7 @@ const COMMANDS: readonly CommandDef[] = [
     cmd: "node",
     sub: "graph",
     description: "View node dependency graph (Mermaid or JSON)",
-    usage: "opentax node graph --node_type start [--depth <n>] [--json]",
+    usage: "opentax node graph --node_type start [--year <year>] [--depth <n>] [--json]",
     options: [
       { flag: "--node_type", description: "Root node type", required: true },
       {
@@ -621,6 +717,7 @@ const COMMANDS: readonly CommandDef[] = [
         description: "Max traversal depth (default: unlimited)",
       },
       { flag: "--json", description: "Output as JSON instead of Mermaid" },
+      { flag: "--year", description: "Tax year (default: 2025)" },
     ],
     handler: async (args) => {
       const nodeType = requireArg("node_type", args.node_type);
@@ -631,7 +728,7 @@ const COMMANDS: readonly CommandDef[] = [
       }
       await run(() =>
         Promise.resolve(
-          graphViewCommand({ nodeType, depth, json: args.json === true }),
+          graphViewCommand({ nodeType, depth, json: args.json === true, year: args.year === undefined ? undefined : Number(args.year) }),
         )
       );
     },
@@ -810,6 +907,10 @@ async function main(): Promise<void> {
       "poll-seconds",
       "max-polls",
       "document",
+      "source-returnId",
+      "target-returnId",
+      "evidence-reference",
+      "provenance",
     ],
     boolean: [
       "json",
@@ -820,6 +921,7 @@ async function main(): Promise<void> {
       "new",
       "full",
       "list-documents",
+      "source-complete",
     ],
     alias: { h: "help" },
   }) as unknown as ParsedArgs;

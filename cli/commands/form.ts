@@ -30,7 +30,11 @@ export function getUserInputSchema(def: FormDefinition, nodeType: string) {
   if (entry) return entry.isArray ? entry.itemSchema : entry.inputSchema;
 
   // The start node is the graph's composite input and is routed directly.
-  if (nodeType === "start") return def.registry.start.inputSchema;
+  if (nodeType === "start") {
+    return def.preparationMode === "paper"
+      ? def.sourceSchema
+      : def.registry.start.inputSchema;
+  }
 
   throw new Error(
     `Node type ${nodeType} is not a valid input for ${def.formType}/${def.taxYear}`,
@@ -123,6 +127,7 @@ export async function formAddCommand(
   }
 
   const schema = getUserInputSchema(def, args.nodeType);
+  if (def.preparationMode === "paper") def.assertInput(args.nodeType, data);
   rejectUnknownFields(schema, data);
   const parsed = schema.safeParse(await resolveSourceBytes(returnPath, data));
   if (!parsed.success) {
@@ -230,6 +235,7 @@ export async function formUpdateCommand(
   }
 
   const schema = getUserInputSchema(def, existing.nodeType);
+  if (def.preparationMode === "paper") def.assertInput(existing.nodeType, data);
   rejectUnknownFields(schema, data);
   const parsed = schema.safeParse(await resolveSourceBytes(returnPath, data));
   if (!parsed.success) {

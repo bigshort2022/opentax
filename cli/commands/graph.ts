@@ -2,12 +2,12 @@ import type { GraphNode } from "../../core/runtime/graph.ts";
 import { computeTaxGraph } from "../../core/runtime/graph.ts";
 import { catalog } from "../../catalog.ts";
 
-const defaultDef = catalog["f1040:2025"];
 
 export type GraphViewArgs = {
   readonly nodeType: string;
   readonly depth: number; // Infinity by default
   readonly json: boolean;
+  readonly year?: number;
 };
 
 /**
@@ -68,6 +68,8 @@ export function formatMermaid(root: GraphNode): string {
 export function graphViewCommand(
   args: GraphViewArgs,
 ): GraphNode | void {
+  const defaultDef = catalog[`f1040:${args.year ?? 2025}`];
+  if (!defaultDef) throw new Error(`Unsupported year: ${args.year}`);
   const result = computeTaxGraph(args.nodeType, defaultDef.registry, args.depth);
 
   if (args.json) {

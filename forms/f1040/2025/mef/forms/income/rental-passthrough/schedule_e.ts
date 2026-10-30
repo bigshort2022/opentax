@@ -10,9 +10,11 @@ import {
   computePropertyNet,
   type inputSchema,
   isPassiveProperty,
+  isInactivePersonalCarryover,
   isVacationHomeExcluded,
   isVacationHomeLimited,
   itemSchema,
+  projectScheduleEItems,
   qualifiedEntireDispositionGain,
   qualifiedEntireDispositionLoss,
 } from "../../../../../nodes/inputs/income/rental-passthrough/schedule_e/index.ts";
@@ -210,7 +212,7 @@ export function verifyMiscRoyaltySource(
   }
 }
 
-function failUnsupportedFacts(item: Property): void {
+function failUnsupportedFacts(item: Property, inactiveCarryover: boolean): void {
   if (item.property_type === 8 && !item.property_type_other_desc) {
     throw new Error("Schedule E other property needs a description");
   }
@@ -243,12 +245,13 @@ function failUnsupportedFacts(item: Property): void {
       "Schedule E carryovers need their limitation worksheets in MeF",
     );
   }
-  if (item.main_home_or_second_home && (item.occupancy_percent ?? 0) > 0) {
+  if (!inactiveCarryover && item.main_home_or_second_home && (item.occupancy_percent ?? 0) > 0) {
     throw new Error(
       "Schedule E mixed-use expense allocation is not filing-ready",
     );
   }
-  if (item.personal_use_days > 0 && computeExpenses(item) > 0) {
+  if (item.personal_use_days > 0 && computeExpenses(item) > 0 &&
+    item.expense_allocation_source === undefined) {
     throw new Error(
       "Schedule E personal-use property needs explicit rental expense allocation",
     );
@@ -271,11 +274,15 @@ function propertyAddress(item: Property): string {
 export function buildScheduleEPropertyLines(
   raw: Property,
   allowedPassiveLoss?: number,
+  taxYear = mefTaxYear(),
 ): PropertyLines | undefined {
-  const item = itemSchema.parse(raw);
-  // §280A(g) excludes short-term rental income and deductions from Schedule E.
-  if (isVacationHomeExcluded(item)) return undefined;
-  failUnsupportedFacts(item);
+  const [item] = projectScheduleEItems([raw], taxYear);
+  const daysInYear = (Date.UTC(taxYear + 1, 0, 1) - Date.UTC(taxYear, 0, 1)) / 86400000;
+  const inactiveCarryover = isInactivePersonalCarryover(item, daysInYear);
+  // Section 280A excludes current personal-use receipts/expenses, not a
+  // reviewed prior PAL that Form 8582 allows against another passive activity.
+  if (isVacationHomeExcluded(item) && !inactiveCarryover) return undefined;
+  failUnsupportedFacts(item, inactiveCarryover);
   const fraction = (item.ownership_percent ?? 100) / 100;
   const allocated = (value: number | undefined) =>
     Math.round((value ?? 0) * fraction);
@@ -652,7 +659,7 @@ export const scheduleE: MefFormDescriptor<"schedule_e", Fields> = {
         "Schedule E unassigned passthrough expense needs property allocation",
       );
     }
-    const itemList = fields.schedule_es ?? [];
+    const itemList = projectScheduleEItems(fields.schedule_es ?? [], mefTaxYear(context));
     const royaltyKeys = itemList.flatMap((item) =>
       item.k1_royalty_source
         ? [
@@ -687,6 +694,7 @@ export const scheduleE: MefFormDescriptor<"schedule_e", Fields> = {
               .recharacterized > 0
           ? Math.max(0, -computePropertyNet(item))
           : allowedPassiveLosses.get(index),
+        mefTaxYear(context),
       )
     ).filter(
       (line): line is PropertyLines => line !== undefined,

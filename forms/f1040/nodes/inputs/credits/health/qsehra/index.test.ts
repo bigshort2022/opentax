@@ -261,3 +261,18 @@ test("qsehra.compute: smoke test — self-only with MEC, full annual amount", ()
   assertEquals(f1040Out, undefined);
   assertEquals(result.outputs.length, 1);
 });
+
+test("historical QSEHRA retains benefit period and rejects contradictory source years", () => {
+  const source = {
+    ...minimalItem({ qsehra_amount_offered: 100, qsehra_amount_received: 50 }),
+    qsehra_source: {
+      tax_year: 2023, employer_ein: "123456789",
+      notice_reference: "synthetic written employer notice",
+      benefit_start_date: "2023-12-01", benefit_end_date: "2023-12-31",
+    },
+  };
+  const result = qsehra.compute({ taxYear: 2023, formType: "f1040" }, source);
+  assertEquals(findOutput(result, "form8962")?.fields.qsehra_source, source.qsehra_source);
+  assertThrows(() => qsehra.compute({ taxYear: 2022, formType: "f1040" }, source), Error, "benefit period");
+  assertThrows(() => qsehra.compute({ taxYear: 2023, formType: "f1040" }, minimalItem({ qsehra_amount_offered: 100 })), Error, "source");
+});

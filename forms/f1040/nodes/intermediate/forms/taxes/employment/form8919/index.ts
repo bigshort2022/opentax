@@ -329,6 +329,9 @@ export function calculateForm8919(
 class Form8919Node extends TaxNode<typeof inputSchema> {
   readonly nodeType = "form8919";
   readonly inputSchema = inputSchema;
+  override readonly contextFields = [
+    "taxpayer_ssn", "spouse_ssn", "form1099_sources", "w2_sources", "form4137_sources",
+  ] as const;
   readonly outputNodes = new OutputNodes([
     f1040,
     agi_aggregator,

@@ -54,7 +54,7 @@ export function formatDiagnosticsText(
   lines.push(`  Rules:          ${padNum(report.summary.total)}`);
   lines.push(`  Passed:         ${padNum(report.summary.passed)}`);
   lines.push(
-    `  Errors:         ${padNum(report.summary.rejected)}${report.summary.rejected > 0 ? "    <-- BLOCKS E-FILE" : ""}`,
+    `  Errors:         ${padNum(report.summary.rejected)}${report.summary.rejected > 0 ? report.paperPreparation ? "    <-- BLOCKS PAPER PREPARATION" : "    <-- BLOCKS E-FILE" : ""}`,
   );
   lines.push(`  Warnings:       ${padNum(report.summary.alerts)}`);
   lines.push(
@@ -62,7 +62,11 @@ export function formatDiagnosticsText(
   );
   lines.push(`  ${sep}`);
 
-  const status = report.canFile
+  const status = report.paperPreparation
+    ? report.paperPreparation.readyForPaper
+      ? "STATUS: READY FOR UNSIGNED PAPER REVIEW; E-FILE UNSUPPORTED"
+      : "STATUS: PAPER PREPARATION BLOCKED; E-FILE UNSUPPORTED"
+    : report.canFile
     ? "STATUS: READY TO FILE"
     : "STATUS: NOT READY TO FILE";
   lines.push(`  ${status}`);

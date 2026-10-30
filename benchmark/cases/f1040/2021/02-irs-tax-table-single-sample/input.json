@@ -1,0 +1,29 @@
+{
+  "year": 2021,
+  "scenario": "2021 IRS published single sample-table row at $25,300 taxable income, exercised through synthetic wage inputs",
+  "source": "IRS 2021 Instructions for Form 1040 Tax and Earned Income Credit Tables, PDF/printed page 3, Sample Table, Single column, taxable income $25,300\u2013$25,350 row; https://www.irs.gov/pub/irs-prior/i1040tt--2021.pdf. Standard-deduction input construction: IRS 2021 Form 1040, page 1 Standard Deduction for sidebar; https://www.irs.gov/pub/irs-prior/f1040--2021.pdf. Retained PDF digests and rendered evidence: docs/historical-federal/benchmark-sources.json.",
+  "synthetic_inputs": "Explicitly synthetic consumer inputs, not an IRS-published complete household or W-2. Wages $37,850 = published taxable income $25,300 + sourced 2021 single basic standard deduction $12,550. Synthetic filers are under 65, nonblind, not dependents, with no other income, adjustments or itemized deductions. W-2 withholding is synthetic zero required by its schema. Only the published taxable-income and tax-table lines are scored; no total-tax, payments, refund or amount-owed oracle is asserted.",
+  "forms": [
+    {
+      "node_type": "start",
+      "data": {
+        "general": {
+          "filing_status": "single",
+          "taxpayer_dob": "1980-01-01",
+          "taxpayer_blind": false,
+          "taxpayer_age_65_or_older": false,
+          "taxpayer_claimed_as_dependent": false,
+          "taxpayer_can_be_claimed_as_dependent": false,
+          "dependents": []
+        }
+      }
+    },
+    {
+      "node_type": "w2",
+      "data": {
+        "box1_wages": 37850,
+        "box2_fed_withheld": 0
+      }
+    }
+  ]
+}

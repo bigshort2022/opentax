@@ -5,7 +5,7 @@ import { PDFDocument } from "pdf-lib";
 import { itemSchema } from "../../../../../nodes/inputs/income/rental-passthrough/schedule_e/index.ts";
 import { buildMefBundle, buildMefXml } from "../../../builder.ts";
 import { FilingStatus } from "../../../types.ts";
-import { scheduleE, scheduleEReturn1099Answer } from "./schedule_e.ts";
+import { buildScheduleEPropertyLines, scheduleE, scheduleEReturn1099Answer } from "./schedule_e.ts";
 import { SCHEDULE_E_TYPE8_STATEMENT_FILE } from "./schedule_e_type8_statement.ts";
 
 function property(overrides: Record<string, unknown> = {}) {
@@ -538,4 +538,51 @@ test("Schedule E return-level Form 1099 answers apply only without property rows
     Error,
     "belong on each property row",
   );
+});
+
+test("Schedule E MeF projects annual rental expenses using the configured return year", () => {
+  for (const taxYear of [2025, 2026]) {
+    const fields = {schedule_es:[property({
+      expense_allocation_source:{
+        tax_year:taxYear,activity_id:"rental-house",source_reference:"Synthetic annual expense ledger",
+        use_pattern:"rental-only",rental_period:{from:`${taxYear}-01-01`,through:`${taxYear}-12-31`},
+        no_personal_use_during_rental_period:true,amounts_before_ownership_allocation:true,
+        expenses:[{expense_id:"insurance",category:"expense_insurance",transaction_kind:"expense",
+          source_amount:4000,source_reference:"Synthetic insurer",paid_on:`${taxYear}-01-01`,
+          expense_period:{from:`${taxYear}-01-01`,through:`${taxYear}-12-31`},
+          method:"documented-share",rental_share:0.5,method_reference:"Reviewed rental-unit share"}],
+      },
+    })]};
+    const before = JSON.stringify(fields);
+    const xml = scheduleE.build(fields, {taxYear});
+    assertStringIncludes(xml, "<TotalExpensesAmt>2000</TotalExpensesAmt>");
+    assertStringIncludes(xml, "<NetRentalIncomeOrLossAmt>10000</NetRentalIncomeOrLossAmt>");
+    assertEquals(JSON.stringify(fields), before);
+    assertThrows(()=>scheduleE.build(fields, {taxYear:taxYear===2025?2026:2025}),
+      Error,"allocation year/activity");
+  }
+});
+
+test("native Schedule E retains the allowed PAL of a fully personal inactive property", () => {
+  const inactive = property({
+    activity_type:"B",fair_rental_days:0,personal_use_days:366,rent_income:0,
+    main_home_or_second_home:true,occupancy_percent:100,
+    prior_unallowed_passive_operating:410,
+    prior_unallowed_passive_4797_part1:0,prior_unallowed_passive_4797_part2:0,
+    reconstructed_prior_loss_source:{
+      tax_year:2023,activity_id:"rental-house",provenance:"calculated-unfiled",
+      evidence_reference:"Reviewed synthetic prior PAL",operating:410,form4797_part1:0,form4797_part2:0,
+    },
+    loss_limitations_review:{
+      basis_resolved:true,at_risk_resolved:true,qbi_transition_resolved:true,
+      evidence_reference:"Reviewed synthetic limitations",
+    },
+  });
+  const lines = buildScheduleEPropertyLines(inactive,410,2024);
+  assertEquals(lines?.net,0);
+  assertEquals(lines?.expenses,0);
+  assertEquals(lines?.deductibleLoss,410);
+  assertStringIncludes(lines?.xml ?? "","<PersonalUseDaysCnt>366</PersonalUseDaysCnt>");
+  assertThrows(()=>buildScheduleEPropertyLines({...inactive,expense_insurance:1},410,2024),
+    Error,"inactive carryover");
 });

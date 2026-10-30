@@ -31,9 +31,15 @@ import { reconcileForm8941DocumentSource } from "../../../credits/health/f8941_s
 import { normalizeAllPending } from "../../../../../return-processing/pending.ts";
 import {
   calculateSingleScheduleCForm7206,
+  form7206 as form7206Node,
+  inputSchema as form7206SourceSchema,
   reconcileSingleScheduleCGraphSource,
   singleScheduleCPlanSchema,
 } from "../../../../../../nodes/intermediate/forms/adjustments/health/form7206/index.ts";
+import {
+  form8962 as form8962Node,
+  inputSchema as form8962SourceSchema,
+} from "../../../../../../nodes/intermediate/forms/credits/health/form8962/index.ts";
 import {
   computeNetProfit,
   inputSchema as scheduleCInputSchema,
@@ -420,6 +426,8 @@ export function assertOneScheduleC8995(
     );
   }
   const pending = normalizeAllPending(rawPending as Record<string, unknown>);
+  const cfg = CONFIG_BY_YEAR[taxYear];
+  if (!cfg) throw new Error(`No Form 8995 configuration for tax year ${taxYear}`);
   const tipExclusions = assertQualifiedTipQbiSource(fields, pending, taxYear);
   const source = scheduleCInputSchema.safeParse(pending.schedule_c);
   const sourceInput = source.success ? source.data : undefined;
@@ -431,6 +439,9 @@ export function assertOneScheduleC8995(
     : undefined;
   const rowSource = scheduleCItemSchema.safeParse(row?.source_schedule_c);
   const f1040 = pending.f1040;
+  const nonitemizerCharitable = cfg.nonitemizerCharitableLimit > 0
+    ? (f1040?.line12f_nonitemizer_charitable ?? 0)
+    : 0;
   const schedule1 = pending.schedule1;
   const general = pending.general;
   const additionalDeduction =
@@ -570,7 +581,35 @@ export function assertOneScheduleC8995(
   const healthPlan = hasHealthDeduction
     ? singleScheduleCPlanSchema.safeParse(form7206?.single_schedule_c_plan)
     : undefined;
-  if (hasHealthDeduction) {
+  let pub974Health: Record<string, unknown> | undefined;
+  if (form7206?.pub974_single_business !== undefined) {
+    const { pub974_filing_row: retainedRow, ...rawSource } = form7206;
+    const replay = form7206Node.compute(
+      { taxYear, formType: "f1040" },
+      form7206SourceSchema.parse(rawSource),
+    );
+    const expectedRow = replay.outputs.find((output) => output.nodeType === "form7206")
+      ?.fields.pub974_filing_row;
+    if (!expectedRow || typeof expectedRow !== "object" || Array.isArray(expectedRow) ||
+      !isDeepStrictEqual(expectedRow, retainedRow)) {
+      throw new Error("Form 8995 Publication 974 deduction needs its source-replayed owner worksheet");
+    }
+    pub974Health = expectedRow as Record<string, unknown>;
+    const expectedReconciliation = replay.outputs.find((output) => output.nodeType === "form8962")
+      ?.fields.pub974_reconciliation;
+    const ptc = pending.form8962;
+    if (!ptc || !isDeepStrictEqual(ptc.pub974_reconciliation, expectedReconciliation)) {
+      throw new Error("Form 8995 Publication 974 deduction differs from its final PTC reconciliation");
+    }
+    const ptcReplay = form8962Node.compute(
+      { taxYear, formType: "f1040" }, form8962SourceSchema.parse(ptc),
+    ).outputs.find((output) => output.nodeType === "form8962")?.fields;
+    if (!ptcReplay || Object.entries(ptcReplay).some(([key, value]) =>
+      !isDeepStrictEqual(ptc[key], value))) {
+      throw new Error("Form 8995 Publication 974 deduction differs from the source-replayed final PTC");
+    }
+  }
+  if (hasHealthDeduction && !pub974Health) {
     if (!healthPlan?.success || !form7206 || typeof seDeduction !== "number") {
       throw new Error("Form 8995 health deduction needs Form 7206 source");
     }
@@ -661,18 +700,21 @@ export function assertOneScheduleC8995(
       !(sourcedFiledCapital !== undefined &&
         (key === "schedule_d" || key === "f1099b"))
     ) ||
-    (!hasHealthDeduction && form7206 !== undefined &&
+    (!hasHealthDeduction && !pub974Health && form7206 !== undefined &&
       Object.keys(form7206).some((key) =>
         key !== "schedule_c_source" && key !== "schedule_se_source"
       )) ||
-    (hasHealthDeduction &&
-      (!healthPlan?.success ||
-        healthPlan.data.business_reference !==
-          sourceBusiness?.business_reference ||
+    ((hasHealthDeduction || pub974Health !== undefined) && (pub974Health
+      ? pub974Health.business_reference !== sourceBusiness?.business_reference ||
+        pub974Health.recipient !== sourceBusiness?.proprietor_recipient ||
+        pub974Health.recipient_ssn !== ownerSsn ||
+        pub974Health.line14 !== healthDeduction ||
+        form7206?.marketplace_ptc_premium_overlap !== true
+      : !healthPlan?.success ||
+        healthPlan.data.business_reference !== sourceBusiness?.business_reference ||
         healthPlan.data.recipient !== sourceBusiness?.proprietor_recipient ||
         healthPlan.data.schedule_c_line31_net_profit !== rawQbi ||
-        calculateSingleScheduleCForm7206(healthPlan.data).line14 !==
-          healthDeduction ||
+        calculateSingleScheduleCForm7206(healthPlan.data).line14 !== healthDeduction ||
         form7206?.line14 !== healthDeduction ||
         form7206?.marketplace_ptc_premium_overlap !== false)) ||
     general?.qbi_no_prior_loss_or_suspended_loss_confirmed !== true ||
@@ -749,11 +791,13 @@ export function assertOneScheduleC8995(
     (investment === undefined && reit + qualifiedDividends.ordinary > 1_500) ||
     typeof f1040.line11_agi !== "number" ||
     typeof f1040.line12c_deduction_total !== "number" ||
+    typeof nonitemizerCharitable !== "number" ||
+    !Number.isFinite(nonitemizerCharitable) || nonitemizerCharitable < 0 ||
     Math.round(
         Math.max(
           0,
           f1040.line11_agi - f1040.line12c_deduction_total -
-            additionalDeduction,
+            nonitemizerCharitable - additionalDeduction,
         ),
       ) !==
       fields.line11
@@ -1443,7 +1487,7 @@ export function assertPositive8995(
     return assertCurrentPropertyQbi(fields, pending);
   }
   if (fields.current_k1_qbi_sources !== undefined) {
-    return assertCurrentK1Qbi(fields, pending);
+    return assertCurrentK1Qbi(fields, pending, taxYear);
   }
   if (
     fields.owned_s_corp_loss_source !== undefined ||

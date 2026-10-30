@@ -26,14 +26,14 @@ export function employerPostyearOwnerSource(owner: "T" | "S") {
   const account = `HSA-${owner}-2025`;
   const trusteeRef = `trustee-${owner}-2026-owner-excess-payment`;
   hsa.retained_employer_postyear_evidence = {
-    filed_2025_w2: retained({
+    filed_tax_year_w2: retained({
       source_document_reference: inputs.w2[0].source_document_reference,
       employer_ein: "123456789",
       employee_ssn: ssn,
       box1_wages: 90000,
       box12_code_w: 5000,
     }),
-    trustee_2026_payment: retained({
+    following_year_trustee_payment: retained({
       source_document_reference: trusteeRef,
       trustee_ein: "234567890",
       owner_ssn: ssn,
@@ -45,7 +45,7 @@ export function employerPostyearOwnerSource(owner: "T" | "S") {
       earnings: 50,
       paid_to: "hsa_owner",
     }),
-    owner_2026_receipt: retained({
+    following_year_owner_receipt: retained({
       source_document_reference: `owner-${owner}-2026-receipt`,
       trustee_transaction_reference: trusteeRef,
       owner_ssn: ssn,

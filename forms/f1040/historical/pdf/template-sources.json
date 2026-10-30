@@ -1,0 +1,804 @@
+{
+  "2021": {
+    "f1040": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040--2021.pdf",
+      "sha256": "41026e1bab58b13c69819a7fb5c836798cbfedf7c99452b2ddd242a28d061a04",
+      "title": "IRS f1040 final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040s1": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040s1--2021.pdf",
+      "sha256": "39de17c19addd9c1c84965ebadd9b134b45980ed66901a7d388b1ec26a25e542",
+      "title": "IRS f1040s1 final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040s2": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040s2--2021.pdf",
+      "sha256": "723cd76b0126527adae9744e49d5b2f8a66478ebf783df3d591c0fa4e8aa783a",
+      "title": "IRS f1040s2 final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040s3": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040s3--2021.pdf",
+      "sha256": "cefa8f213df8f347ce25d8cf378b765151c09df0221dda7b27a74dbbb355f977",
+      "title": "IRS f1040s3 final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040sa": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040sa--2021.pdf",
+      "sha256": "c3e5aee798f4a15059209c673398aa3def3188cf6012feb8f58f0d4d03eb8299",
+      "title": "IRS f1040sa final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040sb": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040sb--2021.pdf",
+      "sha256": "dfd8665b8ad261a8ccda10dbaaaf65f2fef425ea9b61a9f5fb80bd9524f276b3",
+      "title": "IRS f1040sb final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040sc": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040sc--2021.pdf",
+      "sha256": "6f5c657de01c7893884b443b141d03d3aa2d1158911a93f379cd219d9a2e1903",
+      "title": "IRS f1040sc final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040sd": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040sd--2021.pdf",
+      "sha256": "b93087a323755af1d9ced9278dd7e6085680cea08324be67ec4cc5045c705e3d",
+      "title": "IRS f1040sd final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040se": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040se--2021.pdf",
+      "sha256": "297713061cebe26965b6f7d3255172cb5f61a3b5db22f419aef5adf288bb6e89",
+      "title": "IRS f1040se final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040sse": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040sse--2021.pdf",
+      "sha256": "474ef0024350fcc7aa2d2c879b28f362e6fdc11e41ef9ea3fba9e6f51ee01e51",
+      "title": "IRS f1040sse final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8949": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f8949--2021.pdf",
+      "sha256": "7d265f830ff83b5a07e275df2f4a59868a1f62e3f6aa0ee73c931ed517def44d",
+      "title": "IRS f8949 final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8582": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f8582--2021.pdf",
+      "sha256": "6762c4d94b1dff0b7ea73e70228d057a0871b07965dfc99006ea2b2a54b68758",
+      "title": "IRS f8582 final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8995": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f8995--2021.pdf",
+      "sha256": "64ad0e8d7626105a2b6e4d05c801393b33ad765104f8d30838bb1e4d2dc0e11f",
+      "title": "IRS f8995 final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8995a": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f8995a--2021.pdf",
+      "sha256": "541dbdc6cc20da73242f936c6850b89c671933d6bf63066053ba5ce9c84471e9",
+      "title": "IRS f8995a final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f7203": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f7203--2021.pdf",
+      "sha256": "a32f3ea11d6c46eadf50731892a2cc0b88e72fd21438e069b200bacd6185383d",
+      "title": "IRS f7203 final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8962": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f8962--2021.pdf",
+      "sha256": "e4639537e3ec539610633fa54909c218335008945d7b818cc20d118c04caa922",
+      "title": "IRS f8962 final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8889": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f8889--2021.pdf",
+      "sha256": "b1378c35984f8e8ed9ae8908a6f45048522c9c3dc783295f897a7bfef741b710",
+      "title": "IRS f8889 final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8959": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f8959--2021.pdf",
+      "sha256": "9ef34eb8c2b4d6b967eee2ce819103bf872090717e6bca8b98e44f04779cd553",
+      "title": "IRS f8959 final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8960": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f8960--2021.pdf",
+      "sha256": "fd778ac4f5ebf1aa23e0d24bfeb5a5794d7ed50bc2b7c83f62f3799cc1d08713",
+      "title": "IRS f8960 final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f5329": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f5329--2021.pdf",
+      "sha256": "20110207983807cd7bf95fb5e4e366b84cd52d0d65ace83616b4500fc3c7a0f4",
+      "title": "IRS f5329 final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f6198": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f6198--2020.pdf",
+      "sha256": "34e5c197a67eb8e91b0d189efcab00393922ddeb58941e005c30f6953ba08670",
+      "revisionYear": 2020,
+      "title": "IRS f6198 final 2020 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions",
+      "applicability": "Revision-dated form; retained final revision in effect for this tax year; printed revision is not relabeled."
+    },
+    "f8995aa": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f8995aa--2021.pdf",
+      "sha256": "5107c7016cea65f3a9d95487a345c90852d1d442400b4f279b6c3da3b90eaf53",
+      "title": "IRS f8995aa final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8995ab": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f8995ab--2021.pdf",
+      "sha256": "ad215bba5fc2bfd1f580f9bccea4343ee39c83aacb140a46bcb52af927470c3f",
+      "title": "IRS f8995ab final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8995ac": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f8995ac--2021.pdf",
+      "sha256": "39424b2c5e63c0921d5939fdd9eef155e3ba9bacc2f4569756f010953d624907",
+      "title": "IRS f8995ac final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8995ad": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f8995ad--2021.pdf",
+      "sha256": "5dceb44e3bfa446e9a7b56b049516c3fbd3feee9a04ed046d3aa7713c6c3b28d",
+      "title": "IRS f8995ad final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f6251": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f6251--2021.pdf",
+      "sha256": "a2507f08d2ca43c2693f7a01eb817a3b522f32bc6f4d9d7a775340e59324a997",
+      "title": "IRS f6251 final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8880": {
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f8880--2021.pdf",
+      "sha256": "6c68c2d17d5f8d2a284d469637dd02565c73177eddb47c5154ffe6674422c639",
+      "title": "IRS f8880 final 2021 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    }
+  },
+  "2022": {
+    "f1040": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040--2022.pdf",
+      "sha256": "7f7933e17b2701e8555164f18bd9d93e8891c7bc0d6e45d8df6d84a2cf78b48f",
+      "title": "IRS f1040 final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040s1": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040s1--2022.pdf",
+      "sha256": "82887534af818328b48c10569402ba177b87729edda2cd59151bc854c7e40001",
+      "title": "IRS f1040s1 final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040s2": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040s2--2022.pdf",
+      "sha256": "605832e130be0d13ebb0b2f6cc17a20b5a5634ebaa300a34fcbfbf2738a02c81",
+      "title": "IRS f1040s2 final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040s3": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040s3--2022.pdf",
+      "sha256": "dd1e162a40444ac25e37c9dc8eb443038dd0f00b8ea589ec4927752a62210f10",
+      "title": "IRS f1040s3 final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040sa": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040sa--2022.pdf",
+      "sha256": "1e2e4ee74ad4a8261eec47ebb8eae2ace4a3f2b4758a62d133adf6ef52e16f99",
+      "title": "IRS f1040sa final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040sb": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040sb--2022.pdf",
+      "sha256": "828e8d014568b4c91eb1bc4890bc5cb42fc83b669e7679eaba64f447f5204308",
+      "title": "IRS f1040sb final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040sc": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040sc--2022.pdf",
+      "sha256": "334ef0667595d7c22eac360177f1da0d0a7e6fbe228d0b4df7e0b62e34b4908a",
+      "title": "IRS f1040sc final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040sd": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040sd--2022.pdf",
+      "sha256": "7aa00b008894e30b38d0486e9ffdb1436e25f1f8503c8c6a13a7e85b34d1de5e",
+      "title": "IRS f1040sd final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040se": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040se--2022.pdf",
+      "sha256": "a730ec6835f66df904eb4ade34949a12c493e752e8d2622c68419e29b9f28cb5",
+      "title": "IRS f1040se final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040sse": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040sse--2022.pdf",
+      "sha256": "60900671b35f6076b3dd6b24ede232d7e40da1c4dc4eaac49f84257d3a4dc269",
+      "title": "IRS f1040sse final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8949": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f8949--2022.pdf",
+      "sha256": "452cec716f08fda9c4c760fb3a3f339bb617250811fccc2429da36cd2b1f8038",
+      "title": "IRS f8949 final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8582": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f8582--2022.pdf",
+      "sha256": "3d5c569d11158e9a4ea180d7c56725e54234b6cdaa3e06a064ba40eb6e91db66",
+      "title": "IRS f8582 final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8995": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f8995--2022.pdf",
+      "sha256": "82a5b8fb18a868112ed5d8948ee78ad11ce03b3aa5a280d5604caee6a7501c19",
+      "title": "IRS f8995 final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8995a": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f8995a--2022.pdf",
+      "sha256": "155155873e7f3a4e9e28abd4718b16c4f057e2f99f5e88933527f6a6d9ad924e",
+      "title": "IRS f8995a final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f7203": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f7203--2022.pdf",
+      "sha256": "e138560a8c5d591f1619544cbf189658e6d4540e13e9b3726b6fcd653cb2ad1d",
+      "title": "IRS f7203 final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8962": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f8962--2022.pdf",
+      "sha256": "52f9b6b5fff10d0d4a21480c2f21546d31e2f888778ae51e756fb5fb3e59cee5",
+      "title": "IRS f8962 final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8889": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f8889--2022.pdf",
+      "sha256": "280be3b328e35a20a1b5a4753fb384d67ea6053cea67f60fd756de1806b1b41c",
+      "title": "IRS f8889 final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8959": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f8959--2022.pdf",
+      "sha256": "052e2444e4837ac9082e4c567d7d23d42241546d9d6ca70700479ab86b80ddb0",
+      "title": "IRS f8959 final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8960": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f8960--2022.pdf",
+      "sha256": "a01b71cde9c9bcc8929f35ecc26da06619a9b331adeb17804f9cf30559c1110e",
+      "title": "IRS f8960 final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f5329": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f5329--2022.pdf",
+      "sha256": "fe112aac16a02c4c187c9032664b5835634c7fae3d2dea928a87dfa3280ab6d5",
+      "title": "IRS f5329 final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f6198": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f6198--2020.pdf",
+      "sha256": "34e5c197a67eb8e91b0d189efcab00393922ddeb58941e005c30f6953ba08670",
+      "revisionYear": 2020,
+      "title": "IRS f6198 final 2020 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions",
+      "applicability": "Revision-dated form; retained final revision in effect for this tax year; printed revision is not relabeled."
+    },
+    "f8995aa": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f8995aa--2022.pdf",
+      "sha256": "73295fca6fe59544865c8946636f4e92b1c8ca61762fc13fc53b402bd19cb3b1",
+      "title": "IRS f8995aa final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8995ab": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f8995ab--2022.pdf",
+      "sha256": "836460c0d7b5e17682a92e61147440336bda63b573f672d0cda0ebd276bc453f",
+      "title": "IRS f8995ab final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8995ac": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f8995ac--2022.pdf",
+      "sha256": "30074d5ce00204c6ab09a6146b95043f1e4f81cf6849590dc2caab08b09ae99b",
+      "title": "IRS f8995ac final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8995ad": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f8995ad--2022.pdf",
+      "sha256": "993afb4447fb6d0de29319bc26e811f6cc5c19dde6b28dad818c42f13a71d8ad",
+      "title": "IRS f8995ad final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f6251": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f6251--2022.pdf",
+      "sha256": "40c48d141283b4415fad971fd71b6b04e5edf1e699b8602359c19025fbd70b05",
+      "title": "IRS f6251 final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8880": {
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f8880--2022.pdf",
+      "sha256": "2485d1ce1023ec8a50501a03e92a352e4793ea988c6ade1f62a7a86cd9f982c5",
+      "title": "IRS f8880 final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    }
+  },
+  "2023": {
+    "f1040": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040--2023.pdf",
+      "sha256": "a410ce39e1f9b75ab3ddd8c314b9e7dce022ed6e3aebde5418a58b88f1e0213c",
+      "title": "IRS f1040 final 2023 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040s1": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040s1--2023.pdf",
+      "sha256": "8b747fa3399ced68be92c199b61b3771134f2dc1b0f5faeef433e0f94278b006",
+      "title": "IRS f1040s1 final 2023 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040s2": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040s2--2023.pdf",
+      "sha256": "ccfe610c15371e722c3743943e0f20e278114c3a040e2e00aceb68ea3c6eab33",
+      "title": "IRS f1040s2 final 2023 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040s3": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040s3--2023.pdf",
+      "sha256": "90d6d5de31810e55e0badcf684e2ad4340e5bb8ed0dcf224e08a93883d16a87b",
+      "title": "IRS f1040s3 final 2023 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040sa": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040sa--2023.pdf",
+      "sha256": "276895a388eb90804e8c17da331983cf84a919e193ced451ae27966b7b7de46d",
+      "title": "IRS f1040sa final 2023 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040sb": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040sb--2023.pdf",
+      "sha256": "3079c35cc14c4392efd436132e62c4c2fec21196a1988f38674da9c29df2f54f",
+      "title": "IRS f1040sb final 2023 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040sc": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040sc--2023.pdf",
+      "sha256": "d475d0c135c0ebc599eadd1a228cbb124a60b0b6ca69a32ae0d355f5708755ff",
+      "title": "IRS f1040sc final 2023 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040sd": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040sd--2023.pdf",
+      "sha256": "3421941cbc675e004d38ff3045e865f82bb97a5db080c9630a34057f4165ec07",
+      "title": "IRS f1040sd final 2023 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040se": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040se--2023.pdf",
+      "sha256": "5252b9584187a583827bc42fd7b6d51b9c071ef7d09687fd8b97b6bcc141543e",
+      "title": "IRS f1040se final 2023 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040sse": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040sse--2023.pdf",
+      "sha256": "ae11beaaedd525f47155e1692c7f7e5386c912c334912978f5f87507dcdc0b30",
+      "title": "IRS f1040sse final 2023 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8949": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f8949--2023.pdf",
+      "sha256": "8d42e05176c6a8c63bf025cb26546a878fc73c462b234ec70fd5a824c3b145a7",
+      "title": "IRS f8949 final 2023 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8582": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f8582--2023.pdf",
+      "sha256": "cec767a84828b93ab9e4950147aef74b7c69af2420cc0d66e50feb108da928b9",
+      "title": "IRS f8582 final 2023 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8995": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f8995--2023.pdf",
+      "sha256": "66514dbc128113ba63bffb21a4444bf21ce89e661b97091d9e98463f8712c929",
+      "title": "IRS f8995 final 2023 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8995a": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f8995a--2023.pdf",
+      "sha256": "6db216b372798dbe90faff0ac5add473734feb43ac75696c7de9933bdfdab942",
+      "title": "IRS f8995a final 2023 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8962": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f8962--2023.pdf",
+      "sha256": "74c8dae38348e5236d1bffb4e07333181d96a6029b872da7d001efe53763deff",
+      "title": "IRS f8962 final 2023 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8889": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f8889--2023.pdf",
+      "sha256": "1185040e24ac4044baa1638f0978e8402ae56f77ec33301300a8722796ab6808",
+      "title": "IRS f8889 final 2023 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8959": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f8959--2023.pdf",
+      "sha256": "44c77b7b237e1b520a23a3aa6c3d869ca2a315656f0c8fada015eb28380b28c5",
+      "title": "IRS f8959 final 2023 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8960": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f8960--2023.pdf",
+      "sha256": "6664676afef1b6391e8b350c30f47ac71163909d158f6e5e57f7ccaf36c77eec",
+      "title": "IRS f8960 final 2023 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f7206": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f7206--2023.pdf",
+      "sha256": "3f7b23f08f7bc014f4480cabf9b2c365369e79df006dd7140be7a87178578009",
+      "title": "IRS f7206 final 2023 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f5329": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f5329--2023.pdf",
+      "sha256": "9252c36ef0d26fa3a38286428802f452ab84413a4ed70e9ffb50a69a8f115caf",
+      "title": "IRS f5329 final 2023 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f6198": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f6198--2020.pdf",
+      "sha256": "34e5c197a67eb8e91b0d189efcab00393922ddeb58941e005c30f6953ba08670",
+      "revisionYear": 2020,
+      "title": "IRS f6198 final 2020 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions",
+      "applicability": "Revision-dated form; retained final revision in effect for this tax year; printed revision is not relabeled."
+    },
+    "f7203": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f7203--2022.pdf",
+      "sha256": "e138560a8c5d591f1619544cbf189658e6d4540e13e9b3726b6fcd653cb2ad1d",
+      "revisionYear": 2022,
+      "title": "IRS f7203 final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions",
+      "applicability": "Revision-dated form; retained final revision in effect for this tax year; printed revision is not relabeled."
+    },
+    "f8995aa": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f8995aa--2022.pdf",
+      "sha256": "73295fca6fe59544865c8946636f4e92b1c8ca61762fc13fc53b402bd19cb3b1",
+      "revisionYear": 2022,
+      "title": "IRS f8995aa final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions",
+      "applicability": "Revision-dated form; retained final revision in effect for this tax year; printed revision is not relabeled."
+    },
+    "f8995ab": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f8995ab--2022.pdf",
+      "sha256": "836460c0d7b5e17682a92e61147440336bda63b573f672d0cda0ebd276bc453f",
+      "revisionYear": 2022,
+      "title": "IRS f8995ab final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions",
+      "applicability": "Revision-dated form; retained final revision in effect for this tax year; printed revision is not relabeled."
+    },
+    "f8995ac": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f8995ac--2022.pdf",
+      "sha256": "30074d5ce00204c6ab09a6146b95043f1e4f81cf6849590dc2caab08b09ae99b",
+      "revisionYear": 2022,
+      "title": "IRS f8995ac final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions",
+      "applicability": "Revision-dated form; retained final revision in effect for this tax year; printed revision is not relabeled."
+    },
+    "f8995ad": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f8995ad--2022.pdf",
+      "sha256": "993afb4447fb6d0de29319bc26e811f6cc5c19dde6b28dad818c42f13a71d8ad",
+      "revisionYear": 2022,
+      "title": "IRS f8995ad final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions",
+      "applicability": "Revision-dated form; retained final revision in effect for this tax year; printed revision is not relabeled."
+    },
+    "f6251": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f6251--2023.pdf",
+      "sha256": "26e3a04f68173ba8120c896728b262cb213351a166067f28b654d5b52e944def",
+      "title": "IRS f6251 final 2023 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8880": {
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f8880--2023.pdf",
+      "sha256": "2841b80fa3ec56c1a120d53ee7a943a81c58a39c9ac5b51744e4611694a15632",
+      "title": "IRS f8880 final 2023 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    }
+  },
+  "2024": {
+    "f1040": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040--2024.pdf",
+      "sha256": "0a7a54354283044cb41373c6faabfa50955d44bdf91b4b76fa1ca2bf13f6d718",
+      "title": "IRS f1040 final 2024 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040s1": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040s1--2024.pdf",
+      "sha256": "2fe9bc204a82a037a50b21c6eda9949e266eafa423e604f312bc177fc721b552",
+      "title": "IRS f1040s1 final 2024 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040s2": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040s2--2024.pdf",
+      "sha256": "2efb90815ed0b92c0a30d23517258382c4087334c76fa07ac033ca70e883420e",
+      "title": "IRS f1040s2 final 2024 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040s3": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040s3--2024.pdf",
+      "sha256": "d9941e4ec1d581ac2e42cabebf8e0416dbc3c703e2142f62de17c838308ddcc8",
+      "title": "IRS f1040s3 final 2024 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040sa": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040sa--2024.pdf",
+      "sha256": "4bfff9a524c6db9421527f77dc375978a3204c583e60e60fbd8f9d37bd58492a",
+      "title": "IRS f1040sa final 2024 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040sb": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040sb--2024.pdf",
+      "sha256": "03b72c78d75082ddd51901ca8a39e0ca2e982fdec2567b2dfb2fe4180f6aa93a",
+      "title": "IRS f1040sb final 2024 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040sc": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040sc--2024.pdf",
+      "sha256": "f56bfd48f3604fc015b7ea22a70c6c36535a723ba84a2b9a961bc9838d070ce6",
+      "title": "IRS f1040sc final 2024 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040sd": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040sd--2024.pdf",
+      "sha256": "5a006b1a9a17c19af294a3da0971528276598e6a54ac4ca1670656d71476b6f5",
+      "title": "IRS f1040sd final 2024 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040se": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040se--2024.pdf",
+      "sha256": "92b044d286bae28a20de52734049464a089e323edaf00485495ecbaafe971fdd",
+      "title": "IRS f1040se final 2024 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f1040sse": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040sse--2024.pdf",
+      "sha256": "ac8ba97e554b67275d0e888d709e0ecadc9b45634c52cd934fa9bdcfd15179b0",
+      "title": "IRS f1040sse final 2024 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8949": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f8949--2024.pdf",
+      "sha256": "dcd2d7ff6833485038aa34946d9a91b7d5adf639677116b57f143677a85a3b51",
+      "title": "IRS f8949 final 2024 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8582": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f8582--2024.pdf",
+      "sha256": "be3362991132f19d17279a544ad7b8152ce850ed09d55be0d892362c8d48d367",
+      "title": "IRS f8582 final 2024 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8995": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f8995--2024.pdf",
+      "sha256": "08f4c0332be3262fda77744c3cc1e32b03cd7a5f3ab52b748991efb273cdd822",
+      "title": "IRS f8995 final 2024 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8995a": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f8995a--2024.pdf",
+      "sha256": "2a6177ce524a89e16ec9ac961c7ed92ce9ff38bd569846f6d564852b4b969979",
+      "title": "IRS f8995a final 2024 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f6198": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f6198--2024.pdf",
+      "sha256": "b6a81c8242ba956ef35d350a9404af5cc7b4a608453d18dc3111a34f8eb845c9",
+      "title": "IRS f6198 final 2024 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8962": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f8962--2024.pdf",
+      "sha256": "9a422c51981856da15154e1dea3666179ff2e1d3ab2400884a545a841392b356",
+      "title": "IRS f8962 final 2024 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8889": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f8889--2024.pdf",
+      "sha256": "a93c1f651b267df7d2935adab13341b1d7e1eade9bcb14acee0b32dd93464e14",
+      "title": "IRS f8889 final 2024 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8959": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f8959--2024.pdf",
+      "sha256": "b8375fc44add4ea928d7d5b14e840ef66420cda1f6a41e37d58cc13284c8f00d",
+      "title": "IRS f8959 final 2024 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8960": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f8960--2024.pdf",
+      "sha256": "fca6fa8dc422ac066741f2b5ec3f8a7dea093766e405c0e261dd597c419edfb3",
+      "title": "IRS f8960 final 2024 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f7206": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f7206--2024.pdf",
+      "sha256": "399b2495cee671f24f2508cfd4b6f76bb953c4c9f70c48278e8e0f0e5f182968",
+      "title": "IRS f7206 final 2024 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f5329": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f5329--2024.pdf",
+      "sha256": "a8cdaadfc77f9f96fca83419682dbb070bc854a0a8785cc230d1a74a293aa74c",
+      "title": "IRS f5329 final 2024 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f7203": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f7203--2022.pdf",
+      "sha256": "e138560a8c5d591f1619544cbf189658e6d4540e13e9b3726b6fcd653cb2ad1d",
+      "revisionYear": 2022,
+      "title": "IRS f7203 final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions",
+      "applicability": "Revision-dated form; retained final revision in effect for this tax year; printed revision is not relabeled."
+    },
+    "f8995aa": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f8995aa--2024.pdf",
+      "sha256": "1997583e4bad9e23b19012084aa9da2ba2024453d07e1dc5d1095463a49477d8",
+      "title": "IRS f8995aa final 2024 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8995ab": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f8995ab--2022.pdf",
+      "sha256": "836460c0d7b5e17682a92e61147440336bda63b573f672d0cda0ebd276bc453f",
+      "revisionYear": 2022,
+      "title": "IRS f8995ab final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions",
+      "applicability": "Revision-dated form; retained final revision in effect for this tax year; printed revision is not relabeled."
+    },
+    "f8995ac": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f8995ac--2022.pdf",
+      "sha256": "30074d5ce00204c6ab09a6146b95043f1e4f81cf6849590dc2caab08b09ae99b",
+      "revisionYear": 2022,
+      "title": "IRS f8995ac final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions",
+      "applicability": "Revision-dated form; retained final revision in effect for this tax year; printed revision is not relabeled."
+    },
+    "f8995ad": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f8995ad--2022.pdf",
+      "sha256": "993afb4447fb6d0de29319bc26e811f6cc5c19dde6b28dad818c42f13a71d8ad",
+      "revisionYear": 2022,
+      "title": "IRS f8995ad final 2022 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions",
+      "applicability": "Revision-dated form; retained final revision in effect for this tax year; printed revision is not relabeled."
+    },
+    "f6251": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f6251--2024.pdf",
+      "sha256": "7fea4e4298121b6e6889f4cba3dd8209aeaab0185ddd29b6c14188ab9ab2719a",
+      "title": "IRS f6251 final 2024 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    },
+    "f8880": {
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f8880--2024.pdf",
+      "sha256": "d09e2b78605b4910876f156c4910a5f2e145ea72cc63fc4f9a0b43a6cce61022",
+      "title": "IRS f8880 final 2024 template",
+      "authority": "https://www.irs.gov/prior-year-forms-and-instructions"
+    }
+  }
+}

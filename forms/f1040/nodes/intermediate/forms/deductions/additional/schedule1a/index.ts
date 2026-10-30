@@ -21,6 +21,8 @@ export * from "./calculation.ts";
 class Schedule1ANode extends TaxNode<typeof inputSchema> {
   readonly nodeType = "schedule1a";
   readonly inputSchema = inputSchema;
+  // Age/valid-SSN eligibility stays triggering for current-year senior claims.
+  override readonly contextFields = ["magi", "filing_status", "taxpayer_ssn", "spouse_ssn"] as const;
   readonly outputNodes = new OutputNodes([f1040, standard_deduction, form8995]);
 
   compute(ctx: NodeContext, rawInput: Schedule1AInput): NodeResult {

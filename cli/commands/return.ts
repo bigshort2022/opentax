@@ -5,6 +5,8 @@ import { singletonPublicInputKeys } from "../store/public-input-keys.ts";
 import { resolveSourceBytes } from "./return-source-files.ts";
 import { returnHints } from "./return-hints.ts";
 import { normalizeAllPending } from "../../forms/f1040/2025/return-processing/pending.ts";
+import type { PaperPreparationStatus } from "../../core/validation/types.ts";
+import { returnPreparationIssues } from "./preparation.ts";
 
 function getCatalogEntry(formType: string, year: number) {
   const key = `${formType}:${year}`;
@@ -22,6 +24,7 @@ export type CreateReturnArgs = {
 export async function createReturnCommand(
   args: CreateReturnArgs,
 ): Promise<{ returnId: string }> {
+  getCatalogEntry(args.formType ?? "f1040", args.year);
   const { returnId } = await createReturn(
     args.year,
     args.baseDir,
@@ -54,6 +57,7 @@ export type GetReturnResult = {
   readonly lines: Record<string, unknown>;
   readonly warnings: readonly string[];
   readonly carryforwards: Readonly<Record<string, number>>;
+  readonly paperPreparation?: PaperPreparationStatus;
 };
 
 function num(value: unknown): number {
@@ -186,6 +190,8 @@ export async function getReturnCommand(
   for (const d of result.diagnostics) {
     warnings.push(`[${d.code}] ${d.nodeType}: ${d.message}`);
   }
+  const preparationIssues = await returnPreparationIssues(args, def, engineInputs, pending);
+  warnings.push(...preparationIssues.map((issue) => `[${issue.code}] ${issue.form}: ${issue.message}`));
 
   return {
     returnId: meta.returnId,
@@ -196,5 +202,11 @@ export async function getReturnCommand(
     lines: def.formType === "f4868" ? pending["form4868"] ?? {} : f1040,
     warnings,
     carryforwards: result.carryforwards,
+    ...(def.preparationMode === "paper" ? {
+      paperPreparation: {
+        readyForPaper: preparationIssues.length === 0 && result.diagnostics.length === 0,
+        electronicFilingSupported: false as const,
+      },
+    } : {}),
   };
 }

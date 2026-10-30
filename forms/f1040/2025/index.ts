@@ -1,5 +1,5 @@
 import { preparePublicForm8886Return } from "./domains/general/filing/form8886/public-return.ts";
-import type { FormDefinition } from "../../../core/types/form-definition.ts";
+import type { MefFormDefinition } from "../../../core/types/form-definition.ts";
 import type { ExecuteResult } from "../../../core/runtime/executor.ts";
 import type { FilerIdentity } from "../mef/header.ts";
 import type { MefFormsPending } from "./mef/types.ts";
@@ -21,7 +21,9 @@ function executeReturn(inputs: Record<string, unknown>): ExecuteResult {
   return executeF1040Return(inputs, context);
 }
 
-export const f1040_2025: FormDefinition = {
+export const f1040_2025: MefFormDefinition = {
+  preparationMode: "mef",
+  paperAvailable: true,
   ...F1040_2025_CONFIG,
   inputNodes,
   registry,

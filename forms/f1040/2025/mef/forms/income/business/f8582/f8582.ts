@@ -35,6 +35,7 @@ import {
   computePropertyNet,
   inputSchema as scheduleEInputSchema,
   isPassiveProperty,
+  projectScheduleEItems,
   qualifiedEntireDispositionGain,
   qualifiedFirstYearRetainedPropertySale,
   qualifiedRetainedPropertySale,
@@ -133,9 +134,12 @@ function assertK1PoolReturn(
   context: MefBuildContext,
 ) {
   const activities = input.activities ?? [];
-  const propertySources = scheduleEInputSchema.parse(
-    context.pending?.schedule_e ?? {},
-  ).schedule_es.flatMap((item) => {
+  const rawScheduleE = scheduleEInputSchema.parse(context.pending?.schedule_e ?? {});
+  const sourceE = {
+    ...rawScheduleE,
+    schedule_es: projectScheduleEItems(rawScheduleE.schedule_es, mefTaxYear(context)),
+  };
+  const propertySources = sourceE.schedule_es.flatMap((item) => {
     const source = reconcileCurrentPropertySource(item);
     return source ? [source] : [];
   });
@@ -188,7 +192,6 @@ function assertK1PoolReturn(
       "Form 8582 K-1 pool differs from independently joined AGI passive sources",
     );
   }
-  const sourceE = scheduleEInputSchema.parse(context.pending?.schedule_e ?? {});
   const farms = context.pending?.f4835 === undefined
     ? []
     : form4835InputSchema.parse(context.pending.f4835).f4835s;
@@ -209,7 +212,7 @@ function assertK1PoolReturn(
         "Form 8582 ordinary K-1 income needs its actual required Form 8995",
       );
     }
-    assertCurrentK1Qbi(qbi as Record<string, unknown>, context.pending);
+    assertCurrentK1Qbi(qbi as Record<string, unknown>, context.pending, mefTaxYear(context));
   }
   if (propertySources.length) {
     const qbi = context.pending?.form8995;
@@ -323,9 +326,13 @@ function linkedActivities(context: MefBuildContext): Array<{
   prior_active_participation?: boolean;
   reporting_form: string;
 }> {
-  const scheduleE = scheduleEInputSchema.parse(
+  const rawScheduleE = scheduleEInputSchema.parse(
     context.pending?.schedule_e ?? {},
   );
+  const scheduleE = {
+    ...rawScheduleE,
+    schedule_es: projectScheduleEItems(rawScheduleE.schedule_es, mefTaxYear(context)),
+  };
   if (
     scheduleE.schedule_es.some((item) =>
       item.passive_property_sales?.some((sale) =>
@@ -779,7 +786,7 @@ function buildOtherPassive(
     const scheduleE = scheduleEInputSchema.safeParse(pending?.schedule_e);
     const property = scheduleE.success &&
         scheduleE.data.schedule_es.length === 1
-      ? scheduleE.data.schedule_es[0]
+      ? projectScheduleEItems(scheduleE.data.schedule_es, mefTaxYear(context))[0]
       : undefined;
     const w2 = w2InputSchema.safeParse(pending?.w2);
     const schedule1 = pending?.schedule1 as Record<string, unknown> | undefined;
@@ -1561,7 +1568,7 @@ export const form8582: MefFormDescriptor<"form8582", Input> = {
       const scheduleE = scheduleEInputSchema.safeParse(pending?.schedule_e);
       const property = scheduleE.success &&
           scheduleE.data.schedule_es.length === 1
-        ? scheduleE.data.schedule_es[0]
+        ? projectScheduleEItems(scheduleE.data.schedule_es, mefTaxYear(context))[0]
         : undefined;
       const w2 = w2InputSchema.safeParse(pending?.w2);
       const schedule1 = pending?.schedule1 as

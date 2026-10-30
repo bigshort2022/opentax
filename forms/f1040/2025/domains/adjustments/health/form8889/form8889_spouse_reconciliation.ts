@@ -447,8 +447,8 @@ export function reconcileCode2Form8889(
         filed.beneficiary_ssn ||
       claimedCodeW.amount !== filedCodeW.amount ||
       source.employer_hsa_contributions !== undefined ||
-      source.employer_contribution_years?.made_in_2025_for_2024_in_w2 !== 0 ||
-      source.employer_contribution_years?.made_in_2026_for_2025 !== 0 ||
+      source.employer_contribution_years?.made_in_tax_year_for_prior_year_in_w2 !== 0 ||
+      source.employer_contribution_years?.made_in_following_year_for_tax_year !== 0 ||
       (source.taxpayer_hsa_contributions ?? 0) !== 0 ||
       source.qualified_hsa_funding_distributions !== undefined ||
       source.prior_year_hsa_excess !== undefined ||
@@ -939,8 +939,8 @@ export function reconcilePairedForm8889(
     owners.every((owner) =>
       (owner.taxpayer_hsa_contributions ?? 0) === 0 &&
       owner.employer_hsa_contributions === undefined &&
-      owner.employer_contribution_years?.made_in_2025_for_2024_in_w2 === 0 &&
-      owner.employer_contribution_years?.made_in_2026_for_2025 === 0 &&
+      owner.employer_contribution_years?.made_in_tax_year_for_prior_year_in_w2 === 0 &&
+      owner.employer_contribution_years?.made_in_following_year_for_tax_year === 0 &&
       (owner.hsa_distributions ?? 0) === 0 &&
       owner.qualified_hsa_funding_distributions === undefined &&
       owner.prior_year_hsa_excess === undefined &&
@@ -977,8 +977,8 @@ export function reconcilePairedForm8889(
       owner.form1099_sa_distributions === undefined &&
       owner.qualified_medical_expenses === undefined &&
       (owner.archer_msa_distributions ?? 0) === 0 &&
-      owner.employer_contribution_years?.made_in_2025_for_2024_in_w2 === 0 &&
-      owner.employer_contribution_years?.made_in_2026_for_2025 === 0 &&
+      owner.employer_contribution_years?.made_in_tax_year_for_prior_year_in_w2 === 0 &&
+      owner.employer_contribution_years?.made_in_following_year_for_tax_year === 0 &&
       (owner === employerReturnedOwner
         ? (owner.taxpayer_hsa_contributions ?? 0) === 0
         : (owner.taxpayer_hsa_contributions ?? 0) > 0)
@@ -1277,8 +1277,8 @@ export function reconcilePairedForm8889(
         codeW[0]!.amount - Number(employerForm.print_line8 ?? 0) ||
       employerOwner.employer_hsa_contributions !== undefined ||
       employerOwner.employer_contribution_years
-          ?.made_in_2025_for_2024_in_w2 !== 0 ||
-      employerOwner.employer_contribution_years?.made_in_2026_for_2025 !== 0 ||
+          ?.made_in_tax_year_for_prior_year_in_w2 !== 0 ||
+      employerOwner.employer_contribution_years?.made_in_following_year_for_tax_year !== 0 ||
       (employerOwner.taxpayer_hsa_contributions ?? 0) !== 0 ||
       employerOwner.employer_excess_treatment
           ?.amount_included_in_w2_box1 !== 0 ||
@@ -1298,8 +1298,8 @@ export function reconcilePairedForm8889(
           owner.employer_hsa_contributions !== undefined ||
           (owner.employer_contribution_years !== undefined &&
             (owner.employer_contribution_years
-                  .made_in_2025_for_2024_in_w2 !== 0 ||
-              owner.employer_contribution_years.made_in_2026_for_2025 !== 0)) ||
+                  .made_in_tax_year_for_prior_year_in_w2 !== 0 ||
+              owner.employer_contribution_years.made_in_following_year_for_tax_year !== 0)) ||
           owner.employer_excess_treatment !== undefined ||
           owner.hsa_excluded_distributions !== undefined ||
           owner.qualified_hsa_funding_distributions !== undefined ||
@@ -1361,8 +1361,8 @@ export function reconcilePairedForm8889(
         ) &&
         row.age_55_or_older === false &&
         row.employer_hsa_contributions === undefined &&
-        row.employer_contribution_years?.made_in_2025_for_2024_in_w2 === 0 &&
-        row.employer_contribution_years?.made_in_2026_for_2025 === 0 &&
+        row.employer_contribution_years?.made_in_tax_year_for_prior_year_in_w2 === 0 &&
+        row.employer_contribution_years?.made_in_following_year_for_tax_year === 0 &&
         row.qualified_hsa_funding_distributions === undefined &&
         row.hsa_excluded_distributions === undefined &&
         row.post_year_personal_excess_withdrawal === undefined &&
@@ -1402,9 +1402,9 @@ export function reconcilePairedForm8889(
       owners.some((owner) =>
         !owner || (owner.taxpayer_hsa_contributions ?? 0) <= 0 ||
         (owner.employer_hsa_contributions ?? 0) > 0 ||
-        (owner.employer_contribution_years?.made_in_2025_for_2024_in_w2 ?? 0) >
+        (owner.employer_contribution_years?.made_in_tax_year_for_prior_year_in_w2 ?? 0) >
           0 ||
-        (owner.employer_contribution_years?.made_in_2026_for_2025 ?? 0) > 0 ||
+        (owner.employer_contribution_years?.made_in_following_year_for_tax_year ?? 0) > 0 ||
         ((owner.hsa_distributions ?? 0) > 0 &&
           !owner.form1099_sa_distributions?.length) ||
         ((owner.qualified_medical_expenses ?? 0) > 0 &&

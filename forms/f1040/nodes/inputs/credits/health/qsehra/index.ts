@@ -6,6 +6,8 @@ import type {
 import { TaxNode } from "../../../../../../../core/types/tax-node.ts";
 import { OutputNodes } from "../../../../../../../core/types/output-nodes.ts";
 import {
+  assertQsehraSourceYear,
+  qsehraSourceSchema,
   form8962,
   inputSchema as form8962InputSchema,
 } from "../../../../intermediate/forms/credits/health/form8962/index.ts";
@@ -33,6 +35,7 @@ export const inputSchema = z.object({
   // Written-notice self-only amounts and actual permitted benefit by month.
   // Null means no QSEHRA was provided in that month.
   qsehra_monthly_facts: form8962InputSchema.shape.qsehra_monthly_facts,
+  qsehra_source: qsehraSourceSchema.optional(),
 });
 
 type QsehraInput = z.infer<typeof inputSchema>;
@@ -48,6 +51,7 @@ function buildOutputs(input: QsehraInput): NodeOutput[] {
       nodeType: form8962.nodeType,
       fields: {
         qsehra_amount_offered: offered,
+        ...(input.qsehra_source ? { qsehra_source: input.qsehra_source } : {}),
         ...(input.qsehra_monthly_facts
           ? { qsehra_monthly_facts: input.qsehra_monthly_facts }
           : {}),
@@ -68,8 +72,10 @@ class QsehraNode extends TaxNode<typeof inputSchema> {
   readonly inputSchema = inputSchema;
   readonly outputNodes = new OutputNodes([form8962, f1040]);
 
-  compute(_ctx: NodeContext, input: z.infer<typeof inputSchema>): NodeResult {
+  compute(ctx: NodeContext, input: z.infer<typeof inputSchema>): NodeResult {
     const parsed = inputSchema.parse(input);
+    assertQsehraSourceYear(parsed.qsehra_source, ctx.taxYear,
+      parsed.qsehra_amount_offered > 0 || parsed.qsehra_amount_received > 0);
     return { outputs: buildOutputs(parsed) };
   }
 }

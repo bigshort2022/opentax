@@ -483,6 +483,8 @@ export function calculateForm4137(
 class Form4137Node extends TaxNode<typeof inputSchema> {
   readonly nodeType = "form4137";
   readonly inputSchema = inputSchema;
+  // W-2 rows are not pure context: allocated tips can require this form.
+  override readonly contextFields = ["taxpayer_ssn", "spouse_ssn"] as const;
   readonly outputNodes = new OutputNodes([
     f1040,
     schedule2,

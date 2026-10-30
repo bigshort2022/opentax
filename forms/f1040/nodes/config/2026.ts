@@ -247,6 +247,7 @@ export const config2026: F1040Config = {
   simpleEmployerMatchRate: 0.03,
   // Rev. Proc. 2026-15 Tables 1-2, each succeeding year.
   luxuryAutoSucceedingYears: 7_160,
+  eitcMaximumRounding: "rounded",
   // RP §4.06(1); credit and phaseout rates IRC §32(b)(1).
   eitcByChildren: [
     {

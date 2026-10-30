@@ -14,11 +14,15 @@ import {
   currentK1QbiLines,
 } from "../../../../../../nodes/inputs/deductions/business/k1_qbi_source.ts";
 import type { Filed8995 } from "./f8995-route.ts";
+import { CONFIG_BY_YEAR } from "../../../../../../nodes/config/index.ts";
 
 export function assertCurrentK1Qbi(
   fields: Record<string, unknown>,
   pending: Readonly<Record<string, unknown>> | undefined,
+  taxYear: number,
 ): Filed8995 {
+  const cfg = CONFIG_BY_YEAR[taxYear];
+  if (!cfg) throw new Error(`No Form 8995 configuration for tax year ${taxYear}`);
   const partnerships = pending?.k1_partnership === undefined
     ? []
     : partnershipSchema.parse(pending.k1_partnership).k1_partnerships;
@@ -114,6 +118,7 @@ export function assertCurrentK1Qbi(
       canonical(fields.current_k1_qbi_sources as any[] ?? []),
     ) ||
     sources.some((s) => !owners.includes(s.recipient_tin)) ||
+    sources.some((s) => s.tax_year !== taxYear) ||
     farms.some((s) => !owners.includes(s.recipient_tin)) ||
     items.some((item) =>
       (("box20z_qbi" in item
@@ -148,9 +153,11 @@ export function assertCurrentK1Qbi(
   const taxable = Math.max(
     0,
     f.line11_agi - (f.line12c_deduction_total ?? 0) -
+      (cfg.nonitemizerCharitableLimit > 0 ? (f.line12f_nonitemizer_charitable ?? 0) : 0) -
       (f.line13b_additional_deductions ?? 0),
   );
-  const threshold = general?.filing_status === "mfj" ? 394600 : 197300;
+  const threshold = general?.filing_status === "mfj" ? cfg.qbiThresholdMfj
+    : general?.filing_status === "mfs" ? cfg.qbiThresholdMfs : cfg.qbiThresholdSingle;
   if (taxable > threshold) {
     throw new Error(
       "Current K-1 QBI above threshold needs the advanced wage/property source route",

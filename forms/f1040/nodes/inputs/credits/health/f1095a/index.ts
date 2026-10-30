@@ -5,6 +5,7 @@ import { OutputNodes } from "../../../../../../../core/types/output-nodes.ts";
 import {
   allocationPctSchema,
   form8962,
+  inputSchema as form8962InputSchema,
   sharedPolicyAllocationSchema,
 } from "../../../../intermediate/forms/credits/health/form8962/index.ts";
 import type { NodeContext } from "../../../../../../../core/types/node-context.ts";
@@ -139,6 +140,7 @@ const sharedPolicySchema = z.discriminatedUnion("basis", [
 ]);
 
 export const itemSchema = z.object({
+  unemployment_compensation_2021: form8962InputSchema.shape.unemployment_compensation_2021,
   // Part I — Issuer / Marketplace information
   issuer_name: z.string().trim().min(1),
   policy_number: z.string().trim().min(1).optional(),
@@ -443,6 +445,15 @@ class F1095ANode extends TaxNode<typeof inputSchema> {
       alternative_marriage_month: marriageMonth,
     } = inputSchema
       .parse(input);
+    const unemploymentReviews = sourceStatements.flatMap((policy) =>
+      policy.unemployment_compensation_2021 ? [policy.unemployment_compensation_2021] : []);
+    const unemployment = unemploymentReviews[0];
+    if (unemploymentReviews.some((review) => JSON.stringify(review) !== JSON.stringify(unemployment))) {
+      throw new Error("Marketplace policies contain contradictory unemployment eligibility evidence");
+    }
+    if (unemployment && ctx.taxYear !== 2021) {
+      throw new Error("Marketplace unemployment special treatment applies only to 2021");
+    }
     assertSourceTaxYears(
       ctx.taxYear,
       sourceStatements.flatMap((item) =>
@@ -1004,6 +1015,7 @@ class F1095ANode extends TaxNode<typeof inputSchema> {
 
     // Build form8962 fields — pass whatever data is available
     const form8962Fields: Record<string, unknown> = {};
+    if (unemployment) form8962Fields.unemployment_compensation_2021 = unemployment;
 
     if (totalAnnualPremium > 0) {
       form8962Fields.annual_premium = totalAnnualPremium;

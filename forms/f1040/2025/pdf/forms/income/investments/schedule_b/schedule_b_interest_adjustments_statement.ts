@@ -12,6 +12,7 @@ export async function appendScheduleBInterestAdjustmentsStatement(
   document: PDFDocument,
   fields: Record<string, unknown>,
   filer: FilerIdentity | undefined,
+  taxYear: number,
 ): Promise<void> {
   const nonzero = adjustments.filter(([key]) =>
     typeof fields[key] === "number" && (fields[key] as number) > 0
@@ -38,7 +39,7 @@ export async function appendScheduleBInterestAdjustmentsStatement(
   const regular = await document.embedFont(StandardFonts.Helvetica);
   const bold = await document.embedFont(StandardFonts.HelveticaBold);
   const page = document.addPage([612, 792]);
-  page.drawText("Schedule B (Form 1040) 2025 - Interest Adjustments", {
+  page.drawText(`Schedule B (Form 1040) ${taxYear} - Interest Adjustments`, {
     x: 36,
     y: 748,
     size: 11,

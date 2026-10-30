@@ -1,10 +1,10 @@
 import { z } from "zod";
-import type { NodeResult } from "../../../../../../../../core/types/tax-node.ts";
-import { TaxNode } from "../../../../../../../../core/types/tax-node.ts";
+import type { NodeOutput, NodeResult } from "../../../../../../../../core/types/tax-node.ts";
+import { output, TaxNode } from "../../../../../../../../core/types/tax-node.ts";
 import { OutputNodes } from "../../../../../../../../core/types/output-nodes.ts";
 import type { NodeContext } from "../../../../../../../../core/types/node-context.ts";
 import { FilingStatus } from "../../../../../types.ts";
-import { CONFIG_BY_YEAR } from "../../../../../config/index.ts";
+import { CONFIG_BY_YEAR, isHistoricalTaxYear } from "../../../../../config/index.ts";
 import { normalizeArray } from "../../../../../utils.ts";
 import { schedule1 } from "../../../../../outputs/general/return-assembly/schedule1/index.ts";
 import { agi_aggregator } from "../../../../aggregation/general/return-assembly/agi_aggregator/index.ts";
@@ -32,6 +32,8 @@ export const inputSchema = z.object({
   filing_status: z.nativeEnum(FilingStatus).optional(),
   line2_schedule_c: signedAmount.optional(),
   line6_schedule_f: signedAmount.optional(),
+  // Internal signed post-limitation K-1 business net; not a filed Form 461 line.
+  historical_k1_business_income_loss: signedAmount.optional(),
   passive_loss_unresolved: z.union([z.boolean(), z.array(z.boolean())])
     .optional(),
   scope_review: form461ScopeReviewSchema.optional(),
@@ -68,15 +70,22 @@ function sumAmount(value: Form461Input["line2_schedule_c"]): number {
   return normalizeArray(value).reduce((total, amount) => total + amount, 0);
 }
 
+export function historicalOwnerBusinessOutputs(taxYear: number, businessNet: number): NodeOutput[] {
+  if (!isHistoricalTaxYear(taxYear) || businessNet === 0) return [];
+  return [output(form461, { historical_k1_business_income_loss: businessNet })];
+}
+
 class Form461Node extends TaxNode<typeof inputSchema> {
   readonly nodeType = "form461";
   readonly inputSchema = inputSchema;
+  override readonly contextFields = ["filing_status", "passive_loss_unresolved"] as const;
   readonly outputNodes = new OutputNodes([schedule1, agi_aggregator, form8995]);
 
   compute(ctx: NodeContext, rawInput: Form461Input): NodeResult {
     const input = inputSchema.parse(rawInput);
     const hasBusinessSource = input.line2_schedule_c !== undefined ||
-      input.line6_schedule_f !== undefined;
+      input.line6_schedule_f !== undefined ||
+      input.historical_k1_business_income_loss !== undefined;
     if (!hasBusinessSource) return { outputs: [] };
     if (!input.filing_status) {
       throw new Error(
@@ -89,6 +98,26 @@ class Form461Node extends TaxNode<typeof inputSchema> {
       throw new Error(
         "Form 461 needs the passive activity loss limitation resolved before using Schedule C/F losses",
       );
+    }
+    const ownerBusinessNet = sumAmount(input.historical_k1_business_income_loss);
+    if (input.historical_k1_business_income_loss !== undefined) {
+      if (!isHistoricalTaxYear(ctx.taxYear)) {
+        throw new Error("Historical owner K-1 business marker requires a historical return");
+      }
+      const cfg = CONFIG_BY_YEAR[ctx.taxYear];
+      const threshold = input.filing_status === FilingStatus.MFJ
+        ? cfg.eblThresholdMfj : cfg.eblThresholdSingle;
+      const lineTrigger = cfg.eblThresholdSingle / 2;
+      if (
+        (ctx.taxYear >= 2024 &&
+          (line2 < -lineTrigger || line6 < -lineTrigger)) ||
+        line2 + line6 + ownerBusinessNet < -threshold
+      ) {
+        throw new Error("Historical owner K-1 and Schedule C/F losses require a combined Form 461 source and filing calculation");
+      }
+      // The complete Schedule E attachment test runs after PAL and basis in
+      // assertHistoricalOwnerLossCoverage; this business subset is not line 5.
+      return { outputs: [] };
     }
     if (line2 >= 0 && line6 >= 0) return { outputs: [] };
     if (!input.scope_review) {
@@ -113,12 +142,11 @@ class Form461Node extends TaxNode<typeof inputSchema> {
       ? cfg.eblThresholdMfj
       : cfg.eblThresholdSingle;
     const line16 = line9 + threshold;
-    // Who Must File: a loss of more than half the single threshold on any
-    // one line, for every filing status ($156,500 in the 2025 instructions).
-    // It decides only whether the form is attached, never line 16.
+    // The any-line half-threshold filing trigger began in 2024.
+    // Earlier forms expressly say not to attach when line 16 is nonnegative.
     const lineTrigger = cfg.eblThresholdSingle / 2;
-    const mustFile = line9 < -threshold || line2 < -lineTrigger ||
-      line6 < -lineTrigger;
+    const mustFile = line9 < -threshold ||
+      (ctx.taxYear >= 2024 && (line2 < -lineTrigger || line6 < -lineTrigger));
     if (!mustFile) return { outputs: [] };
 
     const fields = filedForm461Schema.parse({

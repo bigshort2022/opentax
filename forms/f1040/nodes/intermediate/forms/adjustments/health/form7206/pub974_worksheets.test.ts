@@ -66,7 +66,7 @@ test("Pub 974 Worksheet W links specified premium and APTC to policy months", ()
 });
 
 test("Pub 974 Worksheet X computes the provisional 200%-300% tier", () => {
-  const x = calculateWorksheetX(xSource, calculateWorksheetW(wSource));
+  const x = calculateWorksheetX(2025, xSource, calculateWorksheetW(wSource));
   assertEquals(x.line8_taxpayer_modified_agi, 38_000);
   assertEquals(x.line14_household_income, 38_000);
   assertEquals(x.line17b_federal_poverty_line, 15_060);
@@ -76,10 +76,7 @@ test("Pub 974 Worksheet X computes the provisional 200%-300% tier", () => {
 });
 
 test("Pub 974 Worksheet X uses paid APTC at 400% FPL or higher", () => {
-  const x = calculateWorksheetX(
-    { ...xSource, form1040_line9_total_income: 100_000 },
-    calculateWorksheetW(wSource),
-  );
+  const x = calculateWorksheetX(2025, { ...xSource, form1040_line9_total_income: 100_000 }, calculateWorksheetW(wSource));
   assertEquals(x.line25_repayment_limit, 6_000);
   assertEquals(x.line30_max_specified_deduction, 12_000);
   assertEquals(x.line31_max_total_deduction, 13_000);
@@ -131,14 +128,14 @@ test("Pub 974 W/X reject duplicate policy months and unsupported APTC facts", ()
   });
   assertEquals(noAptc.line19_remaining_limit_for_worksheet_x, null);
   assertThrows(
-    () => calculateWorksheetX(xSource, noAptc),
+    () => calculateWorksheetX(2025, xSource, noAptc),
     Error,
     "only when specified-premium APTC was paid",
   );
 });
 
 test("Pub 974 Steps 1-6 converge on reconciled full-year policy rows", () => {
-  const result = calculatePub974SingleBusinessIterative({
+  const result = calculatePub974SingleBusinessIterative(2025, {
     worksheet_w: {
       ...wSource,
       nonspecified_premium_deduction: 0,
@@ -183,7 +180,7 @@ test("Pub 974 Steps 1-6 converge on reconciled full-year policy rows", () => {
 test("Pub 974 single-business route rejects non-reconciled policy months", () => {
   assertThrows(
     () =>
-      calculatePub974SingleBusinessIterative({
+      calculatePub974SingleBusinessIterative(2025, {
         worksheet_w: {
           ...wSource,
           nonspecified_premium_deduction: 0,
@@ -219,7 +216,7 @@ test("Pub 974 single-business route rejects non-reconciled policy months", () =>
 test("Pub 974 partial-year iteration rejects a persistent dollar oscillation", () => {
   assertThrows(
     () =>
-      calculatePub974SingleBusinessIterative({
+      calculatePub974SingleBusinessIterative(2025, {
         worksheet_w: {
           ...wSource,
           nonspecified_premium_deduction: 0,
@@ -295,7 +292,7 @@ test("Pub 974 partial-year route rejects uncovered and duplicate source months",
   };
   assertThrows(
     () =>
-      calculatePub974SingleBusinessIterative({
+      calculatePub974SingleBusinessIterative(2025, {
         ...base,
         form1095a_policy_months: [
           ...base.form1095a_policy_months.slice(0, 5),
@@ -307,7 +304,7 @@ test("Pub 974 partial-year route rejects uncovered and duplicate source months",
   );
   assertThrows(
     () =>
-      calculatePub974SingleBusinessIterative({
+      calculatePub974SingleBusinessIterative(2025, {
         ...base,
         form8962_source: {
           ...base.form8962_source,
@@ -326,7 +323,7 @@ test("Pub 974 partial-year route rejects uncovered and duplicate source months",
 test("Pub 974 mixed coverage rejects a persistent dollar oscillation", () => {
   assertThrows(
     () =>
-      calculatePub974SingleBusinessIterative({
+      calculatePub974SingleBusinessIterative(2025, {
         worksheet_w: {
           ...wSource,
           nonspecified_premium_deduction: 0,
@@ -378,4 +375,60 @@ test("Pub 974 attribution uses monthly column (e) when amounts vary", () => {
     ),
     600,
   );
+});
+
+test("Publication 974 Worksheet X uses the return year's poverty line and repayment cap", () => {
+  const w = calculateWorksheetW(wSource);
+  const historical = calculateWorksheetX(2023, xSource, w);
+  assertEquals(historical.line17b_federal_poverty_line, 13590);
+  assertEquals(historical.line25_repayment_limit, 900);
+  const noCap = calculateWorksheetX(2026, xSource, w);
+  assertEquals(noCap.line25_repayment_limit, 6000);
+});
+
+test("2021 Publication 974 iteration retains actual income while applying reviewed unemployment treatment", () => {
+  const policy = Array.from({ length: 12 }, (_, index) => ({
+    form1095a_policy_number: "SYNTHETIC-2021",
+    month: index + 1,
+    specified_premium: 1000,
+    attributable_aptc: 500,
+  }));
+  const result = calculatePub974SingleBusinessIterative(2021, {
+    worksheet_w: {
+      ...wSource,
+      specified_policy_months: policy,
+      nonspecified_premium_deduction: 0,
+      business: {
+        kind: "self_employed",
+        establishing_business_reference: "SCHEDULE-C-A",
+        establishing_business_earned_income: 50000,
+        all_profitable_business_earned_income: 50000,
+        schedule1_line15_se_tax_deduction: 5000,
+        establishing_business_schedule1_line16_retirement_deduction: 0,
+        form2555_attributable_exclusion: 0,
+      },
+    },
+    worksheet_x: xSource,
+    no_other_se_income_sources_verified: true,
+    form1095a_policy_months: policy.map((row) => ({
+      form1095a_policy_number: row.form1095a_policy_number,
+      month: row.month,
+      premium: row.specified_premium,
+      aptc: row.attributable_aptc,
+    })),
+    form8962_source: {
+      monthly_premiums: Array(12).fill(1000),
+      monthly_slcsps: Array(12).fill(1000),
+      monthly_aptcs: Array(12).fill(500),
+      unemployment_compensation_2021: {
+        recipient: "taxpayer",
+        received_or_approved: true,
+        source_reference: "synthetic state unemployment approval",
+        no_one_can_claim_recipient: true,
+      },
+    },
+  });
+  assertEquals(result.schedule1_line17_deduction, 0);
+  assertEquals(result.form8962_fields.total_premium_tax_credit, 12000);
+  assertEquals(result.form8962_fields.taxpayer_modified_agi, 45000);
 });

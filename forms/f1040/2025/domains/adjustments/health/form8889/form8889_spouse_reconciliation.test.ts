@@ -1041,8 +1041,8 @@ test("paired Form 8889 rejects reused receipts and return totals that omit taxab
 
 test("paired Form 8889 prints both W-2-funded HSAs without inventing Schedule 1 income or deduction", () => {
   const employerYear = {
-    made_in_2025_for_2024_in_w2: 0,
-    made_in_2026_for_2025: 0,
+    made_in_tax_year_for_prior_year_in_w2: 0,
+    made_in_following_year_for_tax_year: 0,
   };
   const primary = {
     beneficiary_identity: {

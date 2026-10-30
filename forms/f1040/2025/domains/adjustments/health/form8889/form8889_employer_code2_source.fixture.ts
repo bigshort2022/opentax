@@ -28,12 +28,12 @@ export function employerCode2ReturnSource(owner: "T" | "S") {
   const hsa = inputs.form8889;
   hsa.spouse_hsa.age_55_or_older = false;
   hsa.employer_contribution_years = {
-    made_in_2025_for_2024_in_w2: 0,
-    made_in_2026_for_2025: 0,
+    made_in_tax_year_for_prior_year_in_w2: 0,
+    made_in_following_year_for_tax_year: 0,
   };
   hsa.spouse_hsa.employer_contribution_years = {
-    made_in_2025_for_2024_in_w2: 0,
-    made_in_2026_for_2025: 0,
+    made_in_tax_year_for_prior_year_in_w2: 0,
+    made_in_following_year_for_tax_year: 0,
   };
   hsa.taxpayer_hsa_contributions = owner === "S" ? 2000 : undefined;
   hsa.spouse_hsa.taxpayer_hsa_contributions = owner === "T" ? 2000 : undefined;

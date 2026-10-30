@@ -1,0 +1,299 @@
+{
+  "schemaVersion": 1,
+  "retrievedOn": "2026-10-30",
+  "scope": "Publication-line oracles for historical federal ordinary income tax; not IRS-published complete households, full-return certification, ATS certification, or evidence of filing.",
+  "authority": [
+    {
+      "title": "2021 Tax and Earned Income Credit Tables",
+      "taxYear": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/i1040tt--2021.pdf",
+      "sha256": "09d99a12d69d5531fcb21793babcb4727b1f26f6fd910509e3f9c2e9f8bd929b",
+      "retainedPath": "docs/historical-federal/benchmark-evidence/i1040tt--2021.pdf"
+    },
+    {
+      "title": "2021 Form 1040 U.S. Individual Income Tax Return",
+      "taxYear": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040--2021.pdf",
+      "sha256": "41026e1bab58b13c69819a7fb5c836798cbfedf7c99452b2ddd242a28d061a04",
+      "retainedPath": "docs/historical-federal/benchmark-evidence/f1040--2021.pdf"
+    },
+    {
+      "title": "2022 Tax and Earned Income Credit Tables",
+      "taxYear": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/i1040tt--2022.pdf",
+      "sha256": "3c39b0db2ada9f9fe5ab60183860c0c3cfe675920f46dc539aab6448e7c1301b",
+      "retainedPath": "docs/historical-federal/benchmark-evidence/i1040tt--2022.pdf"
+    },
+    {
+      "title": "2022 Form 1040 U.S. Individual Income Tax Return",
+      "taxYear": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040--2022.pdf",
+      "sha256": "7f7933e17b2701e8555164f18bd9d93e8891c7bc0d6e45d8df6d84a2cf78b48f",
+      "retainedPath": "docs/historical-federal/benchmark-evidence/f1040--2022.pdf"
+    },
+    {
+      "title": "2023 Tax and Earned Income Credit Tables",
+      "taxYear": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/i1040tt--2023.pdf",
+      "sha256": "d3d2ad3a1f167a3a9db369fecc2faa4b15b94ec6918e7263db00eac95e066ed4",
+      "retainedPath": "docs/historical-federal/benchmark-evidence/i1040tt--2023.pdf"
+    },
+    {
+      "title": "2023 Form 1040 U.S. Individual Income Tax Return",
+      "taxYear": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040--2023.pdf",
+      "sha256": "a410ce39e1f9b75ab3ddd8c314b9e7dce022ed6e3aebde5418a58b88f1e0213c",
+      "retainedPath": "docs/historical-federal/benchmark-evidence/f1040--2023.pdf"
+    },
+    {
+      "title": "2024 Tax and Earned Income Credit Tables",
+      "taxYear": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/i1040tt--2024.pdf",
+      "sha256": "fb82d748af260815c65e50591ec69cfb566e9c71ea7589abee06ac7de9a7be09",
+      "retainedPath": "docs/historical-federal/benchmark-evidence/i1040tt--2024.pdf"
+    },
+    {
+      "title": "2024 Form 1040 U.S. Individual Income Tax Return",
+      "taxYear": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/f1040--2024.pdf",
+      "sha256": "0a7a54354283044cb41373c6faabfa50955d44bdf91b4b76fa1ca2bf13f6d718",
+      "retainedPath": "docs/historical-federal/benchmark-evidence/f1040--2024.pdf"
+    },
+    {
+      "title": "ats 2021 scenario 1",
+      "taxYear": 2021,
+      "url": "https://www.irs.gov/pub/irs-wi/1040_mef_ats_scenario_1_form%20_1040_11162021.pdf",
+      "sha256": "decc2ba0238d6faf0694df7a9702dd754a6c382bbcde6b1f009696121d59c902",
+      "retainedPath": "docs/historical-federal/benchmark-evidence/ats-2021-scenario-1.pdf"
+    },
+    {
+      "title": "ats 2023 scenario 4",
+      "taxYear": 2023,
+      "url": "https://www.irs.gov/pub/irs-efile/1040-mef-ats-scenario-4-11022023.pdf",
+      "sha256": "62947f81431cd34fa37d249935673aed7bb747419f1880187b6c57b5e033bbc1",
+      "retainedPath": "docs/historical-federal/benchmark-evidence/ats-2023-scenario-4.pdf"
+    },
+    {
+      "title": "ats 2024 scenario 12",
+      "taxYear": 2024,
+      "url": "https://www.irs.gov/pub/irs-efile/1040-ats-scenario12-ty2024.pdf",
+      "sha256": "e3b143b6f5dd5ab55d68515092635d7b6407df3674b1f9f1b3439c2114294d5c",
+      "retainedPath": "docs/historical-federal/benchmark-evidence/ats-2024-scenario-12.pdf"
+    }
+  ],
+  "annualCases": [
+    {
+      "taxYear": 2021,
+      "publication": "https://www.irs.gov/pub/irs-prior/i1040tt--2021.pdf",
+      "pdfPage": 3,
+      "printedPage": 3,
+      "pinpoint": "Example and Sample Table: taxable income at least $25,300 but less than $25,350; Single and Married filing jointly columns. Narrative explicitly directs the joint amount to Form 1040 line 16.",
+      "publishedFacts": {
+        "line15_taxable_income": 25300,
+        "line16_tax_by_filing_status": {
+          "single": 2840,
+          "mfj": 2641
+        }
+      },
+      "inputConstruction": {
+        "kind": "explicitly synthetic consumer fixture, not a published W-2 or complete return",
+        "rule": "Use the published filing status and $25,300 taxable income. Construct W-2 box 1 as $25,300 plus the published basic standard deduction. Choose under-65, nonblind filers with no dependent claim, no other income, no adjustments, no itemized deductions and no credits to isolate the printed tax-table result. Withholding is a synthetic zero required by the W-2 schema and is not an expected refund/owed assertion.",
+        "standardDeductionByFilingStatus": {
+          "single": 12550,
+          "mfj": 25100
+        },
+        "standardDeductionSource": {
+          "url": "https://www.irs.gov/pub/irs-prior/f1040--2021.pdf",
+          "pdfPage": 1,
+          "pinpoint": "Standard Deduction for sidebar"
+        },
+        "syntheticWagesByFilingStatus": {
+          "single": 37850,
+          "mfj": 50400
+        }
+      },
+      "expectedCoverage": [
+        "line15_taxable_income",
+        "line16_income_tax"
+      ],
+      "unasserted": [
+        "line24_total_tax",
+        "line33_total_payments",
+        "line35a_refund",
+        "line37_amount_owed"
+      ],
+      "renderedEvidence": "docs/historical-federal/benchmark-evidence/tax-table-example-2021.png"
+    },
+    {
+      "taxYear": 2022,
+      "publication": "https://www.irs.gov/pub/irs-prior/i1040tt--2022.pdf",
+      "pdfPage": 3,
+      "printedPage": 3,
+      "pinpoint": "Example and Sample Table: taxable income at least $25,300 but less than $25,350; Single and Married filing jointly columns. Narrative explicitly directs the joint amount to Form 1040 line 16.",
+      "publishedFacts": {
+        "line15_taxable_income": 25300,
+        "line16_tax_by_filing_status": {
+          "single": 2834,
+          "mfj": 2628
+        }
+      },
+      "inputConstruction": {
+        "kind": "explicitly synthetic consumer fixture, not a published W-2 or complete return",
+        "rule": "Use the published filing status and $25,300 taxable income. Construct W-2 box 1 as $25,300 plus the published basic standard deduction. Choose under-65, nonblind filers with no dependent claim, no other income, no adjustments, no itemized deductions and no credits to isolate the printed tax-table result. Withholding is a synthetic zero required by the W-2 schema and is not an expected refund/owed assertion.",
+        "standardDeductionByFilingStatus": {
+          "single": 12950,
+          "mfj": 25900
+        },
+        "standardDeductionSource": {
+          "url": "https://www.irs.gov/pub/irs-prior/f1040--2022.pdf",
+          "pdfPage": 1,
+          "pinpoint": "Standard Deduction for sidebar"
+        },
+        "syntheticWagesByFilingStatus": {
+          "single": 38250,
+          "mfj": 51200
+        }
+      },
+      "expectedCoverage": [
+        "line15_taxable_income",
+        "line16_income_tax"
+      ],
+      "unasserted": [
+        "line24_total_tax",
+        "line33_total_payments",
+        "line35a_refund",
+        "line37_amount_owed"
+      ],
+      "renderedEvidence": "docs/historical-federal/benchmark-evidence/tax-table-example-2022.png"
+    },
+    {
+      "taxYear": 2023,
+      "publication": "https://www.irs.gov/pub/irs-prior/i1040tt--2023.pdf",
+      "pdfPage": 3,
+      "printedPage": 3,
+      "pinpoint": "Example and Sample Table: taxable income at least $25,300 but less than $25,350; Single and Married filing jointly columns. Narrative explicitly directs the joint amount to Form 1040 line 16.",
+      "publishedFacts": {
+        "line15_taxable_income": 25300,
+        "line16_tax_by_filing_status": {
+          "single": 2819,
+          "mfj": 2599
+        }
+      },
+      "inputConstruction": {
+        "kind": "explicitly synthetic consumer fixture, not a published W-2 or complete return",
+        "rule": "Use the published filing status and $25,300 taxable income. Construct W-2 box 1 as $25,300 plus the published basic standard deduction. Choose under-65, nonblind filers with no dependent claim, no other income, no adjustments, no itemized deductions and no credits to isolate the printed tax-table result. Withholding is a synthetic zero required by the W-2 schema and is not an expected refund/owed assertion.",
+        "standardDeductionByFilingStatus": {
+          "single": 13850,
+          "mfj": 27700
+        },
+        "standardDeductionSource": {
+          "url": "https://www.irs.gov/pub/irs-prior/f1040--2023.pdf",
+          "pdfPage": 1,
+          "pinpoint": "Standard Deduction for sidebar"
+        },
+        "syntheticWagesByFilingStatus": {
+          "single": 39150,
+          "mfj": 53000
+        }
+      },
+      "expectedCoverage": [
+        "line15_taxable_income",
+        "line16_income_tax"
+      ],
+      "unasserted": [
+        "line24_total_tax",
+        "line33_total_payments",
+        "line35a_refund",
+        "line37_amount_owed"
+      ],
+      "renderedEvidence": "docs/historical-federal/benchmark-evidence/tax-table-example-2023.png"
+    },
+    {
+      "taxYear": 2024,
+      "publication": "https://www.irs.gov/pub/irs-prior/i1040tt--2024.pdf",
+      "pdfPage": 3,
+      "printedPage": 3,
+      "pinpoint": "Example and Sample Table: taxable income at least $25,300 but less than $25,350; Single and Married filing jointly columns. Narrative explicitly directs the joint amount to Form 1040 line 16.",
+      "publishedFacts": {
+        "line15_taxable_income": 25300,
+        "line16_tax_by_filing_status": {
+          "single": 2807,
+          "mfj": 2575
+        }
+      },
+      "inputConstruction": {
+        "kind": "explicitly synthetic consumer fixture, not a published W-2 or complete return",
+        "rule": "Use the published filing status and $25,300 taxable income. Construct W-2 box 1 as $25,300 plus the published basic standard deduction. Choose under-65, nonblind filers with no dependent claim, no other income, no adjustments, no itemized deductions and no credits to isolate the printed tax-table result. Withholding is a synthetic zero required by the W-2 schema and is not an expected refund/owed assertion.",
+        "standardDeductionByFilingStatus": {
+          "single": 14600,
+          "mfj": 29200
+        },
+        "standardDeductionSource": {
+          "url": "https://www.irs.gov/pub/irs-prior/f1040--2024.pdf",
+          "pdfPage": 1,
+          "pinpoint": "Standard Deduction for sidebar"
+        },
+        "syntheticWagesByFilingStatus": {
+          "single": 39900,
+          "mfj": 54500
+        }
+      },
+      "expectedCoverage": [
+        "line15_taxable_income",
+        "line16_income_tax"
+      ],
+      "unasserted": [
+        "line24_total_tax",
+        "line33_total_payments",
+        "line35a_refund",
+        "line37_amount_owed"
+      ],
+      "renderedEvidence": "docs/historical-federal/benchmark-evidence/tax-table-example-2024.png"
+    }
+  ],
+  "rejectedFullReturnCandidates": [
+    {
+      "taxYear": 2021,
+      "url": "https://www.irs.gov/pub/irs-wi/1040_mef_ats_scenario_1_form%20_1040_11162021.pdf",
+      "retainedPath": "docs/historical-federal/benchmark-evidence/ats-2021-scenario-1.pdf",
+      "pinpoint": "PDF pages 2-3, Form 1040 calculated lines; page 4 Schedule 1 supplies $270 taxable state refund.",
+      "reason": "Numeric Form 1040 totals are visibly blank, not an extraction failure. No AcroForm values exist. The inputs-only ATS exercise cannot supply an independently published full-return oracle."
+    },
+    {
+      "taxYear": 2022,
+      "urls": [
+        "https://www.irs.gov/pub/irs-efile/1040-mef-ats-scenario-1-10032022.pdf",
+        "https://www.irs.gov/pub/irs-wi/1040-mef-ats-scenario-1-10032022.pdf",
+        "https://www.irs.gov/pub/irs-wi/1040-mef-ats-scenario-4-11082022.pdf",
+        "https://www.irs.gov/e-file-providers/tax-year-2022-form-1040-series-and-extensions-modernized-mef-assurance-testing-system-ats-information"
+      ],
+      "reason": "Each fetched URL returned HTTP 404 on the retrieval date. Search-index snippets are not retained readable filled-return evidence."
+    },
+    {
+      "taxYear": 2023,
+      "url": "https://www.irs.gov/pub/irs-efile/1040-mef-ats-scenario-4-11022023.pdf",
+      "retainedPath": "docs/historical-federal/benchmark-evidence/ats-2023-scenario-4.pdf",
+      "pinpoint": "PDF pages 2-3, Form 1040 numeric amount columns.",
+      "reason": "Visually inspected calculated lines are blank. The PDF supplies source material for a wage/energy-credit exercise but no scored complete-return values."
+    },
+    {
+      "taxYear": 2024,
+      "url": "https://www.irs.gov/pub/irs-efile/1040-ats-scenario12-ty2024.pdf",
+      "retainedPath": "docs/historical-federal/benchmark-evidence/ats-2024-scenario-12.pdf",
+      "pinpoint": "PDF page 2 Form 1040 lines 8, 13; page 3 lines 16, 24, 25a, 33, 35a, 37; page 8 Schedule C line 31; page 12 Form 7206 lines 4-5; pages 13-14 Form 7217.",
+      "publishedAmounts": {
+        "line9_total_income": 125164,
+        "line10_adjustments": 2719,
+        "line11_agi": 122445,
+        "line15_taxable_income": 107845,
+        "line16_tax": 19283,
+        "line23_other_taxes": 3438,
+        "line24_total_tax": 22721,
+        "line33_total_payments": 14444,
+        "line37_amount_owed": 8277
+      },
+      "reason": "A completed return exists, but the source does not explain omitted QBI; Form 7206 lines 4-5 report $14,328 while Schedule C line 31 reports $24,328; Form 7217 line 10 reports $6,000 while its Part II total basis is $4,000. Do not invent missing eligibility or alter the source to produce a passing full-return fixture.",
+      "refundEvidence": "Line 35a is printed blank and line 37 is $8,277; no refund is due under the printed Form 1040 refund/amount-owed instructions. No numeric refund expectation is used here."
+    }
+  ]
+}

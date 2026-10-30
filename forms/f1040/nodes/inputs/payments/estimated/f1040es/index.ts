@@ -14,7 +14,7 @@ import type { NodeContext } from "../../../../../../../core/types/node-context.t
 const ssn = z.string().regex(/^\d{3}-?\d{2}-?\d{4}$/);
 const reference = z.string().trim().min(1);
 // Each payment row names its tax year; compute() requires the return's year.
-const taxYear = z.number().int().min(2025);
+const taxYear = z.number().int();
 const quarterPaymentSchema = z.object({
   tax_year: taxYear,
   quarter: z.enum(["q1", "q2", "q3", "q4"]),
@@ -60,6 +60,13 @@ const mfsJointAllocationSchema = z.object({
   signed_agreement_pdf_base64: z.string().trim().min(1),
   payments: z.array(mfsJointPaymentRowSchema).min(1).max(4),
 }).strict();
+export const priorYearAppliedCreditReviewSchema = z.object({
+  accepted_prior_year_return_reference: reference,
+  irs_account_credit_record_reference: reference,
+  applied_amount: z.number().positive(),
+  joint_prior_year_former_spouse_ssn: ssn.optional(),
+}).strict();
+
 // TY2025 names the prior return by year; the prior-year form serves any year.
 const appliedCreditReviewSchema = z.union([
   z.object({
@@ -68,12 +75,7 @@ const appliedCreditReviewSchema = z.union([
     applied_amount: z.number().positive(),
     joint_2024_former_spouse_ssn: ssn.optional(),
   }).strict(),
-  z.object({
-    accepted_prior_year_return_reference: reference,
-    irs_account_credit_record_reference: reference,
-    applied_amount: z.number().positive(),
-    joint_prior_year_former_spouse_ssn: ssn.optional(),
-  }).strict(),
+  priorYearAppliedCreditReviewSchema,
 ]);
 const jointAllocationSchema = z.union([
   divorcedJointAllocationSchema,

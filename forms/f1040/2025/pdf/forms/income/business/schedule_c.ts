@@ -230,7 +230,7 @@ function requirePrintable(
   }
 }
 
-function projectBusiness(
+export function projectBusiness(
   item: ScheduleCItem,
   wotcReduction: number,
   filingStatus: unknown,

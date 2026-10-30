@@ -20,6 +20,8 @@ import {
 import { z } from "zod";
 import { ownedSCorpLossLines } from "../../../../intermediate/forms/deductions/business/form8995/owned-s-corp-loss.ts";
 import { ty2025IrsCountryCodeSchema } from "../../../../irs_country_code.ts";
+import { isHistoricalTaxYear } from "../../../../config/index.ts";
+import { form461, historicalOwnerBusinessOutputs } from "../../../../intermediate/forms/income/business/form461/index.ts";
 import {
   type Box10CodeJSource,
   box10CodeJSourceSchema,
@@ -86,7 +88,7 @@ export const itemSchema = z.object({
   corporation_name: z.string().min(1),
   corporation_ein: z.string().regex(/^\d{9}$/).optional(),
   source_document_reference: z.string().trim().min(1).optional(),
-  source_tax_year: z.literal(2025).optional(),
+  source_tax_year: z.number().int().optional(),
   recipient_tin: z.string().regex(/^\d{9}$/).optional(),
   // Box 13 code Z is the shareholder's orphan-drug credit.
   box13_code_z_orphan_drug_credit: z.number().int().positive().optional(),
@@ -241,8 +243,11 @@ export const itemSchema = z.object({
   // At-risk suspended losses from pre-2018 years (K1S > "Pre-2018 At-Risk" tab)
   pre2018_at_risk_suspended: z.number().nonnegative().optional(),
 }).superRefine((item, ctx) => {
+  // A separate rental is not a shareholder-debt inventory. The stock-only
+  // route still enforces one S corporation; paper reconciles other activity.
   if (
     item.form7203_stock_loss_ledger?.no_other_schedule_e_activity === false &&
+    item.form7203_debt_evidence !== undefined &&
     !(item.form7203_debt_evidence?.kind !==
         "prior_reduced_formal_note_repayment" &&
       item.form7203_debt_evidence?.owned_current_records
@@ -962,6 +967,7 @@ class K1SCorpNode extends TaxNode<typeof inputSchema> {
   readonly inputSchema = inputSchema;
   readonly outputNodes = new OutputNodes([
     schedule1,
+    form461,
     agi_aggregator,
     schedule_b,
     f1040,
@@ -986,6 +992,22 @@ class K1SCorpNode extends TaxNode<typeof inputSchema> {
     const { k1_s_corps } = inputSchema.parse(input);
 
     for (const item of k1_s_corps) {
+      for (const year of [item.source_tax_year, item.passive_income_source?.tax_year,
+        item.qualified_business_income_source?.tax_year]) {
+        if (year !== undefined && year !== ctx.taxYear) {
+          throw new Error("S-corporation K-1 source must match the return tax year");
+        }
+      }
+      if (isHistoricalTaxYear(ctx.taxYear) &&
+        [item.box2_rental_re, item.box3_other_rental, item.box6_royalties,
+          item.box7_net_st_cap_gain, item.box8a_net_lt_cap_gain,
+          item.box9_net_1231].some((amount) => (amount ?? 0) < 0)) {
+        throw new Error("Historical S-corporation K-1 loss character requires separately reviewed basis, at-risk, passive and character-specific limitation sources");
+      }
+      const contributionDate = item.form7203_stock_loss_ledger?.cash_capital_contribution?.contributed_date;
+      if (contributionDate && Number(contributionDate.slice(0, 4)) !== ctx.taxYear) {
+        throw new Error("S-corporation stock contribution date must match the return tax year");
+      }
       if (item.first_year_passive_loss_source) {
         const allowed = new Set([
           "corporation_ein",
@@ -1146,6 +1168,9 @@ class K1SCorpNode extends TaxNode<typeof inputSchema> {
     }
 
     const outputs: NodeOutput[] = [
+      // Ordinary losses enter only after Form 7203 has applied actual basis.
+      ...historicalOwnerBusinessOutputs(ctx.taxYear, k1_s_corps.reduce(
+        (total, item) => total + Math.max(0, item.box1_ordinary_business ?? 0), 0)),
       ...schedule1Output(k1_s_corps),
       ...scheduleBInterestOutputs(k1_s_corps),
       ...scheduleBDividendOutputs(k1_s_corps),

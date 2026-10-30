@@ -66,7 +66,7 @@ export function buildEngineInputs(
 
 const RETURN_JSON = "return.json";
 
-async function readReturnJson(returnPath: string): Promise<ReturnJson> {
+export async function readReturnJson(returnPath: string): Promise<ReturnJson> {
   const filePath = join(returnPath, RETURN_JSON);
   try {
     const raw = JSON.parse(await readFile(filePath, "utf8")) as ReturnJson;
@@ -85,7 +85,7 @@ async function readReturnJson(returnPath: string): Promise<ReturnJson> {
   }
 }
 
-async function writeReturnJson(
+export async function writeReturnJson(
   returnPath: string,
   data: ReturnJson,
 ): Promise<void> {
@@ -182,7 +182,7 @@ export async function loadInputs(returnPath: string): Promise<InputsJson> {
   return (await readReturnJson(returnPath)).inputs;
 }
 
-function withUpdatedInputs(
+export function withUpdatedInputs(
   current: ReturnJson,
   inputs: InputsJson,
 ): ReturnJson {

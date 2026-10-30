@@ -1604,3 +1604,17 @@ test("reviewed HOH lived-apart spouse marks the Form 1040 separated-spouse box o
     "needs head-of-household status",
   );
 });
+
+test("PTC residence source keys are year-neutral and keep the highest actual-year poverty region", () => {
+  const result = compute({
+    filing_status: FilingStatus.Single,
+    address_state: "TX",
+    ptc_residence_states: ["AK", "TX"],
+    ptc_residence_months: [...Array(6).fill("AK"), ...Array(6).fill("TX")],
+  });
+  assertEquals(findOutput(result, "form8962")?.fields.fpl_region, "alaska");
+  assertEquals(general.inputSchema.safeParse({
+    filing_status: FilingStatus.Single,
+    ptc_residence_states_2025: ["AK"],
+  }).success, false);
+});

@@ -287,6 +287,14 @@ export const itemSchema = z.object({
   line_23_taxes_licenses: z.number().nonnegative().optional(),
   line_24a_travel: z.number().nonnegative().optional(),
   line_24b_meals: z.number().nonnegative().optional(),
+  // Included in line 24b, not additional expenses. Notice 2021-25 permits
+  // 100% only for qualifying restaurant food/beverages paid in 2021–2022.
+  restaurant_meals: z.array(z.object({
+    amount: z.number().positive(),
+    paid_or_incurred_on: z.string().date(),
+    restaurant_source_reference: z.string().trim().min(1),
+    business_meal_requirements_met: z.literal(true),
+  }).strict()).min(1).optional(),
   meals_dot_worker: z.boolean().optional(), // DOT hours-of-service → 80% meals
   meals_as_wages: z.boolean().optional(), // Meals treated as wages → 100%
   line_25_utilities: z.number().nonnegative().optional(),
@@ -766,6 +774,15 @@ export function computeGrossIncome(item: ScheduleCItem): number {
 }
 
 export function mealsDeductiblePct(item: ScheduleCItem): number {
+  if (item.restaurant_meals) {
+    const restaurant = item.restaurant_meals.reduce((total, row) => total + row.amount, 0);
+    const meals = item.line_24b_meals ?? 0;
+    if (restaurant > meals || item.meals_as_wages || item.meals_dot_worker ||
+        item.restaurant_meals.some((row) => !["2021", "2022"].includes(row.paid_or_incurred_on.slice(0, 4)))) {
+      throw new Error("Schedule C restaurant meal sources must be included in total meals and qualify for the 2021–2022 exception");
+    }
+    return (restaurant + (meals - restaurant) * MEALS_STANDARD_PCT) / meals;
+  }
   if (item.meals_as_wages === true) return MEALS_WAGES_PCT;
   if (item.meals_dot_worker === true) return MEALS_DOT_PCT;
   return MEALS_STANDARD_PCT;

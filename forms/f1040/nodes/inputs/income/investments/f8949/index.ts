@@ -1,3 +1,5 @@
+import { assertHistoricalCapitalSource, HistoricalForm8949Part } from "../../../../intermediate/forms/income/investments/form8949/historical-source.ts";
+export { HistoricalForm8949Part };
 import { reportedCapitalSale } from "../../../../intermediate/forms/income/investments/form8949/reported-money.ts";
 import { z } from "zod";
 import type {
@@ -73,6 +75,10 @@ export const itemSchema = z.object({
     .describe(
       "Portion of gain taxable as ordinary income due to depreciation recapture (IRC §1245/§1250)",
     ),
+});
+
+export const historical8949ItemSchema = itemSchema.extend({
+  part: z.nativeEnum(HistoricalForm8949Part),
 });
 
 export const inputSchema = z.object({
@@ -257,6 +263,7 @@ class F8949Node extends TaxNode<typeof inputSchema> {
 
   compute(_ctx: NodeContext, input: z.infer<typeof inputSchema>): NodeResult {
     const parsed = inputSchema.parse(input);
+    for (const item of parsed.f8949s) assertHistoricalCapitalSource(item, _ctx.taxYear);
     return { outputs: parsed.f8949s.flatMap((item) => processItem(item)) };
   }
 }

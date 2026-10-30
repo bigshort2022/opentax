@@ -2,6 +2,8 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { catalog } from "../../catalog.ts";
+import type { FormDefinition, PreparationIssue } from "../../core/types/form-definition.ts";
+import { PreparationBlockedError, returnPreparationIssues } from "./preparation.ts";
 import { buildEngineInputs, loadReturn } from "../store/store.ts";
 import { singletonPublicInputKeys } from "../store/public-input-keys.ts";
 import { extractFilerIdentity } from "../../forms/f1040/mef/filer.ts";
@@ -93,11 +95,12 @@ export class ExportExecutionError extends Error {
   }
 }
 
-type PipelineResult = {
+export type PipelineResult = {
   readonly pending: Readonly<Record<string, Record<string, unknown>>>;
-  readonly def: ReturnType<typeof getCatalogEntry>;
-  readonly filer: ReturnType<typeof extractFilerIdentity>;
+  readonly def: FormDefinition;
+  readonly filer: FilerIdentity | undefined;
   readonly executorDiagnostics: readonly ExecutorDiagnosticEntry[];
+  readonly preparationIssues: readonly PreparationIssue[];
 };
 
 export function validateBusinessRules(
@@ -117,6 +120,9 @@ function validateSubmissionRules(
   force: boolean | undefined,
   xml: string,
 ): void {
+  if (def.preparationMode !== "mef") {
+    throw new Error(`TY${def.taxYear} ${def.formType} does not support MeF`);
+  }
   if (def.mefRuleReport) {
     gateRuleReport(def.mefRuleReport(pending, xml), force);
     return;
@@ -155,10 +161,14 @@ function gateRuleReport(
 /** Shared: execute nodes, warn on failures, run validation gate. */
 export async function runReturnPipeline(
   args: ExportReturnArgs,
+  requiredCapability?: "mef",
 ): Promise<PipelineResult> {
   const returnPath = join(args.baseDir, args.returnId);
   const { meta, inputs } = await loadReturn(returnPath);
   const def = getCatalogEntry(meta.formType ?? "f1040", meta.year);
+  if (requiredCapability === "mef" && def.preparationMode !== "mef") {
+    throw new Error(`TY${def.taxYear} ${def.formType} does not support MeF; use paper PDF preparation`);
+  }
   const engineInputs = await resolveSourceBytes(
     returnPath,
     buildEngineInputs(inputs, singletonPublicInputKeys(def)),
@@ -182,12 +192,17 @@ export async function runReturnPipeline(
   const pending = normalizeAllPending(result.pending);
   const f1040 = pending["f1040"] ?? {};
   const filer = extractFilerIdentity(f1040);
+  const preparationIssues = await returnPreparationIssues(args, def, engineInputs, pending);
+  if (preparationIssues.length > 0 && !args.draft) {
+    throw new PreparationBlockedError(preparationIssues);
+  }
 
   return {
     pending,
     def,
     filer,
     executorDiagnostics: result.diagnostics,
+    preparationIssues,
   };
 }
 
@@ -222,6 +237,9 @@ export async function prepareWithSourceFiles(
   def: PipelineResult["def"],
   filer: PipelineResult["filer"],
 ) {
+  if (def.preparationMode !== "mef") {
+    throw new Error(`TY${def.taxYear} ${def.formType} does not support MeF`);
+  }
   const files = await loadReturnSourceFiles(
     join(args.baseDir, args.returnId),
     pending,
@@ -243,6 +261,7 @@ export async function exportMefCommand(
 ): Promise<string> {
   const { pending, def, filer, executorDiagnostics } = await runReturnPipeline(
     args,
+    "mef",
   );
   const prepared = await prepareWithSourceFiles(args, pending, def, filer);
   const xml = prepared.bundle.xml;
@@ -258,9 +277,19 @@ export type ExportPdfArgs = ExportReturnArgs & {
 export async function exportPdfCommand(
   args: ExportPdfArgs,
 ): Promise<string> {
-  const { pending, def, filer } = await runReturnPipeline(
-    args,
-  );
+  const { pending, def, filer, executorDiagnostics, preparationIssues } = await runReturnPipeline(args);
+  if (def.preparationMode === "paper") {
+    const issues = [
+      ...preparationIssues,
+      ...executorDiagnostics.map((entry): PreparationIssue => ({
+        code: entry.code, message: entry.message, form: entry.nodeType,
+      })),
+    ];
+    const bytes = await def.buildPdfBytes(pending, filer, { draft: args.draft, issues });
+    const path = args.outputPath ?? join(args.baseDir, args.returnId, "export.pdf");
+    await writeFile(path, bytes);
+    return path;
+  }
   // An unidentified draft is a PDF preview; it has no fileable MeF return.
   const prepared = args.draft && !filer
     ? undefined
@@ -414,7 +443,7 @@ export async function prepareMefSubmissionArchive(
       "MeF submission export cannot bypass filing checks or export a draft",
     );
   }
-  const { pending, def, filer: returnFiler } = await runReturnPipeline(args);
+  const { pending, def, filer: returnFiler } = await runReturnPipeline(args, "mef");
   if (def.formType !== "f1040" || def.taxYear !== 2025) {
     throw new Error("MeF submission export requires a TY2025 Form 1040");
   }

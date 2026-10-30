@@ -32,6 +32,7 @@ function projectSingleReviewedStockLoss7203(
   allPending: Readonly<Record<string, unknown>>,
   filer: FilerIdentity | undefined,
   taxYear: number,
+  otherScheduleEIncome = 0,
 ) {
   if (!filer) {
     throw new Error(
@@ -233,7 +234,8 @@ function projectSingleReviewedStockLoss7203(
   const schedule1Line10 = schedule1.line10_total_additional_income;
   const form1040Line8 = form1040.line8_additional_income;
   if (
-    printedLine5 !== -allowed ||
+    !Number.isFinite(otherScheduleEIncome) ||
+    printedLine5 !== otherScheduleEIncome - allowed ||
     typeof schedule1Line10 !== "number" ||
     (form1040Line8 ?? 0) !== schedule1Line10
   ) {
@@ -287,8 +289,12 @@ export function projectReviewedStockLoss7203(
   allPending: Readonly<Record<string, unknown>>,
   filer: FilerIdentity | undefined,
   taxYear: number,
+  otherScheduleEIncome = 0,
 ) {
   if (rawFields.owned_debt_loss_sources !== undefined) {
+    if (otherScheduleEIncome !== 0) {
+      throw new Error("Owned debt-family copies require their independently reviewed combined Schedule E projection");
+    }
     if (
       Object.keys(rawFields).some((k) =>
         k !== "owned_debt_loss_sources" && k !== "owned_debt_loss_copy_index"
@@ -316,6 +322,7 @@ export function projectReviewedStockLoss7203(
     allPending,
     filer,
     taxYear,
+    otherScheduleEIncome,
   );
 }
 
