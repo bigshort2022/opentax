@@ -158,8 +158,8 @@ Verification after integration: actual PDFs for all four years; field readback o
 - [x] Run the real CLI in an isolated synthetic store through create → add source inputs → get → validate → paper export for each historical year. Run 2021 → 2022 → 2023 → 2024 → 2025 preview/review/apply. Edit the synthetic ancestor and observe a downstream stale blocker, then review/reapply in order and observe reconciliation.
 - [x] Visually inspect actual rendered PDFs as specified in Task 6; tests alone are not PDF proof. Confirm rejected unsupported years/fields, wrong taxpayers, unknown opening basis/carries and stale chains produce no financial writes.
 - [x] After smoke proof, update existing product/architecture/CLI documentation with actual supported forms, boundaries and runnable commands. Remove throwaway scaffolds; retain only useful publication or deterministic regression evidence. Do not preserve implementation-wording tests or duplicate source-text checks.
-- [ ] Independently review specification compliance first, then code quality, arithmetic/source authority and persistence safety. Resolve findings and run the affected checks again only after a fix. Maintain one feature PR; do not merge or deploy without authorization.
-- [ ] Deliver exact exercised checks, unresolved external verification (including unavailable private IRS XSDs where applicable), and the use-case workflow. No optional Jev semantic verification is claimed; repository gates and runtime proof are recorded separately.
+- [x] Independently review specification compliance first, then code quality, arithmetic/source authority and persistence safety. Resolve findings and run the affected checks again only after a fix. Maintain one feature PR; do not merge or deploy without authorization.
+- [x] Deliver exact exercised checks, unresolved external verification (including unavailable private IRS XSDs where applicable), and the use-case workflow. No optional Jev semantic verification is claimed; repository gates and runtime proof are recorded separately.
 
 ## Plan self-review
 
@@ -246,3 +246,11 @@ basis/at-risk/QBI transitions and unsupported required forms remain blocked.
 No entity election, missing cost basis, repayment treatment or private opening
 balance was inferred. Paper readiness does not mean signature, filing, mailing,
 payment or IRS acceptance.
+
+### Publication
+
+Published as [draft PR #4](https://github.com/bigshort2022/opentax/pull/4) on
+`codex/historical-federal-preparation`, against `main` at `29eec9d1`.
+The feature worktree remains at `.worktrees/historical-federal-preparation`
+for review and iteration. The PR is unmerged; its live checks report CI status
+separately from the local verification above.
