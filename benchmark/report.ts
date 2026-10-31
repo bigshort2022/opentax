@@ -1,8 +1,14 @@
 import { basename } from "node:path";
 import type { BenchmarkDiscovery } from "./harness.ts";
+import {
+  parseReviewedSyntheticFixture,
+  type ReviewedSyntheticFixture,
+  type ReviewedAssertionEvidence,
+} from "./reviewed_contract.ts";
 
 export const LEGACY_BENCHMARK_TOLERANCE = 5;
 export const PUBLISHED_LINE_TOLERANCE = 0;
+export const REVIEWED_SYNTHETIC_TOLERANCE = 0;
 
 export type NumericLineFailure = {
   readonly line: string;
@@ -37,9 +43,16 @@ export const BENCHMARK_ISSUE_TAGS: Readonly<Record<BenchmarkIssue, string>> = {
 };
 
 export type BenchmarkOracle = {
-  readonly scope: "full_return" | "published_lines";
+  readonly scope: "full_return" | "published_lines" | "reviewed_synthetic";
   readonly citations: readonly string[];
   readonly sourceIssues: readonly string[];
+  readonly provenance?: ReviewedSyntheticFixture["provenance"];
+};
+
+export type AssertionEvidence = ReviewedAssertionEvidence & {
+  readonly expected: number;
+  readonly actual: unknown;
+  readonly matched: boolean;
 };
 
 export type BenchmarkCaseResult = {
@@ -52,6 +65,7 @@ export type BenchmarkCaseResult = {
   readonly ok: boolean;
   /** Null means the expected-value file could not be read or validated. */
   readonly oracle: BenchmarkOracle | null;
+  readonly assertionEvidence?: readonly AssertionEvidence[];
 };
 
 /** Presence is metadata, not an independent review of the cited publication. */
@@ -70,12 +84,18 @@ export function describeBenchmarkOracle(
       if (typeof source === "string" && source.trim()) citations.push(source);
     }
   }
+  const reviewed = fixture.oracle_scope === "reviewed_synthetic"
+    ? parseReviewedSyntheticFixture(fixture)
+    : undefined;
   return {
-    scope: fixture.oracle_scope === "published_lines"
+    scope: reviewed
+      ? "reviewed_synthetic"
+      : fixture.oracle_scope === "published_lines"
       ? "published_lines"
       : "full_return",
     citations,
     sourceIssues,
+    ...(reviewed ? { provenance: reviewed.provenance } : {}),
   };
 }
 
@@ -132,8 +152,14 @@ export function buildBenchmarkReport(
     passingWithoutCitation: [] as string[],
     sourceLimitedCases: [] as string[],
   };
-  const oracleScopes = { fullReturn: 0, publishedLines: 0, unavailable: 0 };
+  const oracleScopes = { fullReturn: 0, publishedLines: 0, reviewedSynthetic: 0, unavailable: 0 };
   const publishedLineCases: { name: string; scoredLines: string[] }[] = [];
+  const reviewedSyntheticCases: {
+    name: string;
+    declaredFields: string[];
+    scoredFields: string[];
+    evidence: readonly AssertionEvidence[];
+  }[] = [];
   const caseProvenance: { name: string; oracle: BenchmarkOracle | null }[] = [];
   const failures: Pick<
     BenchmarkCaseResult,
@@ -179,6 +205,14 @@ export function buildBenchmarkReport(
         name: result.name,
         scoredLines: Object.keys(result.correct),
       });
+    } else if (oracle.scope === "reviewed_synthetic") {
+      oracleScopes.reviewedSynthetic++;
+      reviewedSyntheticCases.push({
+        name: result.name,
+        declaredFields: Object.keys(oracle.provenance?.assertions ?? {}),
+        scoredFields: Object.keys(result.correct),
+        evidence: result.assertionEvidence ?? [],
+      });
     } else oracleScopes.fullReturn++;
   }
   const notRunCases = discovery.found.map((directory) => basename(directory))
@@ -186,6 +220,7 @@ export function buildBenchmarkReport(
   failures.sort((a, b) => a.name.localeCompare(b.name));
   caseProvenance.sort((a, b) => a.name.localeCompare(b.name));
   publishedLineCases.sort((a, b) => a.name.localeCompare(b.name));
+  reviewedSyntheticCases.sort((a, b) => a.name.localeCompare(b.name));
   provenance.missingCitationCases.sort();
   provenance.passingWithoutCitation.sort();
   provenance.sourceLimitedCases.sort();
@@ -210,11 +245,13 @@ export function buildBenchmarkReport(
     provenance,
     oracleScopes,
     publishedLineCases,
+    reviewedSyntheticCases,
     caseProvenance,
     validationLimits: {
       currency: "USD",
       fullReturnAbsoluteTolerance: LEGACY_BENCHMARK_TOLERANCE,
       publishedLineAbsoluteTolerance: PUBLISHED_LINE_TOLERANCE,
+      reviewedSyntheticAbsoluteTolerance: REVIEWED_SYNTHETIC_TOLERANCE,
       independentSourceVerification: false,
       fullReturnCertification: false,
       executorFailureAmounts: "partial_or_unavailable",
@@ -252,7 +289,7 @@ export function formatBenchmarkSummary(report: BenchmarkReport): string {
   }
   lines.push(
     "",
-    `Scoring: ${oracleScopes.fullReturn} full-return cases use an inclusive absolute $${validationLimits.fullReturnAbsoluteTolerance} legacy tolerance; ${oracleScopes.publishedLines} published-line cases use exact dollar equality.`,
+    `Scoring: ${oracleScopes.fullReturn} full-return cases use an inclusive absolute $${validationLimits.fullReturnAbsoluteTolerance} legacy tolerance; ${oracleScopes.publishedLines} published-line and ${oracleScopes.reviewedSynthetic} reviewed-synthetic cases use exact dollar equality.`,
     `  ${oracleScopes.unavailable} cases have unavailable oracle metadata.`,
     "Limits: no independent IRS-source verification or full-return certification. Published-line cases verify only their scored lines.",
     "  Green means within the applicable comparison tolerance, not IRS approval. Unscored columns are dim; N/A means unavailable or invalid.",
@@ -264,6 +301,20 @@ export function formatBenchmarkSummary(report: BenchmarkReport): string {
     for (const published of report.publishedLineCases) {
       lines.push(`  ${published.name}: ${published.scoredLines.join(", ") || "none compared"}`);
     }
+  }
+  if (report.reviewedSyntheticCases.length > 0) {
+    lines.push("", "Reviewed synthetic assertions (exact; not published completed returns):");
+    for (const reviewed of report.reviewedSyntheticCases) {
+      const matched = reviewed.evidence.filter((entry) => entry.matched).length;
+      lines.push(`  ${reviewed.name}: ${matched}/${reviewed.scoredFields.length} compared assertions match; ${reviewed.scoredFields.length}/${reviewed.declaredFields.length} declared assertions compared.`);
+      for (const entry of reviewed.evidence) {
+        lines.push(
+          `    ${entry.field}: ${entry.matched ? "MATCH" : "FAIL"}; expected=${entry.expected}; actual=${JSON.stringify(entry.actual)}; ${entry.status}`,
+          `      ${entry.observable}: ${entry.detail}`,
+        );
+      }
+    }
+    lines.push("  No-contribution evidence does not certify unused worksheets or synthetic eligibility.");
   }
   if (report.excludedCases.length > 0) {
     lines.push("", "Known-invalid exclusions (not executed; outside PASS/FAIL):");

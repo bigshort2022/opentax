@@ -32,7 +32,10 @@ interface FormDefinitionBase {
   readonly inputNodes: readonly InputNodeEntry[];
   readonly registry: Record<string, TaxNode>;
   /** Single form-owned execution entrypoint for validated source inputs. */
-  readonly executeReturn: (inputs: Record<string, unknown>) => ExecuteResult;
+  readonly executeReturn: (
+    inputs: Record<string, unknown>,
+    options?: { readonly captureExecution?: boolean },
+  ) => ExecuteResult;
   readonly buildPdfBytes: (
     pending: Record<string, unknown>,
     filer?: FilerIdentity,

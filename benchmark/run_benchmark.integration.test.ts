@@ -145,7 +145,7 @@ for (
         assertEquals(report.excludedCases.map((entry) => entry.case),
           scenario === "excluded" ? ["f1040/2025/invalid"] : []);
       } else if (scenario === "published-line") {
-        assertEquals(report.oracleScopes, { fullReturn: 0, publishedLines: 1, unavailable: 0 });
+        assertEquals(report.oracleScopes, { fullReturn: 0, publishedLines: 1, reviewedSynthetic: 0, unavailable: 0 });
         assertEquals(report.provenance.citationPresent, 1);
         assertEquals(report.publishedLineCases, [{ name: "synthetic", scoredLines: ["line16_income_tax"] }]);
       } else {
@@ -165,6 +165,69 @@ for (
           assertEquals(report.failureCauses[BenchmarkIssue.Executor], 1);
           assertEquals(report.failures[0].issues.includes(BenchmarkIssue.Executor), true);
         }
+      }
+    } finally {
+      await sys.remove(temporary, { recursive: true });
+    }
+  });
+}
+
+for (const scenario of ["case01", "case01-exact-mismatch", "case01-source-gap"] as const) {
+  test(`reviewed case 01 scores every assertion without weakening source or dollar checks: ${scenario}`, async () => {
+    const temporary = await sys.makeTempDir();
+    const casesRoot = join(temporary, "cases");
+    const yearRoot = join(casesRoot, "f1040", "2025");
+    const caseDir = join(yearRoot, "case01");
+    const runtime = join(temporary, "runtime");
+    const source = join(root, "cases", "f1040", "2025", "01-single-w2-minimal");
+    try {
+      await fs.mkdir(caseDir, { recursive: true });
+      await fs.mkdir(runtime);
+      await fs.copyFile(join(source, "input.json"), join(caseDir, "input.json"));
+      const expected = JSON.parse(await fs.readFile(join(source, "correct.json"), "utf8"));
+      if (scenario === "case01-exact-mismatch") expected.correct.eitc += 1;
+      if (scenario === "case01-source-gap") {
+        expected.reconciliation.source_limitations = ["Synthetic eligibility remains unresolved"];
+      }
+      await fs.writeFile(join(caseDir, "correct.json"), JSON.stringify(expected));
+      const script = `import { runBenchmark } from ${JSON.stringify(join(root, "run_benchmark.ts"))};
+        process.exitCode = await runBenchmark(${JSON.stringify(yearRoot)}, ${JSON.stringify({
+        casesRoot,
+        baseline: [],
+        today: "2026-10-31",
+      })}, true);`;
+      const { code, stdout, stderr } = await new sys.Command(process.execPath, {
+        args: ["-e", script],
+        cwd: runtime,
+        stdout: "piped",
+        stderr: "piped",
+      }).output();
+      const jsonLine = new TextDecoder().decode(stdout).split("\n")
+        .find((line) => line.startsWith("{"));
+      if (!jsonLine) throw new Error(new TextDecoder().decode(stderr));
+      const report: BenchmarkReport = JSON.parse(jsonLine);
+      assertEquals(code, scenario === "case01" ? 0 : 1);
+      assertEquals(report.counts.executed, 1);
+      assertEquals(report.counts.passed, scenario === "case01" ? 1 : 0);
+      assertEquals(report.oracleScopes.reviewedSynthetic, 1);
+      const reviewed = report.reviewedSyntheticCases[0];
+      assertEquals(reviewed.scoredFields.sort(), Object.keys(expected.correct).sort());
+      assertEquals(reviewed.evidence.filter((entry) => entry.status === "unavailable"), []);
+      assertEquals(report.provenance.passingWithoutCitation, []);
+      if (scenario === "case01") {
+        assertEquals(report.failures, []);
+      } else if (scenario === "case01-exact-mismatch") {
+        assertEquals(report.failures[0].lineFailures, [{
+          line: "eitc",
+          expected: 313,
+          actual: 312,
+          reason: "mismatch",
+          tolerance: 0,
+        }]);
+        assertEquals(report.failures[0].issues, [BenchmarkIssue.NumericMismatch]);
+      } else {
+        assertEquals(report.failures[0].lineFailures, []);
+        assertEquals(report.failures[0].issues, [BenchmarkIssue.Source]);
       }
     } finally {
       await sys.remove(temporary, { recursive: true });

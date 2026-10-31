@@ -1,6 +1,7 @@
 import type { NodeRegistry } from "../types/node-registry.ts";
 import type { ExecutionStep } from "./planner.ts";
 import type { NodeContext } from "../types/node-context.ts";
+import type { NodeOutput } from "../types/tax-node.ts";
 import {
   type SourceDocumentBytes,
   type SourceDocumentClaim,
@@ -15,10 +16,32 @@ export type ExecutorDiagnosticEntry = {
   readonly message: string;
 };
 
+export type NodeExecutionStatus = "computed" | "inactive" | "failed" | "unavailable";
+
+/** Evidence from this execution, keyed by plan step ID; absence is not zero. */
+export type NodeExecution =
+  | {
+    readonly nodeType: string;
+    readonly status: "computed";
+    readonly input: unknown;
+    readonly outputs: readonly NodeOutput[];
+    readonly finalizations?: readonly NodeOutput[];
+  }
+  | {
+    readonly nodeType: string;
+    readonly status: "inactive";
+    readonly input: Readonly<Record<string, unknown>>;
+  }
+  | {
+    readonly nodeType: string;
+    readonly status: "failed" | "unavailable";
+  };
+
 export type ExecuteResult = {
   readonly pending: Readonly<Record<string, Record<string, unknown>>>;
   readonly diagnostics: readonly ExecutorDiagnosticEntry[];
   readonly carryforwards: Readonly<Record<string, number>>;
+  readonly execution?: Readonly<Record<string, NodeExecution>>;
   readonly replayInputs?: Readonly<
     Record<string, Readonly<Record<string, unknown>>>
   >;
@@ -126,10 +149,18 @@ export function execute(
   const diagnostics: ExecutorDiagnosticEntry[] = [];
   const carryforwards: Record<string, number> = {};
   const replayInputs: Record<string, Record<string, unknown>> = {};
+  const execution: Record<string, NodeExecution> | undefined = ctx.captureExecution
+    ? {}
+    : undefined;
 
   for (const step of plan) {
     const node = registry[step.nodeType];
-    if (!node || !node.implemented) continue;
+    if (!node || !node.implemented) {
+      if (execution) {
+        execution[step.id] = { nodeType: step.nodeType, status: "unavailable" };
+      }
+      continue;
+    }
 
     const input = pending[step.id] ?? {};
     const parsed = node.inputSchema.safeParse(input);
@@ -149,6 +180,16 @@ export function execute(
           message:
             `Zod validation failed for node "${step.nodeType}": ${parsed.error.message}`,
         });
+        if (execution) {
+          execution[step.id] = { nodeType: step.nodeType, status: "failed" };
+        }
+      } else if (execution) {
+        // Pending slots remain mutable; preserve the context-only skip facts.
+        execution[step.id] = {
+          nodeType: step.nodeType,
+          status: "inactive",
+          input: { ...input },
+        };
       }
       continue;
     }
@@ -189,7 +230,22 @@ export function execute(
       if (result.carryforwards) {
         Object.assign(carryforwards, result.carryforwards);
       }
+      // Publish only after all returned contributions have been processed.
+      if (execution) {
+        execution[step.id] = {
+          nodeType: step.nodeType,
+          status: "computed",
+          input: parsed.data,
+          outputs: result.outputs,
+          ...(result.finalizations !== undefined
+            ? { finalizations: result.finalizations }
+            : {}),
+        };
+      }
     } catch (err: unknown) {
+      if (execution) {
+        execution[step.id] = { nodeType: step.nodeType, status: "failed" };
+      }
       const message = err instanceof Error ? err.message : String(err);
       diagnostics.push({
         severity: "error",
@@ -201,12 +257,13 @@ export function execute(
     }
   }
 
-  return {
+  const result: ExecuteResult = {
     pending: withoutContextOnlySlots(pending, registry),
     diagnostics,
     carryforwards,
     ...(Object.keys(replayInputs).length > 0 ? { replayInputs } : {}),
   };
+  return execution ? { ...result, execution } : result;
 }
 
 function withoutContextOnlySlots(

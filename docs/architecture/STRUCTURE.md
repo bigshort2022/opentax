@@ -196,7 +196,21 @@ in `scripts/testing/year-pinned-baseline.json`; a count may only fall, and
 and payments, are scored when supplied; unmapped expectations fail.
 
 Explicit `published_lines` fixtures score only their cited lines with exact
-dollar equality. See the [benchmark reporting contract](../../benchmark/README.md#reading-the-report)
-for corpus exclusions, issue categories, citation metadata, and verification limits.
+dollar equality. `reviewed_synthetic` fixtures retain the three final-balance
+assertions and score every expected key exactly, using validated per-assertion
+bindings and provenance. Their execution evidence distinguishes actual return
+lines, an observed ordinary-rate tax base, and zero-activity contributions.
+Missing or failed execution is never evidence of zero.
 
-Values must come directly from an IRS publication. The `source` field must cite the specific pub, exercise, and page. Never compute values.
+An IRS-published example must cite the specific publication, exercise and page;
+its expected values come from that publication, never from the engine or another
+calculator. A reviewed synthetic regression must instead identify which amounts
+are published, which apply IRS instructions to explicitly synthetic facts, and
+which are benchmark representation conventions. It is not a published completed
+return or eligibility certification. Numeric changes still require the oracle
+ledger; metadata repairs do not authorize changing expected dollars.
+
+See the [benchmark contract](../../benchmark/README.md#reviewed-synthetic-assertions)
+for required source metadata and binding limits, and the
+[reporting contract](../../benchmark/README.md#reading-the-report) for exclusions,
+issue categories, assertion evidence and verification limits.

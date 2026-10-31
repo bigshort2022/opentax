@@ -8,9 +8,11 @@ import {
   getUserInputSchema,
   rejectUnknownFields,
 } from "../cli/commands/form.ts";
+import { reviewedSyntheticExpectedSchema } from "./reviewed_contract.ts";
 
 export enum BenchmarkOracleScope {
   PublishedLines = "published_lines",
+  ReviewedSynthetic = "reviewed_synthetic",
 }
 
 export const benchmarkInputSchema = z.object({
@@ -33,7 +35,10 @@ const fullReturnExpectedSchema = z.union([
   requiredValues.parse("correct" in value ? value.correct : value)
 );
 const publishedLinesExpectedSchema = z.object({
-  oracle_scope: z.nativeEnum(BenchmarkOracleScope),
+  oracle_scope: z.nativeEnum(BenchmarkOracleScope).refine(
+    (scope) => scope === BenchmarkOracleScope.PublishedLines,
+    "A published-line oracle must declare published_lines",
+  ),
   source: z.string().trim().min(1),
   synthetic_inputs: z.string().trim().min(1),
   correct: z.record(z.number().finite()).refine(
@@ -46,6 +51,7 @@ const publishedLinesExpectedSchema = z.object({
 export const benchmarkExpectedSchema = z.union([
   fullReturnExpectedSchema,
   publishedLinesExpectedSchema,
+  reviewedSyntheticExpectedSchema.transform((value) => value.correct),
 ]);
 
 /** A conditional calculation is not a passing, source-backed oracle. */

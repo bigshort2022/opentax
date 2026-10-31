@@ -362,6 +362,7 @@ test("published-line oracles require explicit scope, authority and disclosed syn
   assertEquals(benchmarkExpectedSchema.parse(published), published.correct);
   for (const invalid of [
     { correct: published.correct },
+    { ...published, oracle_scope: "reviewed_synthetic" },
     { ...published, source: "" },
     { ...published, synthetic_inputs: undefined },
     { ...published, correct: {} },

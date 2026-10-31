@@ -21,27 +21,26 @@ Examples of TY2025 scenarios; the runner reports current corpus counts:
 | 21–31 | Mixed         | Additional Medicare Tax, ACTC, LTCG 0% bracket, blind filer, senior + SE income                                                                          |
 | 32–97 | Extended      | Schedule C loss, 1099-R, AOTC, marketplace/1095-A, educator expense, estimated tax, EITC no children, 401(k), tips, QBI, K-1, SSA, NIIT, multiple 1099-R |
 
-**WIP contract — not ready for a standalone accuracy claim:** distinguish public
-summary outputs, exact raw output fields, intermediate oracles and fixture
-metadata. `run_benchmark.ts` lists supported exact keys traced to
-`ReturnSummary` in `cli/commands/return.ts` and the F1040 output schema in
-`forms/f1040/nodes/outputs/general/return-assembly/f1040/index.ts`. No aliases
-or intermediate mappings have been approved. Numeric expectations outside that
-supported contract become explicit `unsupportedChecks` and prevent success,
-rather than being called engine defects. Envelope metadata (`case`, `scenario`,
-`year`, `inputs`, sources/notes) is not scored. The `correct` object is the
-oracle namespace; only explicitly named metadata fields may be nonnumeric.
-Malformed oracles, including unmapped ones, fail.
+**Explicit contracts — not a standalone accuracy claim:** distinguish public
+summary outputs, raw output fields, intermediate observations and fixture metadata.
+Unreviewed fixtures use only the exact keys listed in `run_benchmark.ts`; aliases
+are not inferred. Numeric expectations outside that contract become explicit
+`unsupportedChecks` and prevent success, rather than being called engine defects.
+Reviewed synthetic fixtures opt into the finite bindings below. Envelope metadata
+(`case`, `scenario`, `year`, `inputs`, sources/notes) is not scored. Every value
+inside `correct` is a finite numeric assertion; malformed oracles, including
+unmapped ones, fail.
 
 **Pass criteria:** compare supported expected output keys, including AGI and
 payments, not only tax/refund/owed; unsupported oracles, command failures, and
 executor/source errors prevent a pass.
-Full-return fixtures require a finite numeric actual within an inclusive absolute
-$5 legacy tolerance. `published_lines` fixtures require exact dollar equality
-only for their cited, scored lines. The legacy tolerance accommodates existing
-fixture rounding; it is not an IRS-approved discrepancy allowance. Missing
-values never become zero. Singleton numeric arrays are accepted; empty,
-multi-entry, nonnumeric and nonfinite actuals fail. Nonfinite expectations,
+Unreviewed full-return fixtures require a finite numeric actual within an inclusive
+absolute $5 legacy tolerance. `published_lines` fixtures require exact dollar
+equality only for their cited, scored lines. `reviewed_synthetic` fixtures require
+exact dollar equality for every declared assertion. The legacy tolerance
+accommodates existing fixture rounding; it is not an IRS-approved discrepancy
+allowance. Missing evidence never becomes zero. Return-line comparisons accept
+singleton numeric arrays; empty, multi-entry, nonnumeric and nonfinite actuals fail. Nonfinite expectations,
 invalid tolerances and no numeric expectations fail rather than silently
 passing. Descriptive nonnumeric metadata is not scored.
 
@@ -55,11 +54,49 @@ Some fixtures expect intermediate names not exposed by `return get`. These are
 reported as unsupported checks, not missing filed lines. The omitted refund side
 becomes zero only when a nonnegative amount owed is present, and conversely for
 omitted amount owed with a nonnegative refund. When both are omitted, both become
-zero only if finite tax and payments totals are equal. Explicit nulls, arrays
-and malformed values are never replaced, and no other missing filed line
-receives a default. Resolving mappings/output coverage needs independent review,
+zero only if finite tax and payments totals are equal. A singleton numeric array
+can prove a balance or total without replacing its raw representation. Explicit
+nulls, arrays and malformed values are never overwritten, and no other missing
+filed line receives a default. Resolving mappings/output coverage needs independent review,
 not changes to expected values or relaxed tolerances. A red benchmark is not by
 itself proof that every reported discrepancy is a tax-engine arithmetic error.
+
+## Reviewed synthetic assertions
+
+`oracle_scope: "reviewed_synthetic"` is an opt-in contract, not a blanket alias
+repair for legacy fixtures. `reviewed_contract.ts` validates an official IRS
+source list, explicit synthetic assumptions and limitations, and one provenance
+entry for every expected key, with no orphan entries. Each entry identifies a
+finite supported observable, authority kind (`published_amount`,
+`instruction_application`, or `benchmark_convention`), a declared IRS citation,
+and the applicable page/line/table and reasoning.
+
+Case 01 retains all 23 expectations. Its observations cover:
+
+- Eleven return lines, with explicit reviewed bindings for the standard deduction,
+  income tax, tax before credits and EIC.
+- The actual parsed taxable-income input used by a successfully executed
+  ordinary-rate income-tax node. Other tax routes are not inferred from line 15.
+- Eleven zero-activity assertions about emitted tax, credit or deduction
+  contributions. These require actual successful execution or a recorded optional
+  skip with no source facts. An absent field, missing trace, failed node or
+  unavailable implementation is not sufficient. Nonzero, malformed or ambiguous
+  contributions fail. These assertions do not certify unused private worksheets
+  or disaggregate positive combined child/other-dependent or education credits.
+
+The harness creates and populates the synthetic return through the CLI, then
+invokes the same `getReturnCommand` once with transient execution capture.
+Default CLI output is unchanged; no benchmark flag or tax-store trace is added.
+Form 8839, Form 8990 and QEF-deferral projection routes currently omit execution
+evidence rather than expose a stale pre-projection trace; their reviewed
+intermediate assertions therefore fail closed.
+Only reviewed cases request capture; ordinary runs retain no execution trace.
+
+`provenance.limitations` describes the boundaries of a synthetic oracle, including
+facts not independently certified. It does not resolve an active source gap:
+`reconciliation.source_limitations` still fails the case. Citation presence and a
+review date are metadata, not automated verification of the cited publication.
+
 
 ## Reading the report
 
@@ -91,8 +128,9 @@ The footer distinguishes:
   because the expected-value file could not be read or validated. Passing cases
   without a citation are named. Presence of a nonempty top-level `source` or
   `sources` value does not establish that a publication supports the expected values.
-- **Oracle scope and limits:** full-return legacy tolerance versus exact
-  published-line checks; no independent source verification or full-return certification.
+- **Oracle scope and limits:** full-return legacy tolerance, exact published-line
+  checks, and exact reviewed-synthetic assertions with their observed evidence;
+  no automated independent source verification or full-return certification.
 - **Known-invalid exclusions:** every excluded case includes its validation error,
   baseline reason, approver, and expiry. Exclusions are not hidden in a zero skip count.
 
@@ -109,12 +147,18 @@ The report contains:
 | `excludedCases`, `notRunCases` | Baseline exclusion records and names of unexecuted runnable cases |
 | `provenance` | Citation coverage, missing-citation cases, passing cases without citations, and source-limited cases |
 | `oracleScopes`, `publishedLineCases` | Scope counts and the scored keys for published-line cases |
-| `caseProvenance` | Each executed case's declared scope, citations, and source issues; `oracle: null` when unavailable |
+| `reviewedSyntheticCases` | Declared versus scored fields and each assertion's expected/actual value, numeric match, observation status and evidence detail |
+| `caseProvenance` | Declared scope, citations, source issues and reviewed synthetic authority/assumption metadata; `oracle: null` when unavailable |
 | `validationLimits` | USD tolerances, lack of independent verification/certification, and partial-output warning |
 
 The explicit `counts` object replaces the ambiguous `total` and `skipped` JSON
-fields. Reporting does not change tax calculations, expected values, baseline
-eligibility, or pass/fail criteria.
+fields. A reviewed contract changes which observations can be scored, not tax
+calculations, numeric expected values, or baseline eligibility.
+
+An invalid computed-return envelope remains a case-level parsing failure, not a
+partial success. Reviewed cases then report zero compared assertions against
+their declared coverage. Source errors can also fail a case whose numeric
+assertions all match.
 
 ## How to run
 
@@ -172,9 +216,9 @@ reasons and approvals. Unbaselined invalid cases, expired exclusions, empty or
 incomplete directories, and empty runnable inventories terminate with an error
 before execution; no partial-success JSON report is emitted.
 
-Full-return expected records include total tax, refund, and amount owed.
-Published-line records retain their narrower explicit scope. CLI output must
-pass the shared computed-return schema before per-field comparisons run.
+Full-return and reviewed-synthetic expected records include total tax, refund and
+amount owed. Published-line records retain their narrower explicit scope. Computed
+return output must pass the shared schema before per-field comparisons run.
 
 ## Issue 77 reconciliation
 

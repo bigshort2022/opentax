@@ -29,6 +29,7 @@ const IRS_CACHE_XSD =
 const BENCHMARK_HARNESS_TESTS = new Set([
   "benchmark/harness.test.ts",
   "benchmark/report.test.ts",
+  "benchmark/reviewed_contract.test.ts",
   "benchmark/run_benchmark.test.ts",
   "benchmark/run_benchmark.integration.test.ts",
   "benchmark/fixture_contract.test.ts",

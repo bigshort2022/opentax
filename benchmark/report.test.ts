@@ -112,6 +112,7 @@ test("report reconciles exclusions and unexecuted cases without double-counting 
   assertEquals(report.oracleScopes, {
     fullReturn: 4,
     publishedLines: 1,
+    reviewedSynthetic: 0,
     unavailable: 1,
   });
   assertEquals(report.publishedLineCases, [{

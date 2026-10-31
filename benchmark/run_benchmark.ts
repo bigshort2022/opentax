@@ -9,6 +9,11 @@ import * as sys from "../scripts/support/sys.ts";
 
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath as fromFileUrl } from "node:url";
+import { getReturnCommand } from "../cli/commands/return.ts";
+import {
+  parseReviewedSyntheticFixture,
+  resolveReviewedAssertions,
+} from "./reviewed_contract.ts";
 import {
   BenchmarkOracleScope,
   benchmarkExitCode,
@@ -32,6 +37,7 @@ import {
   LEGACY_BENCHMARK_TOLERANCE,
   type NumericLineFailure,
   PUBLISHED_LINE_TOLERANCE,
+  REVIEWED_SYNTHETIC_TOLERANCE,
   type UnsupportedCheck,
 } from "./report.ts";
 
@@ -118,21 +124,22 @@ export function benchmarkActualLines(
   summary: Readonly<Record<string, unknown>>,
 ): Record<string, unknown> {
   const actual = { ...summary, ...lines };
-  const refund = actual.line35a_refund;
-  const owed = actual.line37_amount_owed;
+  const refund = singleNumericActual(actual.line35a_refund);
+  const owed = singleNumericActual(actual.line37_amount_owed);
   const noRefund = !("line35a_refund" in actual);
   const noOwed = !("line37_amount_owed" in actual);
   // A return has a refund or an amount owed, never both; the blank side is zero.
-  if (noRefund && isFiniteNumber(owed) && owed >= 0) actual.line35a_refund = 0;
-  if (noOwed && isFiniteNumber(refund) && refund >= 0) {
+  if (noRefund && typeof owed === "number" && owed >= 0) actual.line35a_refund = 0;
+  if (noOwed && typeof refund === "number" && refund >= 0) {
     actual.line37_amount_owed = 0;
   }
-  if (
-    noRefund && noOwed && isFiniteNumber(actual.line24_total_tax) &&
-    actual.line24_total_tax === actual.line33_total_payments
-  ) {
-    actual.line35a_refund = 0;
-    actual.line37_amount_owed = 0;
+  if (noRefund && noOwed) {
+    const tax = singleNumericActual(actual.line24_total_tax);
+    const payments = singleNumericActual(actual.line33_total_payments);
+    if (typeof tax === "number" && tax === payments) {
+      actual.line35a_refund = 0;
+      actual.line37_amount_owed = 0;
+    }
   }
   return actual;
 }
@@ -194,7 +201,7 @@ export function compareExpectedNumericLines(
 
 // Exact public summary keys: cli/commands/return.ts ReturnSummary/extractSummary.
 // Additional exact raw output keys: forms/f1040/nodes/outputs/general/return-assembly/f1040/index.ts inputSchema.
-// No inferred aliases, aggregation, missing-to-zero conversion or intermediate mapping.
+// Unreviewed fixtures never infer aliases, aggregation or intermediate mappings.
 const SUMMARY_FIELDS = new Set([
   "line1z_total_wages",
   "line9_total_income",
@@ -225,6 +232,14 @@ const METADATA_FIELDS = new Set([
 export function classifyFixtureExpectations(
   fixture: Readonly<Record<string, unknown>>,
 ) {
+  if (fixture.oracle_scope === BenchmarkOracleScope.ReviewedSynthetic) {
+    const reviewed = parseReviewedSyntheticFixture(fixture);
+    return {
+      expectedLines: reviewed.correct,
+      unsupportedChecks: [] as UnsupportedCheck[],
+      metadata: Object.keys(fixture).filter((key) => key !== "correct"),
+    };
+  }
   const wrapped = fixture.correct !== undefined;
   const expected = wrapped ? fixture.correct : fixture;
   if (!expected || typeof expected !== "object" || Array.isArray(expected)) {
@@ -343,7 +358,18 @@ async function runCase(
     );
   }
 
-  const eng = benchmarkReturnSchema.parse(JSON.parse(
+  const reviewed = correct.oracle_scope === BenchmarkOracleScope.ReviewedSynthetic
+    ? parseReviewedSyntheticFixture(correct)
+    : undefined;
+  // Reuse the product command once; capture is internal, transient and opt-in.
+  const captured = reviewed
+    ? await getReturnCommand({
+      returnId: rid,
+      baseDir: join(process.cwd(), ".state", "returns"),
+      captureExecution: true,
+    })
+    : undefined;
+  const eng = benchmarkReturnSchema.parse(captured ?? JSON.parse(
     await tax("return", "get", "--returnId", rid, "--json"),
   ));
   const l = eng.lines ?? {};
@@ -364,18 +390,32 @@ async function runCase(
   const engRef = displayScalar(actualLines.line35a_refund);
   const engOwe = displayScalar(actualLines.line37_amount_owed);
 
-  const { expectedLines: c, unsupportedChecks } = classifyFixtureExpectations(
-    correct,
-  );
+  const { expectedLines: c, unsupportedChecks } = reviewed
+    ? { expectedLines: reviewed.correct, unsupportedChecks: [] }
+    : classifyFixtureExpectations(correct);
+  const resolved = reviewed
+    ? resolveReviewedAssertions(reviewed, actualLines, captured?.execution)
+    : undefined;
   const lineFailures = Object.keys(c).length > 0
     ? compareExpectedNumericLines(
-      actualLines,
+      resolved?.actual ?? actualLines,
       c,
-      correct.oracle_scope === BenchmarkOracleScope.PublishedLines
+      reviewed
+        ? REVIEWED_SYNTHETIC_TOLERANCE
+        : correct.oracle_scope === BenchmarkOracleScope.PublishedLines
         ? PUBLISHED_LINE_TOLERANCE
         : LEGACY_BENCHMARK_TOLERANCE,
     )
     : [];
+  const failedFields = resolved
+    ? new Set(lineFailures.map((failure) => failure.line))
+    : undefined;
+  const assertionEvidence = resolved?.evidence.map((entry) => ({
+    ...entry,
+    expected: c[entry.field],
+    actual: resolved.actual[entry.field] ?? null,
+    matched: !failedFields?.has(entry.field),
+  }));
   if (Object.keys(c).length === 0 && unsupportedChecks.length === 0) {
     errors.push("No numeric expected benchmark values");
   }
@@ -397,6 +437,7 @@ async function runCase(
     ok,
     oracle,
     issues: classifyBenchmarkIssues(lineFailures, unsupportedChecks, errors),
+    ...(assertionEvidence ? { assertionEvidence } : {}),
   };
 }
 
@@ -414,7 +455,9 @@ function colorNum(
 
 function resultRow(r: CaseResult, idx: number): string {
   const numW = COLS[2].width; // all number columns share this width
-  const tolerance = r.oracle?.scope === "published_lines"
+  const tolerance = r.oracle?.scope === "reviewed_synthetic"
+    ? REVIEWED_SYNTHETIC_TOLERANCE
+    : r.oracle?.scope === "published_lines"
     ? PUBLISHED_LINE_TOLERANCE
     : LEGACY_BENCHMARK_TOLERANCE;
   const nums = [
