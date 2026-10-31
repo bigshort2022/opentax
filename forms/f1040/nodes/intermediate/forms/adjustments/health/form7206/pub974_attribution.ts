@@ -29,3 +29,19 @@ export function attributableSpecifiedPtc(
     [...specifiedMonths].reduce((sum, month) => sum + credits[month - 1], 0) * 100,
   ) / 100;
 }
+
+// Line 11 is permitted only for unchanged full-year premiums and SLCSP.
+// Under that branch, specified-premium months share the annual credit equally.
+export function attributableAnnualSpecifiedPtc(
+  annualCredit: number,
+  specifiedMonths: ReadonlySet<number>,
+  coverageMonths: ReadonlySet<number>,
+): number {
+  if (!Number.isFinite(annualCredit) || annualCredit < 0 ||
+    coverageMonths.size !== 12 || specifiedMonths.size === 0 ||
+    [...coverageMonths].some((month) => !Number.isInteger(month) || month < 1 || month > 12) ||
+    [...specifiedMonths].some((month) => !coverageMonths.has(month))) {
+    throw new Error("Publication 974 annual PTC attribution needs full-year coverage and reviewed specified months");
+  }
+  return Math.round(annualCredit * 100 * specifiedMonths.size / 12) / 100;
+}

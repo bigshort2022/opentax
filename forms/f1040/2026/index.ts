@@ -1,4 +1,4 @@
-import type { FormDefinition } from "../../../core/types/form-definition.ts";
+import type { MefFormDefinition } from "../../../core/types/form-definition.ts";
 import type { FilerIdentity } from "../mef/header.ts";
 import { inputNodes as inputNodes2025 } from "../2025/inputs.ts";
 import { registry } from "../2025/registry.ts";
@@ -21,7 +21,9 @@ function noPdf(): never {
   throw new Error("TY2026 PDF forms are not available yet; export MeF XML");
 }
 
-export const f1040_2026: FormDefinition = {
+export const f1040_2026: MefFormDefinition = {
+  preparationMode: "mef",
+  paperAvailable: false,
   ...F1040_2026_CONFIG,
   inputNodes,
   registry,

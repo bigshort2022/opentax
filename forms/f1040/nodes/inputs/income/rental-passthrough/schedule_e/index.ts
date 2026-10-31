@@ -1,3 +1,5 @@
+import { allocateRentalExpenses, RentalExpenseCategory, RentalUsePattern, rentalExpenseAllocationSourceSchema } from "./expense-allocation.ts";
+import { lossLimitationsReviewSchema, reconstructedPriorLossSourceSchema } from "../../../../intermediate/forms/income/business/form8582/reconstructed-source.ts";
 import {
   allocateCurrentPassiveForms,
   currentPassiveFormsSchema,
@@ -9,6 +11,7 @@ import {
   reconcileCurrentPropertySource,
 } from "./current-property-source.ts";
 import { z } from "zod";
+import { isHistoricalTaxYear } from "../../../../config/index.ts";
 import type {
   NodeOutput,
   NodeResult,
@@ -78,6 +81,7 @@ export const itemSchema = z.object({
   // --- Required identification fields ---
   tsj: tsjSchema,
   current_property_source: currentPropertySourceSchema.optional(),
+  expense_allocation_source: rentalExpenseAllocationSourceSchema.optional(),
   activity_id: z.string().trim().min(1).max(64).optional(),
   // Retained evidence for a positive passive net-income amount used in the
   // Form 8582-CR line 6 tax-without-passive-income worksheet.
@@ -87,8 +91,8 @@ export const itemSchema = z.object({
   activity_type: z.enum(["A", "B", "C", "D"]),
 
   // --- Required income/days ---
-  fair_rental_days: z.number().int().min(0).max(365),
-  personal_use_days: z.number().int().min(0).max(365),
+  fair_rental_days: z.number().int().min(0).max(366),
+  personal_use_days: z.number().int().min(0).max(366),
   rent_income: z.number().nonnegative(),
 
   // --- Required compliance checkbox ---
@@ -111,7 +115,7 @@ export const itemSchema = z.object({
   operating_expenses_carryover: z.number().nonnegative().optional(),
   ownership_percent: z.number().min(0).max(100).optional(),
   tax_court_method: z.boolean().optional(),
-  days_owned_in_year: z.number().int().min(1).max(365).optional(),
+  days_owned_in_year: z.number().int().min(1).max(366).optional(),
   placed_in_service: z.boolean().optional(),
   disposed_of: z.boolean().optional(),
   // Dated sales of property in this rental activity. Form 4797 calculates
@@ -144,6 +148,8 @@ export const itemSchema = z.object({
   // --- Passive activity carryovers ---
   prior_unallowed_passive_operating: z.number().nonnegative().optional(),
   prior_year_8582_source: priorYear8582SourceSchema.optional(),
+  reconstructed_prior_loss_source: reconstructedPriorLossSourceSchema.optional(),
+  loss_limitations_review: lossLimitationsReviewSchema.optional(),
   // True only when the taxpayer actively participated in every year that
   // produced this prior operating loss, as required for Form 8582 Part IV.
   prior_passive_losses_active_when_incurred: z.boolean().optional(),
@@ -277,7 +283,7 @@ export const inputSchema = z.object({
 });
 
 type EItem = z.infer<typeof itemSchema>;
-type EItems = EItem[];
+export type EItems = EItem[];
 type FarmActivity = NonNullable<
   z.infer<typeof inputSchema>["farm_rental_activities"]
 >[number];
@@ -535,20 +541,19 @@ export function reviewPre2025PartIEntireGainCandidate(item: EItem): {
 // TY2025 (filed 2024 Form 8582 records, 2025 acquisition and sale dates).
 function assertTy2025OnlyFacts(
   taxYear: number,
-  input: z.infer<typeof inputSchema>,
+  items: EItems,
 ): void {
   if (taxYear === 2025) return;
-  const dated = input.filed_2024_form8582_record !== undefined ||
-    input.schedule_es.some((item) =>
+  const dated = items.some((item) =>
       item.current_property_source !== undefined ||
       item.passive_property_sales !== undefined ||
       item.section_1231_lookback_source !== undefined ||
-      item.first_year_activity_source !== undefined ||
       item.pre2025_part1_entire_disposition_source !== undefined ||
       item.prior_year_8582_source !== undefined ||
-      (item.prior_unallowed_passive_operating ?? 0) > 0 ||
-      (item.prior_unallowed_passive_4797_part1 ?? 0) > 0 ||
-      (item.prior_unallowed_passive_4797_part2 ?? 0) > 0 ||
+      (!item.reconstructed_prior_loss_source && (
+        (item.prior_unallowed_passive_operating ?? 0) > 0 ||
+        (item.prior_unallowed_passive_4797_part1 ?? 0) > 0 ||
+        (item.prior_unallowed_passive_4797_part2 ?? 0) > 0)) ||
       (item.prior_unallowed_at_risk ?? 0) > 0
     );
   if (dated) {
@@ -756,6 +761,10 @@ export function isVacationHomeExcluded(item: EItem): boolean {
 
 export function isVacationHomeLimited(item: EItem): boolean {
   if (item.property_type === 6) return false;
+  if (item.expense_allocation_source?.use_pattern === RentalUsePattern.MainHomeConversion) {
+    allocateRentalExpenses(item.expense_allocation_source, item.fair_rental_days, item.personal_use_days);
+    return false;
+  }
   // IRC §280A(d)(1): personal use exceeds the GREATER of 14 days or 10%.
   const pud = item.personal_use_days;
   const frd = item.fair_rental_days;
@@ -1047,6 +1056,7 @@ function form8582Outputs(
         : computePropertyNet(item),
       prior_unallowed_operating: item.prior_unallowed_passive_operating ?? 0,
       prior_year_8582_source: item.prior_year_8582_source,
+      reconstructed_prior_loss_source: item.reconstructed_prior_loss_source,
       first_year_activity_source: item.first_year_activity_source,
       prior_active_participation:
         item.prior_passive_losses_active_when_incurred,
@@ -1395,6 +1405,101 @@ function form8990Outputs(items: EItems): NodeOutput[] {
   );
 }
 
+/** A retained PAL is not a current rental or a vacation-home deduction.
+ * Preserve its reviewed opening evidence without inventing rental-use days.
+ * Call only after projectScheduleEItems validates the source and limitations. */
+export function isInactivePersonalCarryover(item: EItem, daysInYear: number): boolean {
+  return item.fair_rental_days === 0 &&
+    item.personal_use_days === daysInYear &&
+    item.activity_id !== undefined &&
+    item.property_type !== 6 &&
+    item.activity_type === "B" &&
+    item.reconstructed_prior_loss_source !== undefined &&
+    item.loss_limitations_review !== undefined &&
+    (item.prior_unallowed_passive_operating ?? 0) +
+        (item.prior_unallowed_passive_4797_part1 ?? 0) +
+        (item.prior_unallowed_passive_4797_part2 ?? 0) > 0 &&
+    item.rent_income === 0 && (item.royalties_income ?? 0) === 0 &&
+    computeExpenses(item) === 0 &&
+    (item.expense_depreciation_amt ?? 0) === 0 &&
+    (item.section_179 ?? 0) === 0 &&
+    (item.section_1231_gain_loss ?? 0) === 0 &&
+    (item.qbi_override ?? 0) === 0 &&
+    (item.qbi_w2_wages ?? 0) === 0 &&
+    (item.qbi_unadjusted_basis ?? 0) === 0 &&
+    item.qbi_trade_or_business !== "Y" &&
+    (item.disallowed_mortgage_interest_8990 ?? 0) === 0 &&
+    (item.disallowed_other_interest_8990 ?? 0) === 0 &&
+    item.current_property_source === undefined &&
+    (item.passive_property_sales?.length ?? 0) === 0 &&
+    item.disposed_of !== true && item.placed_in_service !== true &&
+    item.first_year_activity_source === undefined;
+}
+
+/** Shared engine/paper/carryover projection. Source amounts remain annual and
+ * ownership-unadjusted; only the returned expense fields are rental amounts.
+ * Reprojecting reconciles those fields rather than allocating them again. */
+export function projectScheduleEItems(items: EItems, taxYear: number): EItems {
+  const parsedItems = z.array(itemSchema).parse(items);
+  assertTy2025OnlyFacts(taxYear, parsedItems);
+  const daysInYear = (Date.UTC(taxYear + 1, 0, 1) - Date.UTC(taxYear, 0, 1)) / 86400000;
+  const projected = parsedItems.map((item) => {
+    if (item.fair_rental_days > daysInYear || item.personal_use_days > daysInYear ||
+      (item.days_owned_in_year ?? 0) > daysInYear) throw new Error("Schedule E use days exceed the actual return-year calendar");
+    const source = item.expense_allocation_source;
+    if (!source) {
+      if (isHistoricalTaxYear(taxYear) && item.personal_use_days > 0 &&
+        !isInactivePersonalCarryover(item, daysInYear)) {
+        throw new Error("Historical mixed personal/rental use requires reviewed per-expense allocation evidence; an inactive carryover requires reviewed opening losses and no current rental income, expenses or sales");
+      }
+      return item;
+    }
+    if (source.tax_year !== taxYear || source.activity_id !== item.activity_id) throw new Error("Rental expense allocation year/activity differs from the property");
+    if (item.current_property_source || item.tax_court_method === true || (item.operating_expenses_carryover ?? 0) > 0) throw new Error("Rental expense allocation cannot replace separate property sources or unsupported vacation-home carryovers/methods");
+    // A nonrental remainder can be prepaid or nondeductible, including repayments.
+    // Neither occupancy nor its label establishes Schedule A eligibility.
+    if (item.main_home_or_second_home === true && (item.occupancy_percent ?? 0) > 0 &&
+      source.expenses.some(expense => expense.source_amount > 0 &&
+        (expense.category === RentalExpenseCategory.MortgageInterest ||
+          expense.category === RentalExpenseCategory.Taxes))) {
+      throw new Error("Allocated rental interest/taxes cannot auto-route a personal deduction; disable the Schedule E personal-expense routing and enter separately reviewed Schedule A inputs");
+    }
+    const allocated = allocateRentalExpenses(source, item.fair_rental_days, item.personal_use_days);
+    for (const [field, amount] of Object.entries(allocated.fields)) {
+      const existing = Reflect.get(item, field);
+      if (existing !== undefined && existing !== amount) throw new Error(`Rental expense allocation differs from ${field}; source and supplied deductible amount cannot be added twice`);
+    }
+    if (item.expense_other_lines && JSON.stringify(item.expense_other_lines) !== JSON.stringify(allocated.otherLines)) throw new Error("Rental expense allocation differs from supplied other expense lines");
+    return {...item, ...allocated.fields, expense_other_lines:allocated.otherLines};
+  });
+  for (const item of projected) {
+    validateItem(item);
+    if (item.first_year_activity_source &&
+      Number(item.first_year_activity_source.activity_acquired_on.slice(0, 4)) !== taxYear) {
+      throw new Error("Schedule E first-year activity acquisition must match the return year");
+    }
+    const reconstructed = item.reconstructed_prior_loss_source;
+    if (reconstructed && (
+      reconstructed.tax_year !== taxYear - 1 ||
+      reconstructed.activity_id !== item.activity_id ||
+      reconstructed.operating !== item.prior_unallowed_passive_operating ||
+      reconstructed.form4797_part1 !== item.prior_unallowed_passive_4797_part1 ||
+      reconstructed.form4797_part2 !== item.prior_unallowed_passive_4797_part2 ||
+      item.prior_year_8582_source !== undefined ||
+      !item.loss_limitations_review
+    )) throw new Error("Reconstructed rental opening losses require consecutive activity/character evidence and resolved basis, at-risk and QBI limitations");
+    if (
+      item.some_investment_not_at_risk === true ||
+      (item.prior_unallowed_at_risk ?? 0) > 0
+    ) {
+      throw new Error(
+        "Schedule E at-risk activity needs a per-property Form 6198 computation",
+      );
+    }
+  }
+  return projected;
+}
+
 // ─── Node class ───────────────────────────────────────────────────────────────
 
 class ScheduleENode extends TaxNode<typeof inputSchema> {
@@ -1415,9 +1520,13 @@ class ScheduleENode extends TaxNode<typeof inputSchema> {
 
   compute(ctx: NodeContext, input: z.infer<typeof inputSchema>): NodeResult {
     const parsed = inputSchema.parse(input);
-    assertTy2025OnlyFacts(ctx.taxYear, parsed);
+    const filedRecord = parsed.filed_2024_form8582_record;
+    if (filedRecord && filedRecord.tax_year !== ctx.taxYear - 1) {
+      throw new Error("Schedule E filed prior-loss record must be from the immediately preceding return year");
+    }
+    const schedule_es = projectScheduleEItems(parsed.schedule_es, ctx.taxYear);
     const {
-      schedule_es,
+      // Property consumers below use the shared projection, never the raw rows.
       rental_income,
       royalty_income,
       farm_rental_net,
@@ -1468,24 +1577,14 @@ class ScheduleENode extends TaxNode<typeof inputSchema> {
       return { outputs: [] };
     }
 
-    for (const item of schedule_es) {
-      validateItem(item);
-      if (
-        item.some_investment_not_at_risk === true ||
-        (item.prior_unallowed_at_risk ?? 0) > 0
-      ) {
-        throw new Error(
-          "Schedule E at-risk activity needs a per-property Form 6198 computation",
-        );
-      }
-    }
 
     const propertyNet = schedule_es.reduce(
       (sum, item) => sum + computePropertyNet(item),
       0,
     );
-    const eicRoyalty = scheduleERoyaltyEicAmounts(parsed);
-    const eicPassiveIncome = scheduleEPassiveEicIncome(parsed);
+    const prepared = {...parsed, schedule_es};
+    const eicRoyalty = scheduleERoyaltyEicAmounts(prepared);
+    const eicPassiveIncome = scheduleEPassiveEicIncome(prepared);
     const totalNet = propertyNet + passthroughRental + passthroughRoyalty +
       (farm_rental_net ?? 0) +
       (estate_trust_rows ?? []).reduce(
@@ -1503,7 +1602,7 @@ class ScheduleENode extends TaxNode<typeof inputSchema> {
     const passiveLossOutputs = entireLoss === undefined
       ? form8582Outputs(schedule_es, farms)
       : [];
-    if (parsed.filed_2024_form8582_record) {
+    if (filedRecord) {
       const form8582Input = passiveLossOutputs.find((item) =>
         item.nodeType === "form8582"
       )?.fields;
@@ -1513,7 +1612,7 @@ class ScheduleENode extends TaxNode<typeof inputSchema> {
         );
       }
       reconcileFiled2024Form8582Record(
-        parsed.filed_2024_form8582_record,
+        filedRecord,
         form8582Input,
       );
     }
@@ -1536,7 +1635,12 @@ class ScheduleENode extends TaxNode<typeof inputSchema> {
       ...form8990Outputs(schedule_es),
     ];
 
-    return { outputs };
+    return {
+      outputs,
+      ...(schedule_es.some(item => item.expense_allocation_source)
+        ? {finalizations:[{nodeType:this.nodeType,fields:{schedule_es}}]}
+        : {}),
+    };
   }
 }
 

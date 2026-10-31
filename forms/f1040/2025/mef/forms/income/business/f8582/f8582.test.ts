@@ -1440,3 +1440,27 @@ test("Form 8582: other passive overall gain releases prior loss", () => {
   assertStringIncludes(xml, "<OverallGainAmt>2000</OverallGainAmt>");
   assertEquals(xml.includes("<ParentWrkshtLossGrp>"), false);
 });
+
+test("Form 8582 links raw expense sources to the allocated loss rather than annual amounts", () => {
+  for (const taxYear of [2025,2026]) {
+    const pending = {schedule_e:{schedule_es:reorderedActivityCase.pending.schedule_e.schedule_es.map(item=>({
+      ...item,expense_utilities:undefined,
+      expense_allocation_source:{
+        tax_year:taxYear,activity_id:item.activity_id,source_reference:"Synthetic expense ledger",
+        use_pattern:"rental-only",rental_period:{from:`${taxYear}-01-01`,through:`${taxYear}-12-31`},
+        no_personal_use_during_rental_period:true,amounts_before_ownership_allocation:true,
+        expenses:[{expense_id:"utilities",category:"expense_utilities",transaction_kind:"expense",
+          source_amount:item.expense_utilities*2,source_reference:"Synthetic utilities",paid_on:`${taxYear}-12-31`,
+          expense_period:{from:`${taxYear}-01-01`,through:`${taxYear}-12-31`},
+          method:"documented-share",rental_share:0.5,method_reference:"Reviewed rental-unit share"}],
+      },
+    }))}};
+    const before = JSON.stringify(pending);
+    const xml = form8582.build(reorderedActivityCase.fields,{pending,taxYear});
+    assertStringIncludes(xml,"<NonParticipateActivityNm>Loss A</NonParticipateActivityNm>");
+    assertEquals(JSON.stringify(pending),before);
+    assertThrows(()=>form8582.build(reorderedActivityCase.fields,{
+      pending,taxYear:taxYear===2025?2026:2025,
+    }),Error,"allocation year/activity");
+  }
+});

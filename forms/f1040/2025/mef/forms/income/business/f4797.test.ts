@@ -253,7 +253,7 @@ test("Form 4797: linked passive property sale rows populate native Parts I and I
   );
 });
 
-test("Form 4797: retained sale and prior PAL reconcile in both native parts", () => {
+test("Form 4797: retained sales cannot release unsupported prior Parts I and II PAL", () => {
   const sales = [
     {
       activity_id: "id-Land rental",
@@ -280,7 +280,7 @@ test("Form 4797: retained sale and prior PAL reconcile in both native parts", ()
       entire_activity_interest_disposed: false,
     },
   ];
-  const xml = form4797.build({ passive_property_sales: sales }, {
+  const context = {
     pending: {
       schedule_e: {
         schedule_es: [{
@@ -333,22 +333,17 @@ test("Form 4797: retained sale and prior PAL reconcile in both native parts", ()
         ],
       },
     },
-  });
-  assertStringIncludes(
-    xml,
-    "<TotalPropertyGainLossAmt>5000</TotalPropertyGainLossAmt>",
-  );
-  assertStringIncludes(
-    xml,
-    "<TotalOrdinaryGainLossAmt>1000</TotalOrdinaryGainLossAmt>",
-  );
-  assertStringIncludes(
-    xml,
-    "<PassiveActivityLossLiteralCd>PAL</PassiveActivityLossLiteralCd>",
+  };
+  // Aggregate Form 8582 amounts cannot authenticate a disposition. This
+  // mixed-character prior loss is outside the sourced operating-only route.
+  assertThrows(
+    () => form4797.build({ passive_property_sales: sales }, context),
+    Error,
+    "Schedule E prior passive loss with current disposition needs section 469(g) review",
   );
 });
 
-test("Form 4797: active-rental PAL uses finalized Form 8582 allowance", () => {
+test("Form 4797: an active-rental allowance cannot authorize an unsupported disposition", () => {
   const sale = {
     activity_id: "id-Rental house",
     activity_name: "Rental house",
@@ -361,7 +356,7 @@ test("Form 4797: active-rental PAL uses finalized Form 8582 allowance", () => {
     depreciation_allowed: 0,
     entire_activity_interest_disposed: false,
   };
-  const xml = form4797.build({ passive_property_sales: [sale] }, {
+  const context = {
     pending: {
       schedule_e: {
         schedule_es: [{
@@ -408,19 +403,128 @@ test("Form 4797: active-rental PAL uses finalized Form 8582 allowance", () => {
         modified_agi: 200_000,
       },
     },
-  });
-  assertStringIncludes(
-    xml,
-    "<PropertyDesc>PAL</PropertyDesc><GainOrLossAmt>-2000</GainOrLossAmt>",
+  };
+  assertThrows(
+    () => form4797.build({ passive_property_sales: [sale] }, context),
+    Error,
+    "Schedule E prior passive loss with current disposition needs section 469(g) review",
   );
-  assertStringIncludes(
-    xml,
-    "<PropertyDesc>Retained parcel</PropertyDesc>",
-  );
-  assertStringIncludes(
-    xml,
-    "<PassiveActivityLossLiteralCd>PAL</PassiveActivityLossLiteralCd>",
-  );
+});
+
+test("Form 4797: sourced retained sales preserve operating-only PAL on Schedule E", () => {
+  for (const activityType of ["A", "B"] as const) {
+    const sale = {
+      activity_id: "retained-rental",
+      activity_name: "Retained rental",
+      part: "II",
+      property_description: "Short-held parcel",
+      acquired_on: "2025-01-01",
+      sold_on: "2025-06-01",
+      gross_sales_price: 8_000,
+      cost_or_other_basis: 5_000,
+      depreciation_allowed: 0,
+      entire_activity_interest_disposed: false,
+      buyer_unrelated: true,
+      fully_taxable: true,
+      installment_method: false,
+      disposition_document_reference: "Synthetic 2025 partial parcel closing",
+    };
+    const prior = {
+      tax_year: 2024,
+      activity_id: sale.activity_id,
+      filed_part_vii_column_c: 8_000,
+      source_document_reference: "Synthetic filed 2024 Form 8582 Part VII",
+    };
+    const property = {
+      tsj: "T",
+      activity_id: sale.activity_id,
+      property_description: sale.activity_name,
+      property_type: 1,
+      activity_type: activityType,
+      fair_rental_days: 365,
+      personal_use_days: 0,
+      rent_income: 0,
+      form_1099_payments_made: false,
+      expense_taxes: 5_000,
+      disposed_of: true,
+      passive_property_sales: [sale],
+      prior_unallowed_passive_operating: 8_000,
+      prior_passive_losses_active_when_incurred: activityType === "A",
+      prior_year_8582_source: prior,
+    };
+    const passive = {
+      activities: [{
+        activity_id: sale.activity_id,
+        name: sale.activity_name,
+        activity_type: activityType,
+        property_type: 1,
+        reporting_form: "schedule_e",
+        current_net: -5_000,
+        prior_unallowed_operating: 8_000,
+        prior_active_participation: activityType === "A",
+        prior_year_8582_source: prior,
+        prior_unallowed_4797_part1: 0,
+        prior_unallowed_4797_part2: 0,
+      }],
+      current_loss: 5_000,
+      prior_unallowed: 8_000,
+      has_other_passive: activityType === "B",
+      ...(activityType === "A"
+        ? {
+          rental_current_loss: 5_000,
+          rental_prior_eligible_loss: 8_000,
+          has_active_rental: true,
+          active_participation: true,
+          filing_status: "single",
+          modified_agi: 140_000,
+        }
+        : {}),
+      has_current_4797_transaction: true,
+      current_4797_sale_gains: [{
+        activity_id: sale.activity_id,
+        activity_name: sale.activity_name,
+        part: sale.part,
+        gain: 3_000,
+        entire_activity_interest_disposed: false,
+      }],
+    };
+    const context = {
+      pending: {
+        schedule_e: { schedule_es: [property] },
+        form8582: passive,
+      },
+    };
+    const xml = form4797.build({ passive_property_sales: [sale] }, context);
+    assertStringIncludes(xml, "<PropertyDesc>Short-held parcel</PropertyDesc>");
+    assertStringIncludes(
+      xml,
+      "<TotalOrdinaryGainLossAmt>3000</TotalOrdinaryGainLossAmt>",
+    );
+    // Operating PAL stays on Schedule E; it is not a second Form 4797 loss.
+    assertEquals(xml.includes("<PassiveActivityLossLiteralCd>"), false);
+    assertThrows(
+      () => form4797.build({ passive_property_sales: [sale] }, {
+        pending: {
+          ...context.pending,
+          schedule_e: {
+            schedule_es: [{ ...property, prior_year_8582_source: undefined }],
+          },
+        },
+      }),
+      Error,
+      "section 469(g) review",
+    );
+    assertThrows(
+      () => form4797.build({ passive_property_sales: [sale] }, {
+        pending: {
+          ...context.pending,
+          form8582: { ...passive, current_4797_sale_gains: [] },
+        },
+      }),
+      Error,
+      "matching Form 8582 sale allocation",
+    );
+  }
 });
 
 test("Form 4797: Form 6252 section 1231 gain appears on line 4 and line 7", () => {
@@ -629,4 +733,30 @@ test("Form 4797: amounts must be whole dollars", () => {
     Error,
     "negative",
   );
+});
+
+test("Form 4797 detects an allocated rental loss before releasing passive sale income", () => {
+  const fields = {passive_property_sales:[{
+    activity_id:"allocated-rental",activity_name:"Synthetic rental",part:"II",
+    property_description:"Short-held parcel",acquired_on:"2025-01-01",sold_on:"2025-06-01",
+    gross_sales_price:9000,cost_or_other_basis:7000,depreciation_allowed:0,
+  }]};
+  const pending = {schedule_e:{schedule_es:[{
+    tsj:"T",activity_id:"allocated-rental",property_description:"Synthetic rental",
+    property_type:1,activity_type:"B",fair_rental_days:365,personal_use_days:0,
+    rent_income:0,form_1099_payments_made:false,disposed_of:true,
+    expense_allocation_source:{
+      tax_year:2025,activity_id:"allocated-rental",source_reference:"Synthetic expense ledger",
+      use_pattern:"rental-only",rental_period:{from:"2025-01-01",through:"2025-12-31"},
+      no_personal_use_during_rental_period:true,amounts_before_ownership_allocation:true,
+      expenses:[{expense_id:"insurance",category:"expense_insurance",transaction_kind:"expense",
+        source_amount:2000,source_reference:"Synthetic insurer",paid_on:"2025-01-01",
+        expense_period:{from:"2025-01-01",through:"2025-12-31"},
+        method:"documented-share",rental_share:0.5,method_reference:"Reviewed rental-unit share"}],
+    },
+  }]}};
+  assertThrows(()=>form4797.build(fields,{pending,taxYear:2025}),
+    Error,"matching Form 8582 sale allocation");
+  assertThrows(()=>form4797.build(fields,{pending,taxYear:2026}),
+    Error,"allocation year/activity");
 });

@@ -39,7 +39,9 @@ test("benchmark recursively discovers form/year cases and rejects incomplete or 
   const root = await sys.makeTempDir();
   const one = await caseDirectory(root, "f1040/2025/01");
   const two = await caseDirectory(root, "f1040/2025/02");
-  assertEquals(await discoverBenchmarkCases(root), [one, two]);
+  const discovery = await discoverBenchmarkCases(root);
+  assertEquals(discovery.found, [one, two]);
+  assertEquals(discovery.excluded, []);
   await fs.mkdir(join(root, "f1040/2025/03"));
   await assertRejects(
     () => discoverBenchmarkCases(root),
@@ -269,7 +271,7 @@ test("discovery rejects an expected file whose source is the engine, and accepts
     source:
       "IRS Pub 17 TY2025, Chapter 8, p. 68. All values IRS-stated, none computed by agent.",
   });
-  assertEquals(await discoverBenchmarkCases(cited), [directory]);
+  assertEquals((await discoverBenchmarkCases(cited)).found, [directory]);
 });
 
 test("discovery reports every invalid case in one error, not just the first", async () => {
@@ -324,7 +326,7 @@ test("known-invalid cases are allowed by the baseline until it expires, and a st
   assertEquals(stale.allowed, 0);
 });
 
-test("the runners skip a baselined invalid case until its entry expires, and still fail on any other", async () => {
+test("discovery reports baselined exclusions until expiry without excluding valid cases", async () => {
   const root = await sys.makeTempDir();
   const valid = await caseDirectory(root, "f1040/2025/01");
   await caseWith(root, "f1040/2025/02", [start, {
@@ -339,9 +341,32 @@ test("the runners skip a baselined invalid case until its entry expires, and sti
   };
   const year = join(root, "f1040/2025");
   const known = { casesRoot: root, baseline: [entry], today: "2026-10-16" };
-  assertEquals(await discoverBenchmarkCases(year, undefined, known), [valid]);
+  const discovery = await discoverBenchmarkCases(year, undefined, known);
+  assertEquals(discovery.found, [valid]);
+  assertEquals(discovery.excluded.map((excluded) => excluded.case), [
+    "f1040/2025/02",
+  ]);
   await assertRejects(() => discoverBenchmarkCases(year));
   await assertRejects(() =>
     discoverBenchmarkCases(year, undefined, { ...known, today: "2027-02-01" })
   );
+});
+
+test("published-line oracles require explicit scope, authority and disclosed synthetic inputs", () => {
+  const published = {
+    oracle_scope: "published_lines",
+    source: "IRS 2023 Form 1040 Tax Table, page 3 Example",
+    synthetic_inputs: "Synthetic wages bridge the published taxable income through the real CLI; no return balance is an oracle",
+    correct: { line15_taxable_income: 25300, line16_income_tax: 2599 },
+  };
+  assertEquals(benchmarkExpectedSchema.parse(published), published.correct);
+  for (const invalid of [
+    { correct: published.correct },
+    { ...published, oracle_scope: "reviewed_synthetic" },
+    { ...published, source: "" },
+    { ...published, synthetic_inputs: undefined },
+    { ...published, correct: {} },
+    { ...published, correct: { line16_income_tax: NaN } },
+  ]) assertThrows(() => benchmarkExpectedSchema.parse(invalid));
+  assertThrows(() => benchmarkExpectedSchema.parse({ correct: { line24_total_tax: 100, line37_amount_owed: 100 } }));
 });

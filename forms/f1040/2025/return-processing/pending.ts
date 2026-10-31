@@ -7,6 +7,8 @@
  * most recently computed value). Independent Schedule E sources are additive.
  * Form 8995 QBI contributions are additive, as in its calculation input.
  * Form 4952 source arrays retain their per-payer amounts for export review.
+ * Form 8962 monthly source vectors retain all twelve positions.
+ * Historical Form 461 K-1 business amounts are signed additive contributions.
  */
 const additiveNumericKeys = new Set([
   "line2g_pab_interest",
@@ -28,7 +30,10 @@ export function normalizePendingDict(
       value.length > 0 &&
       value.every((v) => typeof v === "number")
     ) {
-      result[key] = nodeType === "form4952" && key.startsWith("source_")
+      result[key] = (nodeType === "form4952" && key.startsWith("source_")) ||
+          (nodeType === "form8962" &&
+            (key === "monthly_premiums" || key === "monthly_slcsps" ||
+              key === "monthly_aptcs"))
         ? value
         : additiveNumericKeys.has(key) ||
             (nodeType === "agi_aggregator" &&
@@ -37,6 +42,7 @@ export function normalizePendingDict(
                 key === "pal_current_income" ||
                 key === "pal_rental_income")) ||
             (nodeType === "form8995" && key === "qbi") ||
+            (nodeType === "form461" && key === "historical_k1_business_income_loss") ||
             (nodeType === "form8582" &&
               (key === "current_income" || key === "rental_current_income"))
         ? value.reduce((sum, amount) => sum + amount, 0)

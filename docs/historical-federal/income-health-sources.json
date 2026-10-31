@@ -1,0 +1,196 @@
+{
+  "purpose": "Historical federal income and health source contracts; synthetic regressions are not IRS publication oracles.",
+  "sources": [
+    {
+      "id": "ptc-unemployment-2021",
+      "title": "2021 Instructions for Form 8962",
+      "tax_year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/i8962--2021.pdf",
+      "pinpoint": "Pages 6 and 8: line A unemployment certification and line 5; Tables 1-1 through 1-3, 2, and 5",
+      "sha256": "e4b4e5fa151c6964ec763c727288efc36672ecec1536a006aa0449f9adb6dd48",
+      "retrieved_on": "2026-10-30",
+      "rule_or_retained_excerpt": "If you, or your spouse (if filing a joint return), received, or were approved to receive, unemployment compensation for any week beginning in 2021, enter 133 on line 5."
+    },
+    {
+      "id": "ptc-2023",
+      "title": "2023 Instructions for Form 8962",
+      "tax_year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/i8962--2023.pdf",
+      "pinpoint": "Part I lines 4\u20138; monthly lines 12\u201323; Table 5",
+      "sha256": "a9a9e5989ac3a64239afb8aff4ee03c255b998580ef7ced8b86042a5bcd0e787",
+      "retrieved_on": "2026-10-30",
+      "rule_or_retained_excerpt": "One-month coverage uses the monthly contribution, not a full-year contribution. The 2023 single 200%\u2013300% repayment limit is $900."
+    },
+    {
+      "id": "hsa-2021",
+      "title": "2021 Instructions for Form 8889, Health Savings Accounts",
+      "tax_year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/i8889--2021.pdf",
+      "pinpoint": "Part I lines 2, 3, 7, 9 and Employer Contribution Worksheet; Parts II/III lines 14\u201321",
+      "sha256": "d7fdfb332c1ab9c3fa490f5a020d14fb17742c53d51071696095ec975ea40991",
+      "retrieved_on": "2026-10-30",
+      "rule_or_retained_excerpt": "Use contribution-year limits for last-month-rule recapture. W-2 code W subtracts current-year deposits for the preceding year and adds following-year deposits designated for the current year. Distributions and withdrawn earnings belong to the actual distribution year."
+    },
+    {
+      "id": "hsa-2022",
+      "title": "2022 Instructions for Form 8889, Health Savings Accounts",
+      "tax_year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/i8889--2022.pdf",
+      "pinpoint": "Part I lines 2, 3, 7, 9 and Employer Contribution Worksheet; Parts II/III lines 14\u201321",
+      "sha256": "95a142f32936dbe69b97c7f6ad1240d238afb4ced23d01fcb95fa07e5c275c39",
+      "retrieved_on": "2026-10-30",
+      "rule_or_retained_excerpt": "Use contribution-year limits for last-month-rule recapture. W-2 code W subtracts current-year deposits for the preceding year and adds following-year deposits designated for the current year. Distributions and withdrawn earnings belong to the actual distribution year."
+    },
+    {
+      "id": "hsa-2023",
+      "title": "2023 Instructions for Form 8889, Health Savings Accounts",
+      "tax_year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/i8889--2023.pdf",
+      "pinpoint": "Part I lines 2, 3, 7, 9 and Employer Contribution Worksheet; Parts II/III lines 14\u201321",
+      "sha256": "2006a4ec75bfbdfa4a6f74eb141e8b659633bafdc50c3dc0d57cf95f5079d370",
+      "retrieved_on": "2026-10-30",
+      "rule_or_retained_excerpt": "Use contribution-year limits for last-month-rule recapture. W-2 code W subtracts current-year deposits for the preceding year and adds following-year deposits designated for the current year. Distributions and withdrawn earnings belong to the actual distribution year."
+    },
+    {
+      "id": "hsa-2024",
+      "title": "2024 Instructions for Form 8889, Health Savings Accounts",
+      "tax_year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/i8889--2024.pdf",
+      "pinpoint": "Part I lines 2, 3, 7, 9 and Employer Contribution Worksheet; Parts II/III lines 14\u201321",
+      "sha256": "accd65700f75c26127e835d13969c2c44d46c821a4748c57ce74c532c6c65392",
+      "retrieved_on": "2026-10-30",
+      "rule_or_retained_excerpt": "Use contribution-year limits for last-month-rule recapture. W-2 code W subtracts current-year deposits for the preceding year and adds following-year deposits designated for the current year. Distributions and withdrawn earnings belong to the actual distribution year."
+    },
+    {
+      "id": "ptc-insurance-2021",
+      "title": "2021 Publication 974, Premium Tax Credit",
+      "tax_year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/p974--2021.pdf",
+      "pinpoint": "Pages 57\u201364: Worksheets W/X and Iterative Calculation Method; QSEHRA Worksheets N/Q",
+      "sha256": "6b05a07c23240df583d9d05ff20e528ee91b5c1266249b51c9f6146d050bca4c",
+      "retrieved_on": "2026-10-30",
+      "rule_or_retained_excerpt": "Worksheet W establishes the earned-income limit; Worksheet X computes the provisional repayment cap; iteration reconciles the deduction and PTC without feeding guessed MAGI back into the graph."
+    },
+    {
+      "id": "ptc-insurance-2023",
+      "title": "2023 Publication 974, Premium Tax Credit",
+      "tax_year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/p974--2023.pdf",
+      "pinpoint": "Pages 50\u201354: Worksheets W/X and Iterative Calculation Method",
+      "sha256": "d6eb61a351de688cae189dbba727e0b0ce375627b0870162182b93c32ad607f7",
+      "retrieved_on": "2026-10-30",
+      "rule_or_retained_excerpt": "Worksheet X line 17b uses the actual-year Form 8962 poverty table; lines 15, 19, and 22 use the actual-year repayment limits."
+    },
+    {
+      "id": "restaurant-meals",
+      "title": "Notice 2021-25, Temporary 100-Percent Deduction for Business Meal Expenses",
+      "tax_year": [
+        2021,
+        2022
+      ],
+      "url": "https://www.irs.gov/pub/irs-drop/n-21-25.pdf",
+      "pinpoint": "Sections II\u2013IV, pages 2\u20133",
+      "sha256": "df928ef18b7c42bf8a314436e8a4b0fe29ea1a68d722978526391515e854eb65",
+      "retrieved_on": "2026-10-30",
+      "rule_or_retained_excerpt": "Section 274(n)(2)(D) applies to amounts paid or incurred after December 31, 2020, and before January 1, 2023."
+    },
+    {
+      "id": "partnership-2023",
+      "title": "2023 Partner's Instructions for Schedule K-1 (Form 1065)",
+      "tax_year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/i1065sk1--2023.pdf",
+      "pinpoint": "Pages 3\u20135: Limitations on Losses, Deductions, and Credits; Basis Limitations; partner basis worksheet",
+      "sha256": "55f495f047e50ca7e3f73173c7caf3ef8942a6bb159801b230e3d36f16d9754e",
+      "retrieved_on": "2026-10-30",
+      "rule_or_retained_excerpt": "The limitations apply in the order basis, at-risk, and passive activity. The capital account is not outside basis; disallowed losses retain their reporting character."
+    },
+    {
+      "id": "shareholder-2023",
+      "title": "2023 Shareholder's Instructions for Schedule K-1 (Form 1120-S)",
+      "tax_year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/i1120ssk--2023.pdf",
+      "pinpoint": "Pages 2\u20134: Basis Limitations, At-Risk Limitations, Passive Activity Limitations",
+      "sha256": "b6472773bcbd9151df487cf5d20d0726312b24d0794e855eca9351d00b6367bc",
+      "retrieved_on": "2026-10-30",
+      "rule_or_retained_excerpt": "Shareholder losses are limited by stock and direct debt basis, then at-risk and passive limitations. Supplied K-1 income is not self-employment income."
+    },
+    {
+      "id": "form461-attachment-2021",
+      "title": "2021 Form 461",
+      "tax_year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f461--2021.pdf",
+      "pinpoint": "Line 16 attachment direction",
+      "sha256": "3b9aa7edb02418c8a9513ae695333a2495819967bcdbf8ce9c5faacea59d8a28",
+      "rule_or_retained_excerpt": "If zero or greater, do not attach this form to your tax return."
+    },
+    {
+      "id": "form461-attachment-2022",
+      "title": "2022 Form 461",
+      "tax_year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/f461--2022.pdf",
+      "pinpoint": "Line 16 attachment direction",
+      "sha256": "0934e617bbee1d6cf5ec1668dcea384d4acb87b4dba5c3d6a37fec125c753946",
+      "rule_or_retained_excerpt": "If zero or greater, do not attach this form to your tax return."
+    },
+    {
+      "id": "form461-attachment-2023",
+      "title": "2023 Form 461",
+      "tax_year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/f461--2023.pdf",
+      "pinpoint": "Line 16 attachment direction",
+      "sha256": "8cae2d9cab6ad1f5caf80878d3cb6cb978a824af3837834073fa017e8bfddfd6",
+      "rule_or_retained_excerpt": "If zero or greater, do not attach this form to your tax return."
+    },
+    {
+      "id": "form461-filing-transition-2024",
+      "title": "2024 Instructions for Form 461",
+      "tax_year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/i461--2024.pdf",
+      "pinpoint": "Page 1, What\u2019s New and Who Must File",
+      "sha256": "9a9746b7e1d3865a458ce9aec298cc2064a42876b6ed19daf240c25384af8378",
+      "rule_or_retained_excerpt": "New filing rules for 2024 add a loss greater than $152,500 on any line 1 through 8, in addition to aggregate business losses greater than $305,000 ($610,000 joint)."
+    },
+    {
+      "id": "form461-ordering-2023",
+      "title": "2023 Instructions for Form 461",
+      "tax_year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/i461--2023.pdf",
+      "pinpoint": "Page 1, Ordering Rules and Who Must File; page 2, line 5",
+      "sha256": "c3b2bb2c3b5061b6051cfba1a1d62406f1af6d08b98f0eba571bbd59f52b3a6d",
+      "rule_or_retained_excerpt": "Apply at-risk, then passive, then excess-business-loss limitations. Schedule E partnership/S-corporation items enter line 5. Employee wages do not offset business losses for section 461."
+    },
+    {
+      "id": "form7206-marketplace-2023",
+      "title": "2023 Instructions for Form 7206",
+      "tax_year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/i7206--2023.pdf",
+      "pinpoint": "Page 1, How to figure the deduction and Marketplace caution",
+      "sha256": "99a3ddda6687882664e98012ccc9d4363d296138b08a51ca760395522e41c1ce",
+      "rule_or_retained_excerpt": "The Form1040 worksheet generally applies. Form7206 is required for multiple SE income sources, Form2555, or qualified long-term-care insurance. Marketplace coverage with APTC/PTC uses Publication974."
+    }
+  ],
+  "public_input_contracts": {
+    "f1095a": "Per-policy unemployment_compensation_2021: {recipient: taxpayer|spouse, received_or_approved: true, source_reference, no_one_can_claim_recipient: true}. Only 2021; spouse requires joint return. Conflicting copies reject. Output form8962.unemployment_compensation_ind maps 2021 line A.",
+    "general": "ptc_residence_states and ptc_residence_months describe the selected return year. Retired 2025-suffixed keys reject rather than silently strip.",
+    "form8889": "Employer year fields: made_in_tax_year_for_prior_year_in_w2 and made_in_following_year_for_tax_year. Prior excess and last-month evidence must identify taxYear-1; post-year withdrawals identify taxYear+1. Source cents retained. Printed forms remain owner-specific print_line fields.",
+    "qsehra": "Historical positive benefits require qsehra_source {tax_year, employer_ein, notice_reference, benefit_start_date, benefit_end_date}; monthly benefit facts must fall inside the reviewed current-year period.",
+    "form7206": "Historical pub974_single_business requires owner_identity {recipient:T, recipient_ssn}. The identified ScheduleC/ScheduleSE source is reconciled before emitting pub974_filing_row with exact computed Worksheets W/X, final line14 deduction, attributable PTC and iteration count. This is a supporting Publication974 worksheet, not manufactured Form7206 numbered lines.",
+    "schedule_c": "restaurant_meals records are a subset of line_24b_meals, with amount, paid_or_incurred_on, restaurant_source_reference and business_meal_requirements_met:true. Only 2021\u20132022 dates qualify for temporary full deduction; date must match return year.",
+    "k1_partnership": "ordinary_loss_limitations documents current-year source, available outside basis, available at-risk amount, material participation, zero prior suspensions and absence of competing deductions. The supported nonpassive ordinary loss must fit both limits; binding limits require separate character-allocated carryover/Form6198 paths and reject.",
+    "k1_s_corp": "Supplied stock-only ordinary loss uses the existing reviewed Form7203 stock ledger and actual basis limitation. It requires material participation and reviewed absence of at-risk/passive limits/prior suspensions; no entity election is inferred."
+  },
+  "boundaries": [
+    "HSA eligibility is a reviewed monthly input; the engine does not infer qualifying HDHP status from an insurance product name or establish previously unknown excess as zero.",
+    "HSA current-year source nodes calculate tax-year distributions and next-year timely returns separately; retained postyear documents use filed_tax_year_w2, following_year_trustee_payment, following_year_owner_receipt. The existing 2025 paper/MeF retained-document validator still runtime-parses a 2026 withdrawal; generic years do not broaden that certified document route.",
+    "Publication974 deduction/PTC iteration retains one-business, whole-policy-month and no-special-adjustment conditions. Uniform full-year Form1095A columns select annual line11 in both trial and final calculations; other covered months use monthly rows. Annual FPL and repayment caps come from the selected year. Reconciliation requires Worksheet X's cap when annual law has caps and rejects a supplied cap when it has none.",
+    "The ordinary ScheduleC QBI filing consumer accepts a Publication974 source only after replaying the health producer and final PTC, matching the retained owner worksheet, identified business/SSN and finalized deduction. It preserves the existing ordinary-plan certifications and accepts a sourced zero deduction when full PTC covers the premiums. Its taxable-income reconciliation also subtracts the separate nonitemizer charitable deduction in the actual years where annual law permits it, including2021.",
+    "Shared pending normalization preserves Form8962 monthly_premiums, monthly_slcsps and monthly_aptcs as genuine source vectors, never last-value numeric scalars. It sums signed historical_k1_business_income_loss contributions so paper replay retains the same business offsets as computation. Incomplete source vectors remain invalid rather than being expanded or repaired.",
+    "Current-only S-corporation debt-evidence and first-year passive loss packages are not historical stock-only support; their separate source conditions must not be silently adopted.",
+    "Historical partnership/S-corporation nonordinary negative K1 characters require separate reviewed basis/at-risk/passive character-specific sources and are rejected independently of an ordinary-loss certificate. Signed historical_k1_business_income_loss combines partnership ordinary income/loss and guaranteed business payments, positive S-corporation ordinary income, and S-corporation allowed loss only after Form7203. It is a business-only aggregate, not complete ScheduleE line5. Known business profits offset known business losses before the aggregate C/F/K1 threshold; unknown rental income never silently offsets business losses. Actual required combined Form461 filings remain unsupported rather than entering the certified C/F-only path.",
+    "The Form461 any-line half-single-threshold attachment rule starts in2024;2021-2023 use the aggregate actual-filing-status threshold. A final pending-source validator uses the complete assembled Schedule1 line5 after every K1, PartI rental/royalty, basis and allowed-PAL contribution, without adding basis disallowance twice or feeding Form8582 back into the graph. Per-property expense/ownership/section280A projection and activity-ID-matched allowed operating PAL determine separate post-limitation rental nets. Positive K1 passive activities reconcile to issued owner/year/acquisition sources. Negative unclassified activity nets are tested separately, so unknown business classification blocks only when it can change the aggregate obligation; passive status and QBI safe harbor do not establish section162 business status. Reviewed linked nonbusiness royalties are counted once. The shared paper inventory reports actual coverage/classification exceptions as historical-owner-loss-coverage issues.",
+    "Current K1 QBI filing reconciliation receives the explicit tax year, validates source year and owner identity, uses annual thresholds, and includes the separately computed nonitemizer charitable deduction only in years where the annual configuration permits it (2021 and2026).",
+    "Existing 2025 Form8886 K-1 activity/capital consumers runtime-parse identity facts against the retained 2025 source-year schema; generalized individual K-1 inputs do not confer historical Form8886 support.",
+    "W-2 wages, 1099-G unemployment and plain ScheduleC/SE source arithmetic already use existing source-preserving routes and annual payroll configuration. The 2020 unemployment exclusion must not be applied to 2021."
+  ],
+  "verification": "Regression files written before implementation changes; no tests, builds, lint or formatters run by this worker. Parent performs integrated checks."
+}

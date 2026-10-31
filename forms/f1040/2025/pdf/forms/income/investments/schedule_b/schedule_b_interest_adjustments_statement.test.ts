@@ -27,7 +27,7 @@ test("Schedule B adjustment statement documents the gross-to-net calculation", a
     interest_oid_adjustment: 75,
     interest_bond_premium: 125,
     print_line2_total: 1_650,
-  }, filer);
+  }, filer, 2025);
   assertEquals(document.getPageCount(), 1);
   assertEquals(
     (await PDFDocument.load(await document.save())).getPageCount(),
@@ -43,7 +43,7 @@ test("Schedule B adjustment statement rejects a nonreconciling net", async () =>
         interest_line1_subtotal: 2_000,
         interest_nominee: 100,
         print_line2_total: 1_800,
-      }, filer),
+      }, filer, 2025),
     Error,
     "does not reconcile",
   );

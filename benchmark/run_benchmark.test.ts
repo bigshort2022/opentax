@@ -191,3 +191,29 @@ test("only provably inactive CLI balances become zero", () => {
     { line35a_refund: 10, line37_amount_owed: 20 },
   );
 });
+
+test("singleton balances prove only the absent side without replacing raw values", () => {
+  for (const [present, absent] of [
+    ["line35a_refund", "line37_amount_owed"],
+    ["line37_amount_owed", "line35a_refund"],
+  ]) {
+    const actual = benchmarkActualLines({ [present]: [312] }, {});
+    assertEquals(compareExpectedNumericLines(actual, { [present]: 312, [absent]: 0 }, 0), []);
+    assertEquals(actual[present], [312]);
+    for (const invalid of [[], [-1], [Infinity], [312, 312], ["312"]]) {
+      assertEquals(benchmarkActualLines({ [present]: invalid }, {})[absent], undefined);
+    }
+  }
+});
+
+test("singleton tax and payment totals can prove break-even but multiple totals cannot", () => {
+  const expected = { line35a_refund: 0, line37_amount_owed: 0 };
+  const actual = benchmarkActualLines({ line24_total_tax: [10], line33_total_payments: [10] }, {});
+  assertEquals(compareExpectedNumericLines(actual, expected, 0), []);
+  for (const taxes of [[10, 10], [], [NaN]]) {
+    assertEquals(
+      benchmarkActualLines({ line24_total_tax: taxes, line33_total_payments: [10] }, {}).line35a_refund,
+      undefined,
+    );
+  }
+});

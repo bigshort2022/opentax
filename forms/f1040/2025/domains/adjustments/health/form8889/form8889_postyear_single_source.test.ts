@@ -176,7 +176,7 @@ test("sole postyear source rejects owner, date, absent records, copy and finaliz
         p.form8889.eligible_hdhp_coverage_by_month[0] = "none";
       },
       (p) => {
-        p.form8889.retained_employer_postyear_evidence.filed_2025_w2.sha256 =
+        p.form8889.retained_employer_postyear_evidence.filed_tax_year_w2.sha256 =
           "0".repeat(64);
       },
     ];
@@ -188,9 +188,9 @@ test("sole postyear source rejects owner, date, absent records, copy and finaliz
     }
     for (
       const [kind, field, value] of [
-        ["trustee_2026_payment", "transaction_date", "2026-04-16"],
-        ["owner_2026_receipt", "owner_ssn", "999887777"],
-        ["trustee_2026_payment", "principal", 699],
+        ["following_year_trustee_payment", "transaction_date", "2026-04-16"],
+        ["following_year_owner_receipt", "owner_ssn", "999887777"],
+        ["following_year_trustee_payment", "principal", 699],
       ] as const
     ) {
       const pending: any = structuredClone(initial.pending);

@@ -12,8 +12,8 @@ const uniformSelfOnly = {
   age_55_or_older: false,
   last_month_rule_elected: false,
   employer_contribution_years: {
-    made_in_2025_for_2024_in_w2: 0,
-    made_in_2026_for_2025: 0,
+    made_in_tax_year_for_prior_year_in_w2: 0,
+    made_in_following_year_for_tax_year: 0,
   },
 };
 const priorExcessSource = {
@@ -178,8 +178,8 @@ test("Form 8889 two spouse HSAs allocate the family limit and combine Schedule 1
     family_allocation_source_reference:
       "Both spouses' signed 2025 HSA allocation",
     employer_contribution_years: {
-      made_in_2025_for_2024_in_w2: 0,
-      made_in_2026_for_2025: 0,
+      made_in_tax_year_for_prior_year_in_w2: 0,
+      made_in_following_year_for_tax_year: 0,
     },
     taxpayer_hsa_contributions: 4_000,
   };
@@ -844,8 +844,8 @@ test("Form 8889 two spouse HSAs reject unsupported excess and missing allocation
     allocated_family_limit: 4_275,
     family_allocation_source_reference: "Agreed family allocation",
     employer_contribution_years: {
-      made_in_2025_for_2024_in_w2: 0,
-      made_in_2026_for_2025: 0,
+      made_in_tax_year_for_prior_year_in_w2: 0,
+      made_in_following_year_for_tax_year: 0,
     },
     taxpayer_hsa_contributions: 4_000,
     hsa_december_31_value: 0,
@@ -938,8 +938,8 @@ test("Form 8889 paired HSA excess preserves each owner's Part VII source", () =>
     allocated_family_limit: 4_275,
     family_allocation_source_reference: "Agreed family allocation",
     employer_contribution_years: {
-      made_in_2025_for_2024_in_w2: 0,
-      made_in_2026_for_2025: 0,
+      made_in_tax_year_for_prior_year_in_w2: 0,
+      made_in_following_year_for_tax_year: 0,
     },
     taxpayer_hsa_contributions: 4_000,
     hsa_december_31_value: 10_000,
@@ -1421,8 +1421,8 @@ test("part1: employer contribution worksheet removes prior-year W-2 amounts and 
     ...uniformSelfOnly,
     employer_hsa_contributions: 3000,
     employer_contribution_years: {
-      made_in_2025_for_2024_in_w2: 500,
-      made_in_2026_for_2025: 1000,
+      made_in_tax_year_for_prior_year_in_w2: 500,
+      made_in_following_year_for_tax_year: 1000,
     },
     taxpayer_hsa_contributions: 500,
   });
@@ -1436,8 +1436,8 @@ test("part1: a 2026 deposit designated for 2025 reaches Form 8889 line 9 without
   const result = compute({
     ...uniformSelfOnly,
     employer_contribution_years: {
-      made_in_2025_for_2024_in_w2: 0,
-      made_in_2026_for_2025: 1000,
+      made_in_tax_year_for_prior_year_in_w2: 0,
+      made_in_following_year_for_tax_year: 1000,
     },
   });
   assertEquals(
@@ -1457,8 +1457,8 @@ test("part1: employer year worksheet cannot subtract more prior-year deposits th
         ...uniformSelfOnly,
         employer_hsa_contributions: 500,
         employer_contribution_years: {
-          made_in_2025_for_2024_in_w2: 501,
-          made_in_2026_for_2025: 0,
+          made_in_tax_year_for_prior_year_in_w2: 501,
+          made_in_following_year_for_tax_year: 0,
         },
       }),
     Error,
@@ -3043,7 +3043,7 @@ test("part3: unsupported or contradictory 2024 last-month-rule records stop", ()
         },
       }),
     Error,
-    "filed 2024 contribution lines that reconcile",
+    "filed prior-year contribution lines that reconcile",
   );
   assertThrows(() =>
     compute({
@@ -3104,7 +3104,7 @@ test("part3: 2024 last-month rule and prior-year IRA funding need separate recon
         },
       }),
     Error,
-    "combined 2024 last-month-rule and IRA funding recapture",
+    "combined prior-year last-month-rule and IRA funding recapture",
   );
 });
 
@@ -3582,8 +3582,8 @@ test("validation: a W-2 HSA contribution does not imply self-only coverage", () 
       compute({
         employer_hsa_contributions: 1000,
         employer_contribution_years: {
-          made_in_2025_for_2024_in_w2: 0,
-          made_in_2026_for_2025: 0,
+          made_in_tax_year_for_prior_year_in_w2: 0,
+          made_in_following_year_for_tax_year: 0,
         },
       }),
     Error,

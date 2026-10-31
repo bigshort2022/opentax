@@ -178,8 +178,8 @@ test("Form 8889 employer code-2 owner return reconciles W-2, 1099-SA, MeF, PDF, 
       }),
     },
     employer_contribution_years: {
-      made_in_2025_for_2024_in_w2: 0,
-      made_in_2026_for_2025: 0,
+      made_in_tax_year_for_prior_year_in_w2: 0,
+      made_in_following_year_for_tax_year: 0,
     },
     employer_excess_treatment: {
       amount_included_in_w2_box1: 0,

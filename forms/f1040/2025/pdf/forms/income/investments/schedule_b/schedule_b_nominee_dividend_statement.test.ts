@@ -24,7 +24,7 @@ test("Schedule B nominee dividend statement records gross, nominee, and net", as
     dividend_line5_subtotal: 1_000,
     dividend_nominee: 400,
     print_line6_total: 600,
-  }, filer);
+  }, filer, 2025);
   assertEquals(document.getPageCount(), 1);
   assertEquals(
     (await PDFDocument.load(await document.save())).getPageCount(),
@@ -40,7 +40,7 @@ test("Schedule B nominee dividend statement rejects mismatched net", async () =>
         dividend_line5_subtotal: 1_000,
         dividend_nominee: 400,
         print_line6_total: 700,
-      }, filer),
+      }, filer, 2025),
     Error,
     "do not reconcile",
   );

@@ -13,7 +13,7 @@ import { income_tax_calculation } from "../../../taxes/calculation/income_tax_ca
 import { schedule_j_calculation } from "../../../../forms/taxes/income-averaging/schedule_j/index.ts";
 import { form_1116 } from "../../../../forms/credits/foreign/form_1116/index.ts";
 import { form8960 } from "../../../../forms/taxes/investments/form8960/index.ts";
-import { CONFIG_BY_YEAR } from "../../../../../config/index.ts";
+import { CONFIG_BY_YEAR, isHistoricalTaxYear } from "../../../../../config/index.ts";
 import type { F1040Config } from "../../../../../config/index.ts";
 import {
   nonitemizerCharitableDeduction,
@@ -242,7 +242,9 @@ class StandardDeductionNode extends TaxNode<typeof inputSchema> {
       input.nonitemizer_charitable_cash_unclassified === true
     ) {
       throw new Error(
-        "Form 1040 line 12f needs the cash gifts to donor-advised funds and supporting organizations separated (IRC §170(p))",
+        ctx.taxYear === 2021
+          ? "Form 1040 line 12b needs the cash gifts to donor-advised funds and supporting organizations separated"
+          : "Form 1040 line 12f needs the cash gifts to donor-advised funds and supporting organizations separated (IRC §170(p))",
       );
     }
     // Form 6251 line 2a must use Schedule A line 7 whenever the taxpayer
@@ -262,6 +264,9 @@ class StandardDeductionNode extends TaxNode<typeof inputSchema> {
     const enhancedSeniorDeduction = input.enhanced_senior_deduction ?? 0;
     const vehicleInterestDeduction =
       input.qualified_vehicle_loan_interest_deduction ?? 0;
+    if (isHistoricalTaxYear(ctx.taxYear) && additionalDeductions > 0) {
+      throw new Error("Schedule 1-A deductions are unavailable before 2025");
+    }
     if (
       enhancedSeniorDeduction + vehicleInterestDeduction > additionalDeductions
     ) {

@@ -9,11 +9,12 @@ import { schedule3 } from "../../../../intermediate/aggregation/general/return-a
 import type { NodeContext } from "../../../../../../../core/types/node-context.ts";
 
 export const extensionPaymentEvidenceSchema = z.object({
-  tax_year: z.number().int().min(2025),
+  tax_year: z.number().int(),
   primary_ssn: z.string().regex(/^\d{3}-?\d{2}-?\d{4}$/),
   spouse_ssn: z.string().regex(/^\d{3}-?\d{2}-?\d{4}$/).optional(),
-  // January 1 through the April 15 due date of the following year.
-  payment_date: z.string().regex(/^\d{4}-(0[1-3]-\d{2}|04-(0[1-9]|1[0-5]))$/),
+  // Review proves IRS acceptance; this records the payment, not extension timeliness.
+  // A universal April 15 cutoff rejects valid historical and extended deadlines.
+  payment_date: z.string().date(),
   amount: z.number().positive().int(),
   payment_confirmation_reference: z.string().trim().min(1),
   extension_request_reference: z.string().trim().min(1),

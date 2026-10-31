@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   computePropertyNet,
   inputSchema as scheduleEInputSchema,
+  projectScheduleEItems,
 } from "../../../../../inputs/income/rental-passthrough/schedule_e/index.ts";
 import { inputSchema as form1099IntInputSchema } from "../../../../../inputs/income/investments/f1099int/index.ts";
 import { FilingStatus, filingStatusSchema } from "../../../../../types.ts";
@@ -31,7 +32,11 @@ export function calculateForm8582CRLine6OrdinaryWorksheet(
       `Form 8582-CR line 6 ordinary worksheet must be for tax year ${taxYear}`,
     );
   }
-  const scheduleE = scheduleEInputSchema.parse(rawScheduleE ?? {});
+  const rawRentalInput = scheduleEInputSchema.parse(rawScheduleE ?? {});
+  const scheduleE = {
+    ...rawRentalInput,
+    schedule_es: projectScheduleEItems(rawRentalInput.schedule_es, taxYear),
+  };
   const form8582cr = form8582crInputSchema.parse(rawForm8582cr);
   const form1040 = z.object({
     line1z_total_wages: z.number().int().nonnegative(),

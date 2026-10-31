@@ -26,6 +26,14 @@ const root = dirname(dirname(dirname(fromFileUrl(import.meta.url))));
 const FORMS_BASELINE = "scripts/testing/forms-failure-baseline.json";
 const IRS_CACHE_XSD =
   "irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd";
+const BENCHMARK_HARNESS_TESTS = new Set([
+  "benchmark/harness.test.ts",
+  "benchmark/report.test.ts",
+  "benchmark/reviewed_contract.test.ts",
+  "benchmark/run_benchmark.test.ts",
+  "benchmark/run_benchmark.integration.test.ts",
+  "benchmark/fixture_contract.test.ts",
+]);
 
 /** Node, export and return-processing tests: hermetic and fast enough for every pull request. */
 function isFormsGateTest(path: string): boolean {
@@ -132,7 +140,7 @@ try {
   const candidates = mode === "harness"
     ? all.filter((path) =>
       path.startsWith("scripts/testing/") ||
-      path === "benchmark/harness.test.ts"
+      BENCHMARK_HARNESS_TESTS.has(path)
     )
     : mode === "forms"
     ? all.filter(isFormsGateTest)
@@ -141,7 +149,7 @@ try {
       path.startsWith("core/") || path.startsWith("cli/") ||
       path.startsWith("scripts/support/") ||
       path.startsWith("scripts/testing/") ||
-      path === "benchmark/harness.test.ts"
+      BENCHMARK_HARNESS_TESTS.has(path)
     )
     : all;
   const gate = changedBase === null

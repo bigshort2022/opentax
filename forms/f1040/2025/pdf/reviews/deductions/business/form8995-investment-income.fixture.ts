@@ -209,8 +209,8 @@ const jointInputs = {
       "family"
     ],
     employer_contribution_years: {
-      made_in_2025_for_2024_in_w2: 0,
-      made_in_2026_for_2025: 0
+      made_in_tax_year_for_prior_year_in_w2: 0,
+      made_in_following_year_for_tax_year: 0
     },
     age_55_or_older: false,
     last_month_rule_elected: false,

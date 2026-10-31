@@ -5,6 +5,9 @@ import { singletonPublicInputKeys } from "../store/public-input-keys.ts";
 import { resolveSourceBytes } from "./return-source-files.ts";
 import { returnHints } from "./return-hints.ts";
 import { normalizeAllPending } from "../../forms/f1040/2025/return-processing/pending.ts";
+import type { PaperPreparationStatus } from "../../core/validation/types.ts";
+import type { ExecuteResult } from "../../core/runtime/executor.ts";
+import { returnPreparationIssues } from "./preparation.ts";
 
 function getCatalogEntry(formType: string, year: number) {
   const key = `${formType}:${year}`;
@@ -22,6 +25,7 @@ export type CreateReturnArgs = {
 export async function createReturnCommand(
   args: CreateReturnArgs,
 ): Promise<{ returnId: string }> {
+  getCatalogEntry(args.formType ?? "f1040", args.year);
   const { returnId } = await createReturn(
     args.year,
     args.baseDir,
@@ -33,6 +37,7 @@ export async function createReturnCommand(
 export type GetReturnArgs = {
   readonly returnId: string;
   readonly baseDir: string;
+  readonly captureExecution?: boolean;
 };
 
 export type ReturnSummary = {
@@ -54,6 +59,8 @@ export type GetReturnResult = {
   readonly lines: Record<string, unknown>;
   readonly warnings: readonly string[];
   readonly carryforwards: Readonly<Record<string, number>>;
+  readonly paperPreparation?: PaperPreparationStatus;
+  readonly execution?: ExecuteResult["execution"];
 };
 
 function num(value: unknown): number {
@@ -177,7 +184,10 @@ export async function getReturnCommand(
     returnPath,
     buildEngineInputs(inputs, singletonPublicInputKeys(def)),
   );
-  const result = def.executeReturn(engineInputs);
+  const result = def.executeReturn(
+    engineInputs,
+    args.captureExecution ? { captureExecution: true } : undefined,
+  );
   const pending = normalizeAllPending(result.pending);
 
   const f1040 = pending["f1040"] ?? {};
@@ -186,6 +196,8 @@ export async function getReturnCommand(
   for (const d of result.diagnostics) {
     warnings.push(`[${d.code}] ${d.nodeType}: ${d.message}`);
   }
+  const preparationIssues = await returnPreparationIssues(args, def, engineInputs, pending);
+  warnings.push(...preparationIssues.map((issue) => `[${issue.code}] ${issue.form}: ${issue.message}`));
 
   return {
     returnId: meta.returnId,
@@ -196,5 +208,12 @@ export async function getReturnCommand(
     lines: def.formType === "f4868" ? pending["form4868"] ?? {} : f1040,
     warnings,
     carryforwards: result.carryforwards,
+    ...(result.execution !== undefined ? { execution: result.execution } : {}),
+    ...(def.preparationMode === "paper" ? {
+      paperPreparation: {
+        readyForPaper: preparationIssues.length === 0 && result.diagnostics.length === 0,
+        electronicFilingSupported: false as const,
+      },
+    } : {}),
   };
 }

@@ -131,11 +131,18 @@ export interface DiagnosticsSummary {
   readonly skipped: number;
 }
 
+/** Computational paper readiness does not claim signature, submission or acceptance. */
+export interface PaperPreparationStatus {
+  readonly readyForPaper: boolean;
+  readonly electronicFilingSupported: false;
+}
+
 /** Complete diagnostics report for a tax return. */
 export interface DiagnosticsReport {
   readonly entries: readonly DiagnosticEntry[];
   readonly summary: DiagnosticsSummary;
   readonly canFile: boolean;
+  readonly paperPreparation?: PaperPreparationStatus;
 }
 
 /** Maps an XML element name to its location in the pending dict. */

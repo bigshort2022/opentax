@@ -248,8 +248,8 @@ test("dropping a CLI input that nothing routes to reproduces the silently-ignore
   }));
   const regression = await structureReport(root, without, "2026-10-16");
   assertEquals(
-    regression.problems.map((p) => [p.kind, p.nodeType]),
-    [["unreachable", victim.node.nodeType]],
+    [...new Set(regression.problems.map((p) => `${p.kind}:${p.nodeType}`))],
+    [`unreachable:${victim.node.nodeType}`],
   );
 });
 

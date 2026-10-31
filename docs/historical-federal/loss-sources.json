@@ -1,0 +1,85 @@
+{
+  "scope": "2021\u20132024 source returns; consecutive transfers through 2025",
+  "earlierRentalAllocationAuthority": [
+    {"title":"Publication 527 (2021)","year":2021,"url":"https://www.irs.gov/pub/irs-prior/p527--2021.pdf","sha256":"1c37eca3de532938908eac262ca429dc4e227ac058be51802a8a9bd255b631b1","retainedSource":"loss-evidence/p527--2021.pdf","pinpoint":"Chapter 5 p. 18, Days Used as a Main Home Before or After Renting; chapters 1 and 4, deductible rental expense timing/allocation"},
+    {"title":"Publication 527 (2022)","year":2022,"url":"https://www.irs.gov/pub/irs-prior/p527--2022.pdf","sha256":"54c74ac4fd83323094c908fc02f168b384c33018e616678e8edc9b33fd18b89c","retainedSource":"loss-evidence/p527--2022.pdf","pinpoint":"Chapter 5 p. 18, Days Used as a Main Home Before or After Renting; chapters 1 and 4, deductible rental expense timing/allocation"},
+    {"title":"Publication 527 (2023)","year":2023,"url":"https://www.irs.gov/pub/irs-prior/p527--2023.pdf","sha256":"cedb772265bafa5a81d3bd157ffa630bf911bb7bb6c5fa580b5a04a06fc27105","retainedSource":"loss-evidence/p527--2023.pdf","pinpoint":"Chapter 5 p. 28, Days Used as a Main Home Before or After Renting; chapters 1 and 4, deductible rental expense timing/allocation"}
+  ],
+  "rentalExpenseAllocation": [{
+    "title": "Publication 527, Residential Rental Property (2024)",
+    "year": 2024,
+    "url": "https://www.irs.gov/pub/irs-prior/p527--2024.pdf",
+    "sha256": "ea48f23105b0380da10916c2e93c9a3df26f74e3b2b6f308dcdca0caf816c6d7",
+    "retainedSource": "loss-evidence/p527--2024.pdf",
+    "pinpoint": "Chapter 1 pp. 4–5 (cash expenses, ownership, insurance and expense character); chapter 4 pp. 22–24 (allocation by rental period and reasonable methods); chapter 5 pp. 25–28 (actual-use days, dwelling used as home, days used as main home before/after renting).",
+    "implementation": "Compute rental portions from preserved expense source amounts and documented methods. The >=12-consecutive-month main-home exception changes the dwelling-used-as-home limitation classification, not expense allocation. Unsupported section 280A deduction-limit worksheets and section 1341 claims block. Depreciation requires the actual year/retirement-adjusted workpaper amount, never prorated capital basis. A repayment requires explicit source-income year, deduction year, and deductible-character decision.",
+    "syntheticExample": "2024 annual insurance 3660; rental period Jan 1–Jun 30 (182 days), main home Jul 1–Dec 31 (184 days), with qualifying earlier rental history: rental insurance 1820, personal insurance 1840."
+  }],
+  "capitalWorksheet": [
+    {
+      "title": "2022 Instructions for Schedule D",
+      "year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/i1040sd--2022.pdf",
+      "sha256": "b2a22372524dd9b16721a2e1c92416235393c1972b321d89691b968da1d825c5",
+      "retainedSource": "loss-evidence/i1040sd--2022.pdf",
+      "sourceTaxYear": 2021,
+      "destinationTaxYear": 2022,
+      "pinpoint": "Page D-11, Capital Loss Carryover Worksheet\u2014Lines 6 and 14, lines 1\u201313; Capital Losses / Line 21 for $3000 and $1500 MFS"
+    },
+    {
+      "title": "2023 Instructions for Schedule D",
+      "year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/i1040sd--2023.pdf",
+      "sha256": "c7f1e7207e2a2c04fcc15f1555ab156c4c7dbda60d1332b87ceecace8e7cd68b",
+      "retainedSource": "loss-evidence/i1040sd--2023.pdf",
+      "sourceTaxYear": 2022,
+      "destinationTaxYear": 2023,
+      "pinpoint": "Page D-11, Capital Loss Carryover Worksheet\u2014Lines 6 and 14, lines 1\u201313; Capital Losses / Line 21 for $3000 and $1500 MFS"
+    },
+    {
+      "title": "2024 Instructions for Schedule D",
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/i1040sd--2024.pdf",
+      "sha256": "430790bd2be8c79cacdc8e27828f41f7c2d63609cf286f4161a379473d512f06",
+      "retainedSource": "loss-evidence/i1040sd--2024.pdf",
+      "sourceTaxYear": 2023,
+      "destinationTaxYear": 2024,
+      "pinpoint": "Page D-11, Capital Loss Carryover Worksheet\u2014Lines 6 and 14, lines 1\u201313; Capital Losses / Line 21 for $3000 and $1500 MFS"
+    },
+    {
+      "title": "2025 Instructions for Schedule D",
+      "year": 2025,
+      "url": "https://www.irs.gov/pub/irs-prior/i1040sd--2025.pdf",
+      "sha256": "650643a686378b7573e4f4476ee4e7c9f9bab1384314dca32dc336f7b2276002",
+      "retainedSource": "loss-evidence/i1040sd--2025.pdf",
+      "sourceTaxYear": 2024,
+      "destinationTaxYear": 2025,
+      "pinpoint": "Page D-10, Capital Loss Carryover Worksheet\u2014Lines 6 and 14, lines 1\u201313; Capital Losses / Line 21 for $3000 and $1500 MFS"
+    }
+  ],
+  "rentalPassiveLoss": [
+    {
+      "title": "2021 Instructions for Form 8582",
+      "year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/i8582--2021.pdf",
+      "sha256": "be08453c7fea247683cce03ca6f03078a10e66f377ac3e5659483dce6eedc19d",
+      "retainedSource": "loss-evidence/i8582--2021.pdf",
+      "pinpoint": "Page 2, Coordination With Other Limitations; Parts VII\u2013IX, unallowed and allowed losses by activity and reporting form (2021 pp. 10\u201312; 2024 pp. 12\u201314)"
+    },
+    {
+      "title": "2024 Instructions for Form 8582",
+      "year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/i8582--2024.pdf",
+      "sha256": "1d62413f29d834c5965f338a9e91e83f3758d59157637fb3a97bc182de0f7e33",
+      "retainedSource": "loss-evidence/i8582--2024.pdf",
+      "pinpoint": "Page 2, Coordination With Other Limitations; Parts VII\u2013IX, unallowed and allowed losses by activity and reporting form (2021 pp. 10\u201312; 2024 pp. 12\u201314)"
+    }
+  ],
+  "interpretation": {
+    "line1": "Source Form 1040 line 11 less line 14 deductions, BEFORE zero floor; includes applicable QBI/nonitemizer charity deductions.",
+    "line2": "Absolute source Schedule D line 21; capped at $3000 or $1500 MFS after ST/LT offset.",
+    "character": "Worksheet lines 8 and 13 retain short- and long-term character.",
+    "provenance": "calculated-unfiled and reviewed-outside-evidence describe preparation evidence, never filing or acceptance.",
+    "rental": "Preserve durable activity identity and reporting character. Basis and at-risk limitations precede PAL. QBI attributes are not PAL and require separate transition evidence."
+  }
+}

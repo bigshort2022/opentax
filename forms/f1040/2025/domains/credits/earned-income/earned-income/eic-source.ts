@@ -23,6 +23,8 @@ import {
   itemSchema as f8814ItemSchema,
 } from "../../../../../nodes/inputs/income/investments/f8814/index.ts";
 import {
+  inputSchema as scheduleEInputSchema,
+  projectScheduleEItems,
   scheduleEPassiveEicIncome,
   scheduleERoyaltyEicAmounts,
 } from "../../../../../nodes/inputs/income/rental-passthrough/schedule_e/index.ts";
@@ -95,7 +97,7 @@ export function assertEicSource(
       }
       nativeForm8582.build(
         source as Parameters<typeof nativeForm8582.build>[0],
-        { pending },
+        { pending, taxYear },
       );
     }
     for (const row of rows) {
@@ -153,8 +155,13 @@ export function assertEicSource(
   if ((schedule1?.line8z_form8814 ?? 0) !== childSchedule1Income) {
     throw new Error("Form 1040 EIC Form 8814 income differs from Schedule 1");
   }
-  const royalties = scheduleERoyaltyEicAmounts(pending?.schedule_e ?? {});
-  const passiveIncome = scheduleEPassiveEicIncome(pending?.schedule_e ?? {});
+  const rawScheduleE = scheduleEInputSchema.parse(pending?.schedule_e ?? {});
+  const preparedScheduleE = {
+    ...rawScheduleE,
+    schedule_es: projectScheduleEItems(rawScheduleE.schedule_es, taxYear),
+  };
+  const royalties = scheduleERoyaltyEicAmounts(preparedScheduleE);
+  const passiveIncome = scheduleEPassiveEicIncome(preparedScheduleE);
   const agiInput = agiInputSchema.parse(pending?.agi_aggregator ?? {});
   const partnershipItems = pending?.k1_partnership === undefined
     ? []
@@ -225,6 +232,7 @@ export function assertEicSource(
     if (pending?.form8582 !== undefined) {
       nativeForm8582.build(pending.form8582 as Record<string, unknown>, {
         pending,
+        taxYear,
       });
     }
   }

@@ -241,3 +241,20 @@ test("a divorced joint-payment allocation names a divorce in the return year", (
     "needs a 2026 divorce",
   );
 });
+
+test("historical estimated payments require the actual return year and reconcile retained records", () => {
+  const input = {
+    payment_q1: 250,
+    quarter_payment_records: [{
+      tax_year: 2023,
+      quarter: "q1",
+      amount: 250,
+      payer_tin: "123456789",
+      payment_date: "2023-04-18",
+      payment_record_reference: "synthetic-reviewed-2023-q1",
+    }],
+  };
+  assertEquals(estimatedPaymentTotal(input, 2023), 250);
+  assertThrows(() => estimatedPaymentTotal(input, 2024));
+  assertThrows(() => estimatedPaymentTotal({ ...input, payment_q1: 251 }, 2023));
+});

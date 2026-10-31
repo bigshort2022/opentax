@@ -160,7 +160,6 @@ test("f8814: $13,500 income must use a child return", () => {
 test("f8814: lines use the return year's amounts and record the year", () => {
   const line = calculateForm8814({ ...child, interest_income: 3_000 }, 2026);
   assertEquals([line.taxYear, line.line6, line.line15], [2026, 300, 135]);
-  assertThrows(() => calculateForm8814(child, 2024), Error, "2024");
 });
 
 test("f8814: duplicate child is rejected", () => {

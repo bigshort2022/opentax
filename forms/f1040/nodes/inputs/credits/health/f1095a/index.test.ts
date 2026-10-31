@@ -1552,3 +1552,38 @@ test("protected partial no-APTC premium adjusts only its covered month", () => {
     "one nonshared zero-APTC policy or distinct nonoverlapping same-enrollee policies",
   );
 });
+
+test("public Marketplace source reaches the 2021 unemployment PTC rule without computed overrides", () => {
+  const source = f1095a.inputSchema.parse({
+    f1095as: [{
+      issuer_name: "Synthetic Marketplace",
+      unemployment_compensation_2021: {
+        recipient: "taxpayer", received_or_approved: true,
+        no_one_can_claim_recipient: true, source_reference: "synthetic state award",
+      },
+      monthly_premiums: Array(12).fill(500),
+      monthly_slcsps: Array(12).fill(500),
+      monthly_aptcs: Array(12).fill(400),
+    }],
+  });
+  const context = { taxYear: 2021, formType: "f1040" as const };
+  const marketplace = f1095a.compute(context, source);
+  const credit = form8962.compute(context, form8962.inputSchema.parse({
+    ...findOutput(marketplace, "form8962")!.fields,
+    household_size: 1, taxpayer_modified_agi: 60000,
+    filing_status: FilingStatus.Single, fpl_region: "contiguous",
+    dependent_income_complete: true,
+  }));
+  assertEquals(findOutput(credit, "schedule3")?.fields.line9_premium_tax_credit, 1200);
+  assertEquals(findOutput(credit, "form8962")?.fields.unemployment_compensation_ind, true);
+  assertThrows(() => f1095a.compute({ ...context, taxYear: 2023 }, source), Error, "2021");
+  assertThrows(() => f1095a.compute(context, {
+    f1095as: [source.f1095as[0], {
+      ...source.f1095as[0],
+      unemployment_compensation_2021: {
+        ...source.f1095as[0].unemployment_compensation_2021!,
+        recipient: "spouse",
+      },
+    }],
+  }), Error, "contradictory");
+});

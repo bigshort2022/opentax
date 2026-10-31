@@ -4,9 +4,9 @@ const document = z.object({
   sha256: z.string().regex(/^[0-9a-f]{64}$/),
   bytes_base64: z.string().min(1),
 }).strict();
-/** Reviewed transaction bytes, without a claim that a 2026 1099-SA was issued. */
+/** Reviewed transaction bytes, without claiming a following-year 1099-SA was issued. */
 export const employerPostyearEvidenceSchema = z.object({
-  filed_2025_w2: document,
-  trustee_2026_payment: document,
-  owner_2026_receipt: document,
+  filed_tax_year_w2: document,
+  following_year_trustee_payment: document,
+  following_year_owner_receipt: document,
 }).strict();

@@ -228,6 +228,7 @@ export async function exportedTy2026Return(
   retained: readonly RetainedDocument[] = [],
 ) {
   const def = catalog["f1040:2026"];
+  if (def.preparationMode !== "mef") throw new Error("TY2026 requires electronic preparation capability");
   const input = signed(inputs);
   const result = def.executeReturn({
     ...input,

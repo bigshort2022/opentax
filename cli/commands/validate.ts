@@ -6,7 +6,6 @@
  */
 
 import { join } from "node:path";
-import type { ExecutorDiagnosticEntry } from "../../core/runtime/executor.ts";
 import { catalog } from "../../catalog.ts";
 import { buildEngineInputs, loadReturn } from "../store/store.ts";
 import { singletonPublicInputKeys } from "../store/public-input-keys.ts";
@@ -33,6 +32,8 @@ import {
   withMissingSourceFiles,
 } from "./return-source-files.ts";
 import { returnHints } from "./return-hints.ts";
+import { returnPreparationIssues } from "./preparation.ts";
+import type { EmittedValidationScope } from "../../forms/f1040/validation/business-rule-report.ts";
 
 function getCatalogEntry(formType: string, year: number) {
   const key = `${formType}:${year}`;
@@ -68,11 +69,52 @@ export async function validateReturnCommand(
   );
   const result = def.executeReturn(engineInputs);
   const pending = normalizeAllPending(result.pending);
+  const executorEntries: DiagnosticEntry[] = result.diagnostics.map(
+    (diagnostic): DiagnosticEntry => ({
+      ruleNumber: diagnostic.code,
+      severity: "reject",
+      category: "incorrect_data",
+      message: `${diagnostic.nodeType}: ${diagnostic.message}`,
+      formRef: diagnostic.nodeId,
+    }),
+  );
+  const preparationIssues = await returnPreparationIssues(args, def, engineInputs, pending);
+  const preparationEntries = preparationIssues.map((issue): DiagnosticEntry => ({
+    ruleNumber: issue.code,
+    severity: "reject",
+    category: "missing_data",
+    message: issue.message,
+    formRef: issue.form,
+  }));
+  if (def.preparationMode === "paper") {
+    const failures = [...executorEntries, ...preparationEntries];
+    const report: DiagnosticsReport = {
+      entries: [
+        ...failures,
+        {
+          ruleNumber: "ELECTRONIC_FILING_UNSUPPORTED",
+          severity: "alert",
+          category: "unsupported",
+          message: "This historical product prepares unsigned paper returns; it does not provide MeF filing, signature, mailing or acceptance.",
+          formRef: "1040",
+        },
+      ],
+      summary: { total: failures.length + 1, passed: 0, rejected: failures.length, alerts: 1, skipped: 0 },
+      canFile: false,
+      paperPreparation: { readyForPaper: failures.length === 0, electronicFilingSupported: false },
+    };
+    return {
+      report,
+      formatted: args.format === "text"
+        ? formatDiagnosticsText(report, args.returnId, meta.year)
+        : formatDiagnosticsJson(report),
+    };
+  }
 
   // Extract filer identity for header field access
   const f1040 = pending["f1040"] ?? {};
   const filerIdentity = extractFilerIdentity(f1040);
-  let scope: ReturnType<typeof emittedValidationScope> | undefined;
+  let scope: EmittedValidationScope | undefined;
   let ownReport: DiagnosticsReport | undefined;
   let assemblyError: DiagnosticEntry | undefined;
   let missing: readonly string[] = [];
@@ -139,17 +181,6 @@ export async function validateReturnCommand(
       scope?.rulePrefixes,
     );
 
-  // Merge executor diagnostics into report entries
-  const executorEntries: DiagnosticEntry[] = result.diagnostics.map(
-    (d: ExecutorDiagnosticEntry) => ({
-      ruleNumber: d.code,
-      severity: "reject" as const,
-      category: "general" as ErrorCategory,
-      message: `${d.nodeType}: ${d.message}`,
-      formRef: d.nodeId,
-    }),
-  );
-
   // Claims the facts point to but the return does not make; they never block filing.
   const hintEntries: DiagnosticEntry[] = returnHints(pending).map((
     message,
@@ -164,6 +195,7 @@ export async function validateReturnCommand(
   const hasExecutorFailures = executorEntries.length > 0;
   const mergedEntries = [
     ...executorEntries,
+    ...preparationEntries,
     ...(assemblyError ? [assemblyError] : []),
     ...report.entries,
     ...hintEntries,
@@ -171,15 +203,15 @@ export async function validateReturnCommand(
   const mergedSummary = {
     ...report.summary,
     total: report.summary.total + executorEntries.length +
-      (assemblyError ? 1 : 0) + hintEntries.length,
+      (assemblyError ? 1 : 0) + hintEntries.length + preparationEntries.length,
     rejected: report.summary.rejected + executorEntries.length +
-      (assemblyError ? 1 : 0),
+      (assemblyError ? 1 : 0) + preparationEntries.length,
     alerts: report.summary.alerts + hintEntries.length,
   };
   const mergedReport: DiagnosticsReport = {
     entries: mergedEntries,
     summary: mergedSummary,
-    canFile: !hasExecutorFailures && !assemblyError && report.canFile,
+    canFile: !hasExecutorFailures && !assemblyError && preparationEntries.length === 0 && report.canFile,
   };
 
   // Format output

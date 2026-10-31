@@ -1,7 +1,7 @@
 import { test } from "bun:test";
 import { existsSync } from "node:fs";
 import { fileURLToPath as fromFileUrl } from "node:url";
-import { assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import * as sys from "../../../scripts/support/sys.ts";
 import { catalog } from "../../../catalog.ts";
 import { signed } from "../../../scripts/testing/mef.ts";
@@ -73,6 +73,7 @@ function input(): Record<string, unknown> {
 
 async function exported() {
   const def = catalog["f1040:2026"];
+  assert(def.preparationMode === "mef");
   const result = def.executeReturn(input());
   const pending = normalizeAllPending(result.pending);
   const filer = extractFilerIdentity(pending.f1040 ?? {});
@@ -163,6 +164,7 @@ function twoEmployerInput(): Record<string, unknown> {
 
 test("TY2026 excess Social Security withholding uses the 2026 maximum", async () => {
   const def = catalog["f1040:2026"];
+  assert(def.preparationMode === "mef");
   const pending = normalizeAllPending(
     def.executeReturn(twoEmployerInput()).pending,
   );

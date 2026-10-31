@@ -212,6 +212,14 @@ export const inputSchema = z.object({
   // donor-advised funds or supporting organizations (IRC §170(p)).
   cash_contributions_to_daf_or_supporting_organizations: z.number()
     .nonnegative().optional(),
+  // Pub. 526 (2021), Qualified Contributions: an affirmative election,
+  // separate from ordinary 60%-limit cash and unavailable after 2021.
+  qualified_cash_contributions_2021: z.object({
+    amount: z.number().positive(),
+    eligible_public_charity_cash_verified: z.literal(true),
+    election_confirmed: z.literal(true),
+    source_reference: z.string().trim().min(1),
+  }).strict().optional(),
   // The amount printed on the line 11 dotted line; it stays within line 11.
   line_11_qualified_contributions: z.number().positive().optional(),
   qualified_conservation_contributions: z.number().nonnegative().optional(),
@@ -987,7 +995,25 @@ class ScheduleANode extends TaxNode<typeof inputSchema> {
     if (hasContributions && input.agi === undefined) {
       throw new Error("Schedule A charitable limits require computed AGI");
     }
-    const contributions = computeContributions(input, agi, ctx.taxYear);
+    const qualifiedCash = input.qualified_cash_contributions_2021?.amount ?? 0;
+    if (input.qualified_cash_contributions_2021 && ctx.taxYear !== 2021) {
+      throw new Error("The 100%-of-AGI qualified cash election is only available in 2021");
+    }
+    if (
+      qualifiedCash >
+        (input.cash_contributions_to_50_percent_organizations ?? 0) -
+          (input.cash_contributions_to_daf_or_supporting_organizations ?? 0)
+    ) {
+      throw new Error("2021 qualified cash must be part of eligible public-charity cash gifts");
+    }
+    const ordinaryGiftsInput = qualifiedCash > 0
+      ? {
+        ...input,
+        cash_contributions_to_50_percent_organizations:
+          (input.cash_contributions_to_50_percent_organizations ?? 0) - qualifiedCash,
+      }
+      : input;
+    const contributions = computeContributions(ordinaryGiftsInput, agi, ctx.taxYear);
     const charitableAmt = reconcileProducingMiningCharitableAmt(
       input,
       ctx.taxYear,
@@ -999,7 +1025,7 @@ class ScheduleANode extends TaxNode<typeof inputSchema> {
       );
     const electedCarryovers = election
       ? computeElectedCapitalGainCarryovers(
-        input,
+        ordinaryGiftsInput,
         agi,
         ctx.taxYear,
         contributions.cash,
@@ -1027,8 +1053,17 @@ class ScheduleANode extends TaxNode<typeof inputSchema> {
       agi,
       input.line_8d_mortgage_insurance_premiums ?? 0,
     );
-    const priorCarryovers = computePriorCarryovers(input, agi, ctx.taxYear);
+    const priorCarryovers = computePriorCarryovers(ordinaryGiftsInput, agi, ctx.taxYear);
     const line13Carryover = electedCarryovers.allowed + priorCarryovers;
+    // Pub. 526 (2021), Worksheet 2: qualified contributions are taken last,
+    // after the other current-year gifts and allowed carryovers.
+    const qualifiedCashAllowed = Math.min(
+      qualifiedCash,
+      Math.max(0, agi - contributions.cash - contributions.noncash - line13Carryover),
+    );
+    contributions.cash += qualifiedCashAllowed;
+    contributions.carryforwards[`charitable_cash_60_${ctx.taxYear}`] +=
+      qualifiedCash - qualifiedCashAllowed;
     const charitableBeforeFloor = Math.round(contributions.cash) +
       Math.round(contributions.noncash) +
       Math.round(line13Carryover);
@@ -1079,6 +1114,7 @@ class ScheduleANode extends TaxNode<typeof inputSchema> {
         ? [this.outputNodes.output(form8995, {
           itemized_deductions: totalItemized,
           force_itemized: input.force_itemized,
+          ...nonitemizerCash,
         })]
         : []),
     ];
@@ -1090,6 +1126,9 @@ class ScheduleANode extends TaxNode<typeof inputSchema> {
           line_11_cash_contributions: contributions.cash,
           line_12_noncash_contributions: contributions.noncash,
           line_13_contribution_carryover: line13Carryover,
+          ...(qualifiedCashAllowed > 0
+            ? { line_11_qualified_contributions: qualifiedCashAllowed }
+            : {}),
           ...(charitableAmt
             ? { charitable_amt_reconciliation: charitableAmt }
             : {}),

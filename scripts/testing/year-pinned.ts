@@ -80,7 +80,7 @@ export function yearScanned(path: string): boolean {
   if (!path.endsWith(".ts") || path.endsWith(".test.ts")) return false;
   if (/fixture/i.test(path) || /\/test-utils\//.test(path)) return false;
   if (path.startsWith("forms/f1040/nodes/config/")) {
-    return !/\/(?:2025|2026|index)\.ts$/.test(path);
+    return !/\/(?:\d{4}|index)\.ts$/.test(path);
   }
   return path.startsWith("forms/f1040/nodes/") ||
     /^forms\/f1040\/2025\/(?:mef|pdf|domains|return-processing)\//.test(path) ||

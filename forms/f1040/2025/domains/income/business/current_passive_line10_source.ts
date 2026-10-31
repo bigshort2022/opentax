@@ -68,6 +68,6 @@ export function assertCurrentPassiveLine10Return(
     if (!qbi || typeof qbi !== "object" || Array.isArray(qbi)) {
       throw new Error("Current ordinary RPE needs its actual required8995");
     }
-    assertCurrentK1Qbi(qbi as Record<string, unknown>, joined);
+    assertCurrentK1Qbi(qbi as Record<string, unknown>, joined, 2025);
   }
 }

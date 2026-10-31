@@ -88,9 +88,9 @@ export function ordinaryTax2025(income: number, status: FilingStatus): number {
 }
 
 /**
- * Ordinary tax for a year whose Tax Table is not yet published: the table
- * cell derived from that year's rate schedule below $100,000, the Tax
- * Computation Worksheet at or above.
+ * Ordinary tax using a year's rate schedule: published Tax Table intervals
+ * and midpoint whole-dollar rounding below $100,000, Tax Computation Worksheet
+ * at or above. Historical source comparisons are retained in the annual manifest.
  */
 export function ordinaryTaxFromSchedule(
   income: number,

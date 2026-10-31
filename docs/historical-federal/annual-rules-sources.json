@@ -1,0 +1,822 @@
+{
+  "scope": "Historical federal individual preparation2021–2024. Only explicitly unchanged statutory terms are shared. Config availability does not advertise excluded historical credit/foreign products.",
+  "sources": [
+    {
+      "id": "rp2021",
+      "title": "Revenue Procedure 2020-45",
+      "tax_year": 2021,
+      "url": "https://www.irs.gov/pub/irs-drop/rp-20-45.pdf",
+      "pinpoint": "Section 3: .01 Tables 1–4, .02 kiddie tax, .03 capital gain thresholds, AMT, standard deductions, section179, section199A, section213, section221, section448, section461, section911 and LTC per-diem.",
+      "sha256": "12cfb00115b86e3bb97937f1a5fc340cf98c0d61b7508c800b9a3a4674aac52d",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 13,
+          "text": "Standard Deduction.\n\n       (1) In general. For taxable years beginning in 2021, the standard deduction\n\namounts under § 63(c)(2) are as follows:\n\nFiling Status                                                  Standard Deduction\n\nMarried Individuals Filing Joint Returns                       $25,100\nand Surviving Spouses (§ 1(j)(2)(A))\n\nHeads of Households (§ 1(j)(2)(B))                             $18,800\n\nUnmarried Individuals (other than Surviving Spouses            $12,550\nand Heads of Households) (§ 1(j)(2)(C))\n\nMarried Individuals Filing Separate                            $12,550\nReturns (§ 1(j)(2)(D))\n\f                                          - 14 -\n\n\n     (2) Dependent. For taxable years beginning in 2021, the standard deduction\n\namount under § 63(c)(5) for an individual who may be claimed as a dependent by\n\nanother taxpayer cannot exceed the greater of (1) $1,100, or (2) the sum of $350 and\n\nthe individual's earned income.\n\n     (3) Aged or blind. For taxable years beginning in 2021, the additional standard\n\ndeduction amount under § 63(f) for the aged or the blind is $1,350. The additional\n\nstandard deduction amount is increased to $1,700 if the individual is also unmarried and\n\nnot a surviving spouse.\n\n   .17 Cafeteria Plans. For taxable years beginning in 2021, the dollar limitation under\n\n§ 125(i) on voluntary employee salary reductions for contributions to health flexible\n\nspending arrangements is $2,750. If the cafeteria plan permits the carryover of unused\n\namounts, the maximum carryover amount is $550.\n\n   .18 Qualified Transportation Fringe Benefit. For taxable years beginning in 2021, the\n\nmonthly limitation under § 132(f)(2)(A) regarding the aggregate fringe benefit exclusion\n\namount for transportation in a commuter highway vehicle and any transit p"
+        },
+        {
+          "pdf_page": 16,
+          "text": "Qualified Business Income. For taxable years beginning in 2021, the threshold\n\namount under § 199A(e)(2) is $329,800 for married filing joint returns, $164,925 for\n\nmarried filing separate returns, and $164,900 for all other returns.\n\f                                           - 17 -\n\n\n   .28 Eligible Long-Term Care Premiums. For taxable years beginning in 2021, the\n\nlimitations under § 213(d)(10), regarding eligible long-term care premiums includible in\n\nthe term \"medical care,\" are as follows:\n\nAttained Age Before the Close of the Taxable Year      Limitation on Premiums\n\n40 or less                                             $450\n\nMore than 40 but not more than 50                      $850\n\nMore than 50 but not more than 60                      $1,690\n\nMore than 60 but not more than 70                      $4,520\n\nMore than 70                                           $5,640\n\n   .29 Medical Savings Accounts.\n\n     (1) Self-only coverage. For taxable years beginning in 2021, the term \"high\n\ndeductible health plan\" as defined in § 220(c)(2)(A) means, for self-only coverage, a\n\nhealth plan that has an annual deductible that is not less than $2,400 and not more than\n\n$3,600, and under which the annual out-of-pocket expenses required to be paid (other\n\nthan for premiums) for covered benefits do not exceed $4,800.\n\n     (2) Family coverage. For taxable years beginning in 2021, the term \"high\n\ndeductible health plan\" means, for family coverage, a health plan that has an annual\n\ndeductible that is not less than $4,800 and not more than $7,150, and under which the\n\nannual out-of-pocket expenses required to be paid (other than for premiums) for\n\ncovered benefits do not exceed $8,750.\n\n   .30 Interest on Education Loans. For taxable years beginning in 2021, the $2,500\n\nmaximum"
+        },
+        {
+          "pdf_page": 11,
+          "text": "Exemption Amounts for Alternative Minimum Tax. For taxable years beginning in\n\n2021, the exemption amounts under § 55(d)(1) are:\n\f                                          - 12 -\n\n\n   Joint Returns or Surviving Spouses                                  $114,600\n\n   Unmarried Individuals (other than Surviving Spouses)                $73,600\n\n   Married Individuals Filing Separate Returns                         $57,300\n\n   Estates and Trusts                                                  $25,700\n\nFor taxable years beginning in 2021, under § 55(b)(1), the excess taxable income\nabove which the 28 percent tax rate applies is:\n\n   Married Individuals Filing Separate Returns                         $99,950\n\n   Joint Returns, Unmarried Individuals (other\n   than surviving spouses), and Estates and Trusts                     $199,900\n\n\nFor taxable years beginning in 2021, the amounts used under § 55(d)(2) to determine\nthe phaseout of the exemption amounts are:\n                                                  Threshold            Complete\n                                               Phaseout amount Phaseout amount\n\n   Joint Returns or Surviving Spouses                $1,047,200            $1,505,600\n\n   Unmarried Individuals (other than                 $523,600              $818,000\n   Surviving Spouses)\n\n   Married Individuals Filing Separate               $523,600              $752,800\n   Returns\n\n   Estates and Trusts                                $85,650               $188,450\n\n   .13 Alternative Minimum Tax Exemption for a Child Subject to the \"Kiddie Tax.\" For\n\ntaxable years beginning in 2021, for a child to whom the § 1(g) \"kiddie tax\" applies, the\n\nexemption amount under §§ 55(d) and 59(j) for purposes of the alternative minimum tax\n\nunder § 55 may not exceed the su"
+        }
+      ]
+    },
+    {
+      "id": "rp2022",
+      "title": "Revenue Procedure 2021-45",
+      "tax_year": 2022,
+      "url": "https://www.irs.gov/pub/irs-drop/rp-21-45.pdf",
+      "pinpoint": "Section 3: .01 Tables 1–4, .02 kiddie tax, .03 capital gain thresholds, AMT, standard deductions, section179, section199A, section213, section221, section448, section461, section911 and LTC per-diem.",
+      "sha256": "405535647b6287103f5392258d4342cdb70535bf07ff05d89eebc71768083627",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 14,
+          "text": "Standard Deduction.\n\n     (1) In general. For taxable years beginning in 2022, the standard deduction\n\namounts under § 63(c)(2) are as follows:\n\nFiling Status                                                 Standard Deduction\n\nMarried Individuals Filing Joint Returns                      $25,900\nand Surviving Spouses (§ 1(j)(2)(A))\n\nHeads of Households (§ 1(j)(2)(B))                            $19,400\n\nUnmarried Individuals (other than Surviving Spouses           $12,950\nand Heads of Households) (§ 1(j)(2)(C))\n\nMarried Individuals Filing Separate                           $12,950\nReturns (§ 1(j)(2)(D))\n\n     (2) Dependent. For taxable years beginning in 2022, the standard deduction\n\namount under § 63(c)(5) for an individual who may be claimed as a dependent by\n\nanother taxpayer cannot exceed the greater of (1) $1,150, or (2) the sum of $400 and\n\nthe individual's earned income.\n\n     (3) Aged or blind. For taxable years beginning in 2022, the additional standard\n\ndeduction amount under § 63(f) for the aged or the blind is $1,400. The additional\n\nstandard deduction amount is increased to $1,750 if the individual is also unmarried and\n\nnot a surviving spouse.\n\n   .16 Cafeteria Plans. For taxable years beginning in 2022, the dollar limitation under\n\n§ 125(i) on voluntary employee salary reductions for contributions to health flexible\n\nspending arrangements is $2,850. If the cafeteria plan permits the carryover of unused\n\namounts, the maximum carryover amount is $570.\n\n   .17 Qualified Transportation Fringe Benefit. For taxable years beginning in 2022, the\n\nmonthly limitation under § 132(f)(2)(A) regarding the aggregate fringe benefit exclusion\n\f                                           - 15 -\n\n\namount for transportation in a commuter highway vehicle and any transit pass is"
+        },
+        {
+          "pdf_page": 17,
+          "text": "Qualified Business Income. For taxable years beginning in 2022, the threshold\n\namounts under § 199A(e)(2) and phase-in range amounts under § 199A(b)(3)(B) and\n\n§ 199A(d)(3)(A) are:\n\n Filing Status                                         Threshold           Phase-in range\n                                                       amount              amount\n Married Individuals Filing Joint Returns              $340,100            $440,100\n Married Individuals Filing Separate Returns           $170,050            $220,050\n All Other Returns                                     $170,050            $220,050\n\n\n   .28 Eligible Long-Term Care Premiums. For taxable years beginning in 2022, the\n\nlimitations under § 213(d)(10), regarding eligible long-term care premiums includible in\n\nthe term \"medical care,\" are as follows:\n\nAttained Age Before the Close of the Taxable Year      Limitation on Premiums\n\n40 or less                                             $450\n\nMore than 40 but not more than 50                      $850\n\nMore than 50 but not more than 60                      $1,690\n\f                                          - 18 -\n\n\nMore than 60 but not more than 70                      $4,510\n\nMore than 70                                           $5,640\n\n   .29 Medical Savings Accounts.\n\n     (1) Self-only coverage. For taxable years beginning in 2022, the term \"high\n\ndeductible health plan\" as defined in § 220(c)(2)(A) means, for self-only coverage, a\n\nhealth plan that has an annual deductible that is not less than $2,450 and not more than\n\n$3,700, and under which the annual out-of-pocket expenses required to be paid (other\n\nthan for premiums) for covered benefits do not exceed $4,950.\n\n     (2) Family coverage. For taxable years beginning in 2022, the term \"high\n\ndeductible heal"
+        },
+        {
+          "pdf_page": 12,
+          "text": "Exemption Amounts for Alternative Minimum Tax. For taxable years beginning in\n\n2022, the exemption amounts under § 55(d)(1) are:\n\n   Joint Returns or Surviving Spouses                                $118,100\n\n   Unmarried Individuals (other than Surviving Spouses)              $75,900\n\n   Married Individuals Filing Separate Returns                       $59,050\n\n   Estates and Trusts                                                $26,500\n\nFor taxable years beginning in 2022, under § 55(b)(1), the excess taxable income\n\nabove which the 28 percent tax rate applies is:\n\n\n   Married Individuals Filing Separate Returns                       $103,050\n\n   Joint Returns, Unmarried Individuals (other\n   than surviving spouses), and Estates and Trusts                   $206,100\n\n\nFor taxable years beginning in 2022, the amounts used under § 55(d)(2) to determine\n\nthe phaseout of the exemption amounts are:\n\n                                                    Threshold          Complete\n                                                  Phaseout amount    Phaseout amount\n\n   Joint Returns or Surviving Spouses                $1,079,800          $1,552,200\n\n   Unmarried Individuals (other than                 $539,900            $843,500\n   Surviving Spouses)\n\n   Married Individuals Filing Separate               $539,900            $776,100\n\f                                           - 13 -\n\n\n      Returns\n\n      Estates and Trusts                             $88,300                $194,300\n\n      .12 Alternative Minimum Tax Exemption for a Child Subject to the \"Kiddie Tax.\" For\n\ntaxable years beginning in 2022, for a child to whom the § 1(g) \"kiddie tax\" applies, the\n\nexemption amount under §§ 55(d) and 59(j) for purposes of the alternative minimum tax\n\nunder § 55 may not exceed the"
+        }
+      ]
+    },
+    {
+      "id": "rp2023",
+      "title": "Revenue Procedure 2022-38",
+      "tax_year": 2023,
+      "url": "https://www.irs.gov/pub/irs-drop/rp-22-38.pdf",
+      "pinpoint": "Section 3: .01 Tables 1–4, .02 kiddie tax, .03 capital gain thresholds, AMT, standard deductions, section179, section199A, section213, section221, section448, section461, section911 and LTC per-diem.",
+      "sha256": "6c20f8a6c9a3bdf4251fcf50dbf2e2382abc8cbeb1e5e2d3eecdc38b2cbf6bbf",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 13,
+          "text": "Standard Deduction.\n\n         (1) In general. For taxable years beginning in 2023, the standard deduction\n\namounts under § 63(c)(2) are as follows:\n\nFiling Status                                                  Standard Deduction\n\nMarried Individuals Filing Joint Returns                       $27,700\nand Surviving Spouses (§ 1(j)(2)(A))\n\nHeads of Households (§ 1(j)(2)(B))                             $20,800\n\nUnmarried Individuals (other than Surviving Spouses            $13,850\nand Heads of Households) (§ 1(j)(2)(C))\n\nMarried Individuals Filing Separate                            $13,850\nReturns (§ 1(j)(2)(D))\n\n         (2) Dependent. For taxable years beginning in 2023, the standard deduction\n\namount under § 63(c)(5) for an individual who may be claimed as a dependent by\n\nanother taxpayer cannot exceed the greater of (1) $1,250, or (2) the sum of $400 and\n\nthe individual’s earned income.\n\f                                          - 14 -\n\n\n      (3) Aged or blind. For taxable years beginning in 2023, the additional standard\n\ndeduction amount under § 63(f) for the aged or the blind is $1,500. The additional\n\nstandard deduction amount is increased to $1,850 if the individual is also unmarried and\n\nnot a surviving spouse.\n\n   .16 Cafeteria Plans. For taxable years beginning in 2023, the dollar limitation under\n\n§ 125(i) on voluntary employee salary reductions for contributions to health flexible\n\nspending arrangements is $3,050. If the cafeteria plan permits the carryover of unused\n\namounts, the maximum carryover amount is $610.\n\n   .17 Qualified Transportation Fringe Benefit. For taxable years beginning in 2023, the\n\nmonthly limitation under § 132(f)(2)(A) regarding the aggregate fringe benefit exclusion\n\namount for transportation in a commuter highway vehicle and any tr"
+        },
+        {
+          "pdf_page": 16,
+          "text": "Qualified Business Income. For taxable years beginning in 2023, the threshold\n\namounts under § 199A(e)(2) and phase-in range amounts under § 199A(b)(3)(B) and\n\n§ 199A(d)(3)(A) are:\n\f                                            - 17 -\n\n\n Filing Status                                         Threshold           Phase-in range\n                                                       amount              amount\n Married Individuals Filing Joint Returns              $364,200            $464,200\n Married Individuals Filing Separate Returns           $182,100            $232,100\n All Other Returns                                     $182,100            $232,100\n\n\n   .28 Eligible Long-Term Care Premiums. For taxable years beginning in 2023, the\n\nlimitations under § 213(d)(10), regarding eligible long-term care premiums includible in\n\nthe term “medical care,” are as follows:\n\nAttained Age Before the Close of the Taxable Year      Limitation on Premiums\n\n40 or less                                             $480\n\nMore than 40 but not more than 50                      $890\n\nMore than 50 but not more than 60                      $1,790\n\nMore than 60 but not more than 70                      $4,770\n\nMore than 70                                           $5,960\n\n   .29 Medical Savings Accounts.\n\n      (1) Self-only coverage. For taxable years beginning in 2023, the term “high\n\ndeductible health plan” as defined in § 220(c)(2)(A) means, for self-only coverage, a\n\nhealth plan that has an annual deductible that is not less than $2,650 and not more than\n\n$3,950, and under which the annual out-of-pocket expenses required to be paid (other\n\nthan for premiums) for covered benefits do not exceed $5,300.\n\n      (2) Family coverage. For taxable years beginning in 2023, the term “high\n\ndeductible"
+        },
+        {
+          "pdf_page": 11,
+          "text": "Exemption Amounts for Alternative Minimum Tax. For taxable years beginning in\n\n2023, the exemption amounts under § 55(d)(1) are:\n\n   Joint Returns or Surviving Spouses                                    $126,500\n\n   Unmarried Individuals (other than Surviving Spouses)                  $81,300\n\f                                          - 12 -\n\n\n\n   Married Individuals Filing Separate Returns                          $63,250\n\n   Estates and Trusts                                                   $28,400\n\nFor taxable years beginning in 2023, under § 55(b)(1), the excess taxable income\n\nabove which the 28 percent tax rate applies is:\n\n   Married Individuals Filing Separate Returns                          $110,350\n\n   All Other Taxpayers                                                  $220,700\n\nFor taxable years beginning in 2023, the amounts used under § 55(d)(2) to determine\n\nthe phaseout of the exemption amounts are:\n\n                                                     Threshold            Complete\n                                                   Phaseout amount      Phaseout amount\n\n   Joint Returns or Surviving Spouses                $1,156,300             $1,662,300\n\n   Unmarried Individuals (other than                 $578,150               $903,350\n   Surviving Spouses)\n\n   Married Individuals Filing Separate               $578,150               $831,150\n   Returns\n\n   Estates and Trusts                                $94,600                $208,200\n\n   .12 Alternative Minimum Tax Exemption for a Child Subject to the “Kiddie Tax.” For\n\ntaxable years beginning in 2023, for a child to whom the § 1(g) “kiddie tax” applies, the\n\nexemption amount under §§ 55(d) and 59(j) for purposes of the alternative minimum tax\n\nunder § 55 may not exceed the sum of (1) the child’"
+        }
+      ]
+    },
+    {
+      "id": "rp2024",
+      "title": "Revenue Procedure 2023-34",
+      "tax_year": 2024,
+      "url": "https://www.irs.gov/pub/irs-drop/rp-23-34.pdf",
+      "pinpoint": "Section 3: .01 Tables 1–4, .02 kiddie tax, .03 capital gain thresholds, AMT, standard deductions, section179, section199A, section213, section221, section448, section461, section911 and LTC per-diem.",
+      "sha256": "544ba41c7ba64f77da521e0d174a7b7394dc72b5c7c73d10adb19952d5aaae57",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 12,
+          "text": "Standard Deduction.\n\n      (1) In general. For taxable years beginning in 2024, the standard deduction amounts\n\nunder § 63(c)(2) are as follows:\n\nFiling Status                                                                    Standard\n                                                                                 Deduction\nMarried Individuals Filing Joint Returns and Surviving Spouses (§ 1(j)(2)(A))     $29,200\nHeads of Households (§ 1(j)(2)(B))                                                $21,900\nUnmarried Individuals (other than Surviving Spouses and Heads of                  $14,600\nHouseholds) (§ 1(j)(2)(C))\nMarried Individuals Filing Separate Returns (§ 1(j)(2)(D))                        $14,600\n\n      (2) Dependent. For taxable years beginning in 2024, the standard deduction amount\n\nunder § 63(c)(5) for an individual who may be claimed as a dependent by another taxpayer\n\ncannot exceed the greater of (1) $1,300, or (2) the sum of $450 and the individual’s earned\n\nincome.\n\n      (3) Aged or blind. For taxable years beginning in 2024, the additional standard\n\ndeduction amount under § 63(f) for the aged or the blind is $1,550. The additional standard\n\ndeduction amount is increased to $1,950 if the individual is also unmarried and not a\n\nsurviving spouse.\n\n    .16 Cafeteria Plans. For taxable years beginning in 2024, the dollar limitation under\n\n§ 125(i) on voluntary employee salary reductions for contributions to health flexible\n\nspending arrangements is $3,200. If the cafeteria plan permits the carryover of unused\n\f                                             13\n\n\namounts, the maximum carryover amount is $640.\n\n   .17 Qualified Transportation Fringe Benefit. For taxable years beginning in 2024, the\n\nmonthly limitation under § 132(f)(2)(A) regarding the aggregate"
+        },
+        {
+          "pdf_page": 15,
+          "text": "Qualified Business Income. For taxable years beginning in 2024, the threshold\n\namounts under § 199A(e)(2) and phase-in range amounts under § 199A(b)(3)(B) and\n\n§ 199A(d)(3)(A) are:\n\n Filing Status                                     Threshold           Phase-in range\n                                                    amount                amount\n Married Individuals Filing Joint Returns          $383,900              $483,900\n Married Individuals Filing Separate               $191,950              $241,950\n Returns\n All Other Returns                                 $191,950               $241,950\n\n   .28 Eligible Long-Term Care Premiums. For taxable years beginning in 2024, the\n\nlimitations under § 213(d)(10), regarding eligible long-term care premiums includible in the\n\f                                               16\n\n\nterm “medical care”, as adjusted for inflation, are as follows:\n\n Attained Age Before the Close of the Taxable Year Limitation on Premiums\n 40 or less                                                        $470\n More than 40 but not more than 50                                 $880\n More than 50 but not more than 60                                $1,760\n More than 60 but not more than 70                                $4,710\n More than 70                                                     $5,880\n\n   .29 Medical Savings Accounts.\n\n     (1) Self-only coverage. For taxable years beginning in 2024, the term “high deductible\n\nhealth plan” as defined in § 220(c)(2)(A) means, for self-only coverage, a health plan that\n\nhas an annual deductible that is not less than $2,800 and not more than $4,150, and under\n\nwhich the annual out-of-pocket expenses required to be paid (other than for premiums) for\n\ncovered benefits do not exceed $5,550.\n\n     (2) Family cove"
+        },
+        {
+          "pdf_page": 10,
+          "text": "Exemption Amounts for Alternative Minimum Tax. For taxable years beginning in\n\n2024, the exemption amounts under § 55(d)(1) are:\n\n Joint Returns or Surviving Spouses                                          $133,300\n\n Unmarried Individuals (other than Surviving Spouses)                         $85,700\n\n Married Individuals Filing Separate Returns                                  $66,650\n\n Estates and Trusts                                                           $29,900\n\n\nFor taxable years beginning in 2024, under § 55(b)(1), the excess taxable income above\n\f                                               11\n\n\nwhich the 28 percent tax rate applies is:\n\n Married Individuals Filing Separate Returns                                $116,300\n All Other Taxpayers                                                        $232,600\n\nFor taxable years beginning in 2024, the amounts used under § 55(d)(2) to determine the\n\nphaseout of the exemption amounts are:\n\n                                            Threshold Phaseout        Complete Phaseout\n                                            Amount                    Amount\n Joint Returns or Surviving Spouses         $1,218,700                $1,751,900\n Unmarried Individuals (other than          $609,350                  $952,150\n Surviving Spouses)\n Married Individuals Filing Separate        $609,350                  $875,950\n Returns\n Estates and Trusts                         $99,700                   $219,300\n\n   .12 Alternative Minimum Tax Exemption for a Child Subject to the “Kiddie Tax.” For\n\ntaxable years beginning in 2024, for a child to whom the § 1(g) “kiddie tax” applies, the\n\nexemption amount under §§ 55(d) and 59(j) for purposes of the alternative minimum tax\n\nunder § 55 may not exceed the sum of (1) the child’s earned"
+        }
+      ]
+    },
+    {
+      "id": "i1040gi2021",
+      "title": "2021 Instructions for Form1040 and1040-SR",
+      "tax_year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/i1040gi--2021.pdf",
+      "pinpoint": "Tax Table ($0–99999), Tax Computation Worksheet ($100000+), QDCGT Worksheet, standard deduction chart; 2021 line12b charitable deduction.",
+      "sha256": "7337e61fe50cd309c260817d23468cd557426c7e5f15cdbdc291f6d2c7c50d90",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 71,
+          "text": "50,000    50,050      6,754     5,605   6,754    5,719    53,000    53,050      7,414     5,965   7,414    6,079    56,000    56,050      8,074     6,325   8,074    6,622\n 50,050    50,100      6,765     5,611   6,765    5,725    53,050    53,100      7,425     5,971   7,425    6,085    56,050    56,100      8,085     6,331   8,085    6,633\n 50,100    50,150      6,776     5,617   6,776    5,731    53,100    53,150      7,436     5,977   7,436    6,091    56,100    56,150      8,096     6,337   8,096    6,644\n 50,150    50,200      6,787     5,623   6,787    5,737    53,150    53,200      7,447     5,983   7,447    6,097    56,150    56,200      8,107     6,343   8,107    6,655\n 50,200    50,250      6,798     5,629   6,798    5,743    53,200    53,250      7,458     5,989   7,458    6,103    56,200    56,250      8,118     6,349   8,118    6,666\n 50,250    50,300      6,809     5,635   6,809    5,749    53,250    53,300      7,469     5,995   7,469    6,109    56,250    56,300      8,129     6,355   8,129    6,677\n 50,300    50,350      6,820     5,641   6,820    5,755    53,300    53,350      7,480     6,001   7,480    6,115    56,300    56,350      8,140     6,361   8,140    6,688\n 50,350    50,400      6,831     5,647   6,831    5,761    53,350    53,400      7,491     6,007   7,491    6,121    56,350    56,400      8,151     6,367   8,151    6,699\n 50,400    50,450      6,842     5,653   6,842    5,767    53,400    53,450      7,502     6,013   7,502    6,127    56,400    56,450      8,162     6,373   8,162    6,710\n 50,450    50,500      6,853     5,659   6,853    5,773    53,450    53,500      7,513     6,019   7,513    6,133    56,450    56,500      8,173     6,379   8,173    6,721\n 50,500    50,550      6,864     5,665   6,864    5,779    53,500    53,550"
+        }
+      ]
+    },
+    {
+      "id": "i89622021",
+      "title": "2021 Instructions for Form8962",
+      "tax_year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/i8962--2021.pdf",
+      "pinpoint": "Tables1-1,1-2,1-3 (prior-year FPL); Table2 applicable figures; Table5 repayment; employer-sponsored affordability; 2021 unemployment rule.",
+      "sha256": "e4b4e5fa151c6964ec763c727288efc36672ecec1536a006aa0449f9adb6dd48",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 7,
+          "text": "Table 1-1. Federal Poverty Line for the 48                                                       line 4.\n\nContiguous States and the District of Columbia\n       IF your Family Size* from               THEN enter the amount below on\n       Form 8962, line 1, was . . .                Form 8962, line 4 . . .\n                     1                                        $12,760\n                     2                                        $17,240\n                     3                                        $21,720\n                     4                                        $26,200\n                     5                                        $30,680\n                     6                                        $35,160\n                     7                                        $39,640\n                     8                                        $44,120\n *If your family size was more than 8 people, add $4,480 for each additional person. For\n example, if your family size is 11, you have 3 additional people. Multiply $4,480 by 3\n and add the result of $13,440 to $44,120. Enter the result of $57,560 on Form 8962,\n line 4.\n\n\n\n\nInstructions for Form 8962 (2021)                                                          -7-\n\fLine 5                                                                                        • APTC was paid for the coverage of one or more months\n                                                                                              during 2021.\nFigure your household income as a percentage of the federal\npoverty line using Worksheet 2.                                                               • You otherwise qualify as an applicable taxpayer (except for"
+        },
+        {
+          "pdf_page": 15,
+          "text": "Table 5. Enter the appropriate amount from Table 5 on line 28.\n2—Victim of domestic abuse or spousal abandonment applies,                     If you were married at the end of 2021 but are filing separately\nneither spouse is allowed a PTC for 2021. According to Table 3,                from your spouse, the repayment limitations shown in Table 5\nthey follow the rules under Allocation Situation 2. Taxpayers                  apply to you and your spouse separately based on the\nmarried at year end but filing separate returns to allocate the                household income reported on each return.\nAPTC for the January through April coverage. (The other policy\n                                                                               Excess APTC not limited to amounts in Table 5. In the\namounts are not allocated because neither spouse is allowed a\n                                                                               following situations, excess APTC is not limited to the amounts\nPTC.) Under Allocation Situation 2. Taxpayers married at year\n                                                                               in Table 5. A different repayment limitation may apply or there\nend but filing separate returns, 50% of the $4,000 APTC\n                                                                               may be no repayment limitation.\n($2,000) is allocated to Melissa and 50% is allocated to Ryan.\nMelissa must add this amount to her APTC of $3,200 for her                         Leave line 28 blank and enter the amount from line 27 on\nsingle coverage. She enters the monthly amounts on lines 12                    line 29 if any of the following situations apply to you.\nthrough 23, column (f) ($500 for January through April and $400                 • Your e"
+        }
+      ]
+    },
+    {
+      "id": "i88892021",
+      "title": "2021 Instructions for Form8889",
+      "tax_year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/i8889--2021.pdf",
+      "pinpoint": "Line3 contribution limits and line7 additional age55 contribution; PartIII testing period.",
+      "sha256": "d7fdfb332c1ab9c3fa490f5a020d14fb17742c53d51071696095ec975ea40991",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 3,
+          "text": "maximum contribution is       amounts rolled over from another HSA\nassets in the account as of January 1,       $7,200.                                      or Archer MSA. See Rollovers, earlier.\n2021, on line 14a.                                                                        Also, do not include any qualified HSA\n• You used any portion of any of your        Note. If you are age 55 or older at the      funding distributions (see line 10).\nHSAs as security for a loan at any time      end of your tax year, you can make an        Contributions to an employee's account\nin 2021. You must include the fair           additional contribution of $1,000.           through a cafeteria plan are treated as\nmarket value of the assets used as               Your maximum contribution is             employer contributions and are not\nsecurity for the loan as income on           reduced by any employer contributions        included on line 2.\nline 8e of Schedule 1 (Form 1040).           to your HSA, any contributions made to\n                                                                                          Line 3\n                                             your Archer MSA, and any qualified\n   Any deemed distribution will not be       HSA funding distributions.                   When figuring the amount to enter on\ntreated as used to pay qualified medical                                                  line 3, apply the following rules.\nexpenses. Generally, these distributions         You can make deductible\n                                             contributions to your HSA even if your           1. Use the family coverage amount\nare subject to the additional 20% tax.                                                    if you or your spouse had an HDHP with"
+        }
+      ]
+    },
+    {
+      "id": "i1040sse2021",
+      "title": "2021 Instructions for ScheduleSE",
+      "tax_year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/i1040sse--2021.pdf",
+      "pinpoint": "What is new / line7 Social Security wage base; Optional Methods (farm gross/net and maximum).",
+      "sha256": "7dcd878dc46c587792b350e9d6a9a7090f91f54419d0e3807ac1d89153c749fc",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 1,
+          "text": "social security tax is $142,800.               self-employment, it may be to        line 4. However, if you had other earn-\n                                              your benefit to file Schedule SE and use      ings of $400 or more subject to SE tax,\nCredits for self-employed persons.            either \"optional method\" in the instruc-      see line A at the top of Schedule SE.\nExtended refundable credits are availa-       tions for Part II of Schedule SE (dis-\nble to certain self-employed persons im-                                                             If you have ever filed Form\n                                              cussed later).\npacted by the coronavirus. See the In-                                                         !     2031 to elect social security\n                                                                                            CAUTION coverage on your earnings as a\nstructions for Form 7202 for more\n                                              Who Must Pay                                  minister, you can’t revoke that election.\ninformation.\n                                              Self-Employment (SE) Tax\n                                                                                                If you must pay SE tax, include this\nReminder                                      Self-Employed Persons                         income on Schedule SE, line 2. But\nSelf-employed tax payments deferred           You must pay SE tax if you had net            don’t report it on Schedule SE, line 5a;\nin 2020. Legislation allowed for              earnings of $400 or more as a self-em-        it isn’t considered church employee in-\nself-employed individuals to defer the        ployed person. If you are in business         come. Al"
+        },
+        {
+          "pdf_page": 6,
+          "text": "farm optional method.\ndeductions, or other items that are sub-    come, up to $5,880, as your net earn-        The net earnings of $400 or more could\nject to an AGI limit. Figure your AGI       ings. This method can increase or de-        be from either, farm or nonfarm earn-\nwith and without using the optional         crease your net earnings from farm           ings, or both. The net earnings include\nmethods to see if the optional methods      self-employment even if the farming          your distributive share of partnership in-\nwill benefit you.                           business had a loss.                         come or loss subject to SE tax.\n        Using the optional methods as          For a farm partnership, figure your          You can use the nonfarm optional\n                                            share of gross income based on the part-     method to figure your earnings from\n   !    described above may be benefi-\nCAUTION cial, but they may also increase    nership agreement. With guaranteed           self-employment for only 5 years. The 5\nyour SE tax.                                payments, your share of the partnership's    years don’t have to be consecutive.\n                                            gross income is your guaranteed pay-            Under this method, report in Part II,\n                                            ments plus your share of the gross in-       line 17, two-thirds of your gross non-\nChanging Your Method                        come after it is reduced by all guaran-      farm income, up to the amount on\nYou can change the method used to fig-      teed payments made by the partnership.       line 16, as your net earnings. But you\nure your net earnings from self-employ-     If you were a limited partner, include       c"
+        }
+      ]
+    },
+    {
+      "id": "i1040gi2022",
+      "title": "2022 Instructions for Form1040 and1040-SR",
+      "tax_year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/i1040gi--2022.pdf",
+      "pinpoint": "Tax Table ($0–99999), Tax Computation Worksheet ($100000+), QDCGT Worksheet, standard deduction chart; 2021 line12b charitable deduction.",
+      "sha256": "fcd5f84c414ca4d9553779bb558172554299807b3fe2649825aa2c06723de4c9",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 69,
+          "text": "50,000    50,050      6,623     5,592   6,623    5,710    53,000    53,050      7,283     5,952   7,283    6,070    56,000    56,050      7,943     6,312   7,943    6,443\n 50,050    50,100      6,634     5,598   6,634    5,716    53,050    53,100      7,294     5,958   7,294    6,076    56,050    56,100      7,954     6,318   7,954    6,454\n 50,100    50,150      6,645     5,604   6,645    5,722    53,100    53,150      7,305     5,964   7,305    6,082    56,100    56,150      7,965     6,324   7,965    6,465\n 50,150    50,200      6,656     5,610   6,656    5,728    53,150    53,200      7,316     5,970   7,316    6,088    56,150    56,200      7,976     6,330   7,976    6,476\n 50,200    50,250      6,667     5,616   6,667    5,734    53,200    53,250      7,327     5,976   7,327    6,094    56,200    56,250      7,987     6,336   7,987    6,487\n 50,250    50,300      6,678     5,622   6,678    5,740    53,250    53,300      7,338     5,982   7,338    6,100    56,250    56,300      7,998     6,342   7,998    6,498\n 50,300    50,350      6,689     5,628   6,689    5,746    53,300    53,350      7,349     5,988   7,349    6,106    56,300    56,350      8,009     6,348   8,009    6,509\n 50,350    50,400      6,700     5,634   6,700    5,752    53,350    53,400      7,360     5,994   7,360    6,112    56,350    56,400      8,020     6,354   8,020    6,520\n 50,400    50,450      6,711     5,640   6,711    5,758    53,400    53,450      7,371     6,000   7,371    6,118    56,400    56,450      8,031     6,360   8,031    6,531\n 50,450    50,500      6,722     5,646   6,722    5,764    53,450    53,500      7,382     6,006   7,382    6,124    56,450    56,500      8,042     6,366   8,042    6,542\n 50,500    50,550      6,733     5,652   6,733    5,770    53,500    53,550"
+        }
+      ]
+    },
+    {
+      "id": "i89622022",
+      "title": "2022 Instructions for Form8962",
+      "tax_year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/i8962--2022.pdf",
+      "pinpoint": "Tables1-1,1-2,1-3 (prior-year FPL); Table2 applicable figures; Table5 repayment; employer-sponsored affordability; 2021 unemployment rule.",
+      "sha256": "de69b83a5d1630b8193f6a61ebf7c140916d1cc3f47bea1634126b9dc182afb0",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 7,
+          "text": "Table 1-1. Federal Poverty Line for the 48                                                                            3                                        $25,260\nContiguous States and the District of Columbia                                                                        4                                        $30,480\n                                                                                                                      5                                        $35,700\n       IF your Family Size* from               THEN enter the amount below on                                         6                                        $40,920\n       Form 8962, line 1, was . . .                Form 8962, line 4 . . .                                            7                                        $46,140\n                     1                                        $12,880                                                 8                                        $51,360\n                     2                                        $17,420                            *If your family size was more than 8, add $5,220 for each additional person. For\n                     3                                        $21,960                            example, if your family size is 11, you have 3 additional people. Multiply $5,220 by 3\n                     4                                        $26,500                            and add the result of $15,660 to $51,360. Enter the result of $67,020 on Form 8962,\n                     5                                        $31,040                            line 4.\n                     6                                        $35,580\n                     7                                        $40,120"
+        },
+        {
+          "pdf_page": 15,
+          "text": "Table 5. Enter the appropriate amount from Table 5 on line 28.\n2—Victim of domestic abuse or spousal abandonment applies,                     If you were married at the end of 2022 but are filing separately\nneither spouse is allowed a PTC for 2022. According to Table 3,                from your spouse, the repayment limitations shown in Table 5\nthey follow the rules under Allocation Situation 2. Taxpayers                  apply to you and your spouse separately based on the\nmarried at year end but filing separate returns to allocate the                household income reported on each return.\nAPTC for the January through April coverage. (The other policy                     If your entry on Form 8962, line 5, is 400 or more, there is no\namounts are not allocated because neither spouse is allowed a                  repayment limitation. You must repay the amount shown on\nPTC.) Under Allocation Situation 2. Taxpayers married at year                  line 27. Leave line 28 blank and enter the amount from line 27 on\nend but filing separate returns, 50% of the $4,000 APTC                        line 29.\n($2,000) is allocated to Melissa and 50% is allocated to Ryan.\nMelissa must add this amount to her APTC of $3,200 for her                        If you are self-employed and are claiming the self-employed\nsingle coverage. She enters the monthly amounts on lines 12                    health insurance deduction, see Self-Employed Health\nthrough 23, column (f) ($500 for January through April and $400                Insurance Deduction and PTC in Pub. 974 for the amount to\nfor May through December), and the total of $5,200 on Form                     enter on line 28.\n8962, lines 25 and 27. She then completes lines 28 (if it applies\nto her) and 29. Melissa enters the amount from"
+        }
+      ]
+    },
+    {
+      "id": "i88892022",
+      "title": "2022 Instructions for Form8889",
+      "tax_year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/i8889--2022.pdf",
+      "pinpoint": "Line3 contribution limits and line7 additional age55 contribution; PartIII testing period.",
+      "sha256": "95a142f32936dbe69b97c7f6ad1240d238afb4ced23d01fcb95fa07e5c275c39",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 3,
+          "text": "maximum contribution is\nhim or her.                                  2022, on line 14a.                           $7,300.\n                                             • You used any portion of any of your        Note. If you are age 55 or older at the\n    If the designated beneficiary is not     HSAs as security for a loan at any time\nthe account beneficiary's surviving                                                       end of your tax year, you can make an\n                                             in 2022. You must include the fair\nspouse, or there is no designated                                                         additional contribution of $1,000.\n                                             market value of the assets used as\nbeneficiary, the account ceases to be        security for the loan as income on line 8f      Your maximum contribution is\nan HSA as of the date of death. The          of Schedule 1 (Form 1040).                   reduced by any employer contributions\nbeneficiary completes Form 8889 as                                                        to your HSA, any contributions made to\nfollows.                                        Any deemed distribution will not be       your Archer MSA, and any qualified\n• Enter “Death of HSA account                treated as used to pay qualified medical     HSA funding distributions.\nbeneficiary” across the top of Form          expenses. Generally, these distributions\n8889.                                        are subject to the additional 20% tax.           You can make deductible\n• Enter the name(s) shown on the                                                          contributions to your HSA even if your\nbeneficiary's tax return and the             Rollovers                                    employ"
+        }
+      ]
+    },
+    {
+      "id": "i1040sse2022",
+      "title": "2022 Instructions for ScheduleSE",
+      "tax_year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/i1040sse--2022.pdf",
+      "pinpoint": "What is new / line7 Social Security wage base; Optional Methods (farm gross/net and maximum).",
+      "sha256": "c171269529b93deaf2eb4bd8014d6abf4aab572e88d949101cdd9a986c964ec2",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 1,
+          "text": "social security tax is $147,000.      Self-Employed Persons\n                                                                                                If you must pay SE tax, include this\n                                              You must pay SE tax if you had net\nReminder                                      earnings of $400 or more as a self-em-\n                                                                                            income on Schedule SE, line 2. But\n                                                                                            don’t report it on Schedule SE, line 5a;\nSelf-employed tax payments deferred           ployed person. If you are in business\n                                                                                            it isn’t considered church employee in-\nin 2020. Previous legislation allowed         (farm or nonfarm) for yourself, you are\n                                                                                            come. Also, include on line 2:\nfor self-employed individuals to defer        self-employed.\nthe payment of certain social security           You must also pay SE tax on your\n                                                                                                • The rental value of a home or an\n                                                                                            allowance for a home furnished to you\ntaxes from 2020 over the next 2 years.        share of certain partnership income and       (including payments for utilities); and\nSee IRS.gov/Payments for more infor-          your guaranteed payments. See Partner-\nmation about payment options.                 ship Income or Loss, later."
+        },
+        {
+          "pdf_page": 6,
+          "text": "farm optional method.\nduction.                                       Under this method, report in Part II,     The net earnings of $400 or more could\nOther items affected by adjusted            line 15, two-thirds of your gross farm in-   be from either farm or nonfarm earn-\ngross income (AGI). Using the option-       come, up to $6,040, as your net earn-        ings, or both. The net earnings include\nal methods may decrease your AGI,           ings. This method can increase or de-        your distributive share of partnership in-\nwhich may affect your eligibility for       crease your net earnings from farm           come or loss subject to SE tax.\ncredits, deductions, or other items that    self-employment even if the farming             You can use the nonfarm optional\nare subject to an AGI limit. Figure your    business had a loss.                         method to figure your earnings from\nAGI with and without using the optional        For a farm partnership, figure your       self-employment for only 5 years. The 5\nmethods to see if the optional methods      share of gross income based on the part-     years don’t have to be consecutive.\nwill benefit you.                           nership agreement. With guaranteed              Under this method, report in Part II,\n         Using the optional methods as      payments, your share of the partnership's    line 17, two-thirds of your gross non-\n                                            gross income is your guaranteed pay-         farm income, up to the amount on\n   !     described above may be benefi-\nCAUTION cial, but they may also increase    ments plus your share of the gross in-       line 16, as your net earnings. But you\nyour SE tax.                                come after it is reduced by all guaran-      c"
+        }
+      ]
+    },
+    {
+      "id": "i1040gi2023",
+      "title": "2023 Instructions for Form1040 and1040-SR",
+      "tax_year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/i1040gi--2023.pdf",
+      "pinpoint": "Tax Table ($0–99999), Tax Computation Worksheet ($100000+), QDCGT Worksheet, standard deduction chart; 2021 line12b charitable deduction.",
+      "sha256": "90c8759c7a829d8c74296187cdbdb47bc9025480fffc41ff5e7225889c8fea7e",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 71,
+          "text": "50,000    50,050      6,313     5,563    6,313   5,689    53,000    53,050      6,973     5,923    6,973   6,049    56,000    56,050      7,633     6,283    7,633   6,409\n 50,050    50,100      6,324     5,569    6,324   5,695    53,050    53,100      6,984     5,929    6,984   6,055    56,050    56,100      7,644     6,289    7,644   6,415\n 50,100    50,150      6,335     5,575    6,335   5,701    53,100    53,150      6,995     5,935    6,995   6,061    56,100    56,150      7,655     6,295    7,655   6,421\n 50,150    50,200      6,346     5,581    6,346   5,707    53,150    53,200      7,006     5,941    7,006   6,067    56,150    56,200      7,666     6,301    7,666   6,427\n 50,200    50,250      6,357     5,587    6,357   5,713    53,200    53,250      7,017     5,947    7,017   6,073    56,200    56,250      7,677     6,307    7,677   6,433\n 50,250    50,300      6,368     5,593    6,368   5,719    53,250    53,300      7,028     5,953    7,028   6,079    56,250    56,300      7,688     6,313    7,688   6,439\n 50,300    50,350      6,379     5,599    6,379   5,725    53,300    53,350      7,039     5,959    7,039   6,085    56,300    56,350      7,699     6,319    7,699   6,445\n 50,350    50,400      6,390     5,605    6,390   5,731    53,350    53,400      7,050     5,965    7,050   6,091    56,350    56,400      7,710     6,325    7,710   6,451\n 50,400    50,450      6,401     5,611    6,401   5,737    53,400    53,450      7,061     5,971    7,061   6,097    56,400    56,450      7,721     6,331    7,721   6,457\n 50,450    50,500      6,412     5,617    6,412   5,743    53,450    53,500      7,072     5,977    7,072   6,103    56,450    56,500      7,732     6,337    7,732   6,463\n 50,500    50,550      6,423     5,623    6,423   5,749    53,500    53,550"
+        }
+      ]
+    },
+    {
+      "id": "i89622023",
+      "title": "2023 Instructions for Form8962",
+      "tax_year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/i8962--2023.pdf",
+      "pinpoint": "Tables1-1,1-2,1-3 (prior-year FPL); Table2 applicable figures; Table5 repayment; employer-sponsored affordability; 2021 unemployment rule.",
+      "sha256": "a9a9e5989ac3a64239afb8aff4ee03c255b998580ef7ced8b86042a5bcd0e787",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 7,
+          "text": "Table 1-1. Federal Poverty Line for the 48                                                        line 4.\n\nContiguous States and the District of Columbia\n        IF your Family Size* from                THEN enter the amount below on\n        Form 8962, line 1, was . . .                 Form 8962, line 4 . . .\n                      1                                         $13,590\n                      2                                         $18,310\n                      3                                         $23,030\n                      4                                         $27,750\n                      5                                         $32,470\n                      6                                         $37,190\n                      7                                         $41,910\n                      8                                         $46,630\n * If your family size was more than 8 people, add $4,720 for each additional person.\n For example, if your family size is 11, you have 3 additional people. Multiply $4,720 by\n 3 and add the result of $14,160 to $46,630. Enter the result of $60,790 on Form 8962,\n line 4.\n\n\n\n\nInstructions for Form 8962 (2023)                                                           -7-\n\fLine 5                                                                                         • APTC was paid for the coverage of 1 or more months during\n                                                                                               2023.\nFigure your household income as a percentage of the federal\npoverty line using Worksheet 2.                                                                • You otherwise qualify as an applicable taxpayer (except for"
+        },
+        {
+          "pdf_page": 15,
+          "text": "Table 5. Enter the appropriate amount from Table 5 on line 28.\nException 1—Certain married persons living apart nor Exception\n                                                                               If you were married at the end of 2023 but are filing separately\n2—Victim of domestic abuse or spousal abandonment applies,\n                                                                               from your spouse, the repayment limitations shown in Table 5\nneither spouse is allowed a PTC for 2023. According to Table 3,\n                                                                               apply to you and your spouse separately based on the\nthey follow the rules under Allocation Situation 2. Taxpayers\n                                                                               household income reported on each return.\nmarried at year end but filing separate returns to allocate the\nAPTC for the January through April coverage. (The other policy                     If your entry on Form 8962, line 5, is 400 or more, there is no\namounts are not allocated because neither spouse is allowed a                  repayment limitation. You must repay the amount shown on\nPTC.) Under Allocation Situation 2. Taxpayers married at year                  line 27. Leave line 28 blank and enter the amount from line 27 on\nend but filing separate returns, 50% of the $4,000 APTC                        line 29.\n($2,000) is allocated to Melissa and 50% is allocated to Ryan.\nMelissa must add this amount to her APTC of $3,200 for her                        If you are self-employed and are claiming the self-employed\nsingle coverage. She enters the monthly amounts on lines 12                    health insurance deduction, see Self-Employed Health\nthrough 23, column (f) ($500 for Ja"
+        }
+      ]
+    },
+    {
+      "id": "i88892023",
+      "title": "2023 Instructions for Form8889",
+      "tax_year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/i8889--2023.pdf",
+      "pinpoint": "Line3 contribution limits and line7 additional age55 contribution; PartIII testing period.",
+      "sha256": "2006a4ec75bfbdfa4a6f74eb141e8b659633bafdc50c3dc0d57cf95f5079d370",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 4,
+          "text": "maximum contribution is $3,850. If\n                                                                          Line 3\nyou have family coverage, your maximum contribution is                    When figuring the amount to enter on line 3, apply the\n$7,750.                                                                   following rules.\n                                                                              1. Use the family coverage amount if you or your spouse\nNote. If you are age 55 or older at the end of your tax year,             had an HDHP with family coverage. Disregard any plan with\nyou can make an additional contribution of $1,000.                        self-only coverage.\n   Your maximum contribution is reduced by any employer                       2. If the last-month rule (see Last-month rule, earlier)\ncontributions to your HSA, any contributions made to your                 applies, you are considered an eligible individual for the\nArcher MSA, and any qualified HSA funding distributions.                  entire year. You are treated as having the same HDHP\n                                                                          coverage for the entire year as you had on the first day of the\n   You can make deductible contributions to your HSA even if              last month of your tax year.\nyour employer made contributions. However, if you (or\nsomeone on your behalf) made contributions in addition to                     3. If you were, or were considered, an eligible individual\nany employer contributions and qualified HSA funding                      for the entire year and you did not change your type of\ndistributions, you may have to pay an additional tax. See                 coverage, enter $3,850 for a self-only HDHP or $7,750 for a\nExcess Contri"
+        }
+      ]
+    },
+    {
+      "id": "i1040sse2023",
+      "title": "2023 Instructions for ScheduleSE",
+      "tax_year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/i1040sse--2023.pdf",
+      "pinpoint": "What is new / line7 Social Security wage base; Optional Methods (farm gross/net and maximum).",
+      "sha256": "b5e99819f1226c3e169e073deb331ea73585303598e80d9417b441ae923e92d5",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 1,
+          "text": "social security tax. For 2023,               Employees of Churches and Church Organizations\nthe maximum amount of self-employment income subject to\nsocial security tax is $160,200.                                       If you had church employee income of $108.28 or more, you\n                                                                       must pay SE tax. Church employee income is wages you re-\nForm 1040-SS, Part V and Part VI, have been replaced.                  ceived as an employee (other than as a minister, member of a\nFor 2023, Schedule SE (Form 1040) is available to be filed             religious order, or Christian Science practitioner) of a church or\nwith Form 1040-SS, if applicable. For additional information,          qualified church-controlled organization that has a certificate in\nsee the Instructions for Form 1040-SS.                                 effect electing an exemption from employer social security and\n                                                                       Medicare taxes.\nGeneral Instructions\n                                                                       Ministers, Members of Religious Orders, and\nWho Must File Schedule SE                                              Christian Science Practitioners\nYou must file Schedule SE if:                                          In most cases, you must pay SE tax on salaries and other in-\n    • The amount on line 4c of Schedule SE is $400 or more,            come for services you performed as a minister, member of a re-\nor                                                                     ligious order who hasn’t taken a vow of poverty, or Christian\n    • You had church employee income of $108.28 or more.               Science practitioner. But if you filed Form 4361 and rece"
+        },
+        {
+          "pdf_page": 6,
+          "text": "farm Optional Method\nhave a loss or a small amount of income from self-employ-              You may be able to use this method to figure your net earnings\nment.                                                                  from nonfarm self-employment if your net nonfarm profits\nCredits affected by earned income. Using the optional meth-            were less than $7,103 and also less than 72.189% of your gross\nods may qualify you to claim the earned income credit (EIC),           nonfarm income. Net nonfarm profits are the total of the\nadditional child tax credit (ACTC), or child and dependent care        amounts from:\ncredit or give you a larger credit if your net earnings from               • Schedule C (Form 1040), line 31; and\nself-employment (determined without using the optional meth-               • Box 14, code A, of Schedule K-1 (Form 1065) (from oth-\nods) are less than $6,560. Figure the EIC, ACTC, and child and         er than farm partnerships).\ndependent care credit with and without using the optional                  To use this method, you must also be regularly self-em-\nmethods to see if the optional methods will benefit you.               ployed. You meet this requirement if your actual net earnings\nSelf-employed health insurance deduction. The optional                 from self-employment were $400 or more in 2 of the 3 years\nmethods of computing net earnings from self-employment may             before the year you use the nonfarm optional method. The net\nbe used to figure your self-employed health insurance deduc-           earnings of $400 or more could be from either farm or nonfarm\ntion.                                                                  earnings, or both. The net earnings include your distributive\nOther items affected by adjusted"
+        }
+      ]
+    },
+    {
+      "id": "i1040gi2024",
+      "title": "2024 Instructions for Form1040 and1040-SR",
+      "tax_year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/i1040gi--2024.pdf",
+      "pinpoint": "Tax Table ($0–99999), Tax Computation Worksheet ($100000+), QDCGT Worksheet, standard deduction chart; 2021 line12b charitable deduction.",
+      "sha256": "0ae53ed5020d69e6571d40cd7955b7735f44a28df483626d128628d2810e93d4",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 70,
+          "text": "50,000    50,050      6,059     5,539    6,059   5,672    53,000    53,050      6,719     5,899    6,719   6,032    56,000    56,050      7,379     6,259    7,379   6,392\n 50,050    50,100      6,070     5,545    6,070   5,678    53,050    53,100      6,730     5,905    6,730   6,038    56,050    56,100      7,390     6,265    7,390   6,398\n 50,100    50,150      6,081     5,551    6,081   5,684    53,100    53,150      6,741     5,911    6,741   6,044    56,100    56,150      7,401     6,271    7,401   6,404\n 50,150    50,200      6,092     5,557    6,092   5,690    53,150    53,200      6,752     5,917    6,752   6,050    56,150    56,200      7,412     6,277    7,412   6,410\n 50,200    50,250      6,103     5,563    6,103   5,696    53,200    53,250      6,763     5,923    6,763   6,056    56,200    56,250      7,423     6,283    7,423   6,416\n 50,250    50,300      6,114     5,569    6,114   5,702    53,250    53,300      6,774     5,929    6,774   6,062    56,250    56,300      7,434     6,289    7,434   6,422\n 50,300    50,350      6,125     5,575    6,125   5,708    53,300    53,350      6,785     5,935    6,785   6,068    56,300    56,350      7,445     6,295    7,445   6,428\n 50,350    50,400      6,136     5,581    6,136   5,714    53,350    53,400      6,796     5,941    6,796   6,074    56,350    56,400      7,456     6,301    7,456   6,434\n 50,400    50,450      6,147     5,587    6,147   5,720    53,400    53,450      6,807     5,947    6,807   6,080    56,400    56,450      7,467     6,307    7,467   6,440\n 50,450    50,500      6,158     5,593    6,158   5,726    53,450    53,500      6,818     5,953    6,818   6,086    56,450    56,500      7,478     6,313    7,478   6,446\n 50,500    50,550      6,169     5,599    6,169   5,732    53,500    53,550"
+        }
+      ]
+    },
+    {
+      "id": "i89622024",
+      "title": "2024 Instructions for Form8962",
+      "tax_year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/i8962--2024.pdf",
+      "pinpoint": "Tables1-1,1-2,1-3 (prior-year FPL); Table2 applicable figures; Table5 repayment; employer-sponsored affordability; 2021 unemployment rule.",
+      "sha256": "c7aade0f20fe7e32a2a34e6af6d30288f563bc46efc43a682626134e48b899b9",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 8,
+          "text": "Table 1-1. Federal Poverty Line for the 48\n   than line 6b, subtract line 6b from line 6a and                             Contiguous States and the District of Columbia\n   enter the result . . . . . . . . . . . . . . . . . . .     4.\n5. Add lines 1 through 4. Enter here and on Form                                   IF your Family Size* from            THEN enter the amount below on\n   8962, line 2a . . . . . . . . . . . . . . . . . . . . .    5.                   Form 8962, line 1, was . . .             Form 8962, line 4 . . .\n* If you are filing Form 8814 and the amount on Form 8814, line 4, is more                        1                                    $14,580\nthan $1,300, you must enter certain amounts from that form on Worksheet                           2                                    $19,720\n1-2. See Form 8814 under Line 2b below.\n                                                                                                  3                                    $24,860\n                                                                                                  4                                    $30,000\n                                                                                                  5                                    $35,140\nLine 2b                                                                                           6                                    $40,280\n                                                                                                  7                                    $45,420\nEnter on line 2b the combined modified AGI for your\n                                                                                                  8                                    $50,560\ndependents who are required to"
+        },
+        {
+          "pdf_page": 17,
+          "text": "Table 5. Enter the appropriate amount from                      tax return) was enrolled in the same policy as your former\nTable 5 on line 28. If you were married at the end of 2024                 spouse or as an individual in your former spouse's tax\nbut are filing separately from your spouse, the repayment                  family.\nlimitations shown in Table 5 apply to you and your spouse                      You will allocate between you and your former spouse\nseparately based on the household income reported on                       the total enrollment premiums, the applicable SLCSP\neach return.                                                               premium, and APTC for coverage under the plan during\n   If your entry on Form 8962, line 5, is 400 or more, there               the months you were married. You will find these amounts\nis no repayment limitation. You must repay the amount                      on your Form(s) 1095-A, Part III, columns A, B, and C,\nshown on line 27. Leave line 28 blank and enter the                        respectively. You and your former spouse may agree to\namount from line 27 on line 29.                                            allocate any percentage (from 0% to 100%) of these\n                                                                           amounts to one of you (with the remainder allocated to the\n   If you are self-employed and are claiming the\n                                                                           other), but you must allocate all three amounts using the\nself-employed health insurance deduction, see\n                                                                           same percentage. If you do not agree on a percentage,\nSelf-Employed Health Insurance Deduction and PTC in"
+        }
+      ]
+    },
+    {
+      "id": "i88892024",
+      "title": "2024 Instructions for Form8889",
+      "tax_year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/i8889--2024.pdf",
+      "pinpoint": "Line3 contribution limits and line7 additional age55 contribution; PartIII testing period.",
+      "sha256": "accd65700f75c26127e835d13969c2c44d46c821a4748c57ce74c532c6c65392",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 4,
+          "text": "maximum contribution is $4,150. If         Line 3\nyou have family coverage, your maximum contribution is              When figuring the amount to enter on line 3, apply the\n$8,300.                                                             following rules.\n                                                                        1. Use the family coverage amount if you or your spouse\nNote. If you are age 55 or older at the end of your tax year,       had an HDHP with family coverage. Disregard any plan with\nyou can make an additional contribution of $1,000.                  self-only coverage.\n   Your maximum contribution is reduced by any employer                 2. If the last-month rule (see Last-month rule, earlier)\ncontributions to your HSA, any contributions made to your           applies, you are considered an eligible individual for the\nArcher MSA, and any qualified HSA funding distributions.            entire year. You are treated as having the same HDHP\n  You can make deductible contributions to your HSA even if         coverage for the entire year as you had on the first day of the\nyour employer made contributions. However, if you (or               last month of your tax year.\nsomeone on your behalf) made contributions in addition to               3. If you were, or were considered, an eligible individual\nany employer contributions and qualified HSA funding                for the entire year and you did not change your type of\n\n4                                                                                               Instructions for Form 8889 (2024)\n\fcoverage, enter $4,150 for a self-only HDHP or $8,300 for a              6. If, at the end of 2024, you were age 55 or older and\nfamily HDHP on line 3. (See (6) in this list.)                        unmarrie"
+        }
+      ]
+    },
+    {
+      "id": "i1040sse2024",
+      "title": "2024 Instructions for ScheduleSE",
+      "tax_year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/i1040sse--2024.pdf",
+      "pinpoint": "What is new / line7 Social Security wage base; Optional Methods (farm gross/net and maximum).",
+      "sha256": "8cc5629c3032491e06b72c968f7dae958e1473d744d7f0a8fd808c71cda7a30b",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 1,
+          "text": "social security tax. For 2024,               Employees of Churches and Church Organizations\nthe maximum amount of self-employment income subject to\nsocial security tax is $168,600.                                       If you had church employee income of $108.28 or more, you\n                                                                       must pay SE tax. Church employee income is wages you re-\nReminders                                                              ceived as an employee (other than as a minister, member of a\n                                                                       religious order, or Christian Science practitioner) of a church or\nForm 1040-SS. Using Schedule SE (Form 1040) to report                  qualified church-controlled organization that has a certificate in\nself-employment tax for residents of U.S. territories. Sched-          effect electing an exemption from employer social security and\nule SE (Form 1040) must be filed with Form 1040-SS to report           Medicare taxes.\nself-employment taxes by residents of the U.S. Virgin Islands,\nGuam, American Samoa, the Commonwealth of the Northern                 Ministers, Members of Religious Orders, and\nMariana Islands (CNMI), and Puerto Rico. For additional in-            Christian Science Practitioners\nformation, see the Instructions for Form 1040-SS.\n                                                                       In most cases, you must pay SE tax on salaries and other in-\n                                                                       come for services you performed as a minister, member of a re-\nGeneral Instructions                                                   ligious order who hasn’t taken a vow of poverty, or Christian"
+        },
+        {
+          "pdf_page": 6,
+          "text": "farm Optional Method\ncredit or give you a larger credit if your net earnings from           You may be able to use this method to figure your net earnings\nself-employment (determined without using the optional meth-           from nonfarm self-employment if your net nonfarm profits\nods) are less than $6,920. Figure the EIC, ACTC, and child and         were less than $7,493 and also less than 72.189% of your gross\ndependent care credit with and without using the optional              nonfarm income. Net nonfarm profits are the total of the\nmethods to see if the optional methods will benefit you.               amounts from:\nSelf-employed health insurance deduction. The optional                     • Schedule C (Form 1040), line 31; and\nmethods of computing net earnings from self-employment may                 • Box 14, code A, of Schedule K-1 (Form 1065) (from oth-\nbe used to figure your self-employed health insurance deduc-           er than farm partnerships).\ntion. See Form 7206 and its instructions to determine if your              To use this method, you must also be regularly self-em-\nself-employed health insurance deduction is limited.                   ployed. You meet this requirement if your actual net earnings\nOther items affected by adjusted gross income (AGI). Us-               from self-employment were $400 or more in 2 of the 3 consec-\ning the optional methods may decrease your AGI, which may              utive taxable years immediately preceding the year you use the\naffect your eligibility for credits, deductions, or other items that   nonfarm optional method. The net earnings of $400 or more\nare subject to an AGI limit. Figure your AGI with and without          could be from either farm or nonfarm earnings, or both. The\nusing the optional methods to see i"
+        }
+      ]
+    },
+    {
+      "id": "notice2021",
+      "title": "Notice 2020-79",
+      "tax_year": 2021,
+      "url": "https://www.irs.gov/pub/irs-drop/n-20-79.pdf",
+      "pinpoint": "Cost-of-living adjusted limits: IRC 219, 25B, 402(g), 408(p), 414(v), 415(c); 2024 section408(d)(8) QCD.",
+      "sha256": "fcabeb97d4ab3045472d96bbc16aa9fab978cfebc2c6369f3368c6875fade001",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 3,
+          "text": "219(b)(5)(A) for an individual making qualified retirement\ncontributions remains unchanged at $6,000.\n\nThe applicable dollar amount under § 219(g)(3)(B)(i) for determining the deductible\namount of an IRA contribution for taxpayers who are active participants filing a joint\nreturn or as a qualifying widow(er) is increased from $104,000 to $105,000. The\napplicable dollar amount under § 219(g)(3)(B)(ii) for all other taxpayers who are active\nparticipants (other than married taxpayers filing separate returns) is increased from\n$65,000 to $66,000. If an individual or the individual’s spouse is an active participant,\nthe applicable dollar amount under § 219(g)(3)(B)(iii) for a married individual filing a\nseparate return is not subject to an annual cost-of-living adjustment and remains $0.\nThe applicable dollar amount under § 219(g)(7)(A) for a taxpayer who is not an active\nparticipant but whose spouse is an active participant is increased from $196,000 to\n$198,000.\n\nAccordingly, under § 219(g)(2)(A), the deduction for taxpayers making contributions to a\ntraditional IRA is phased out for single individuals and heads of household who are\nactive participants in a qualified plan (or another retirement plan specified in § 219(g)(5))\nand have adjusted gross incomes (as defined in § 219(g)(3)(A)) between $66,000 and\n$76,000, increased from between $65,000 and $75,000. For married couples filing\njointly, if the spouse who makes the IRA contribution is an active participant, the income\nphase-out range is between $105,000 and $125,000, increased from between $104,000\nand $124,000. For an IRA contributor who is not an active participant and is married to\nsomeone who is an active participant, the deduction is phased out if the couple’s income\nis between $198,000 and $208,000, increased f"
+        },
+        {
+          "pdf_page": 1,
+          "text": "402(g)(1) on the exclusion for elective deferrals described in\n       § 402(g)(3) remains unchanged at $19,500.\n\n       The annual compensation limit under §§ 401(a)(17), 404(l), 408(k)(3)(C), and\n       408(k)(6)(D)(ii) is increased from $285,000 to $290,000.\n\n       The dollar limitation under § 416(i)(1)(A)(i) concerning the definition of “key employee” in\n       a top-heavy plan remains unchanged at $185,000.\n\n       The dollar amount under § 409(o)(1)(C)(ii) for determining the maximum account\n       balance in an employee stock ownership plan subject to a 5-year distribution period is\n       increased from $1,150,000 to $1,165,000, while the dollar amount used to determine the\n       lengthening of the 5-year distribution period remains unchanged at $230,000.\n\n       The limitation used in the definition of “highly compensated employee” under\n       § 414(q)(1)(B) remains unchanged at $130,000.\n\n       The dollar limitation under § 414(v)(2)(B)(i) for catch-up contributions to an applicable\n       employer plan other than a plan described in § 401(k)(11) or § 408(p) for individuals\n       aged 50 or over remains unchanged at $6,500. The dollar limitation under\n       § 414(v)(2)(B)(ii) for catch-up contributions to an applicable employer plan described in\n       § 401(k)(11) or § 408(p) for individuals aged 50 or over remains unchanged at $3,000.\n\f       The annual compensation limitation under § 401(a)(17) for eligible participants in certain\n       governmental plans that, under the plan as in effect on July 1, 1993, allowed cost-of-\n       living adjustments to the compensation limitation under the plan under § 401(a)(17) to be\n       taken into account, is increased from $425,000 to $430,000.\n\n       The compensation amount under § 408(k)(2)(C) regarding simpl"
+        }
+      ]
+    },
+    {
+      "id": "notice2022",
+      "title": "Notice 2021-61",
+      "tax_year": 2022,
+      "url": "https://www.irs.gov/pub/irs-drop/n-21-61.pdf",
+      "pinpoint": "Cost-of-living adjusted limits: IRC 219, 25B, 402(g), 408(p), 414(v), 415(c); 2024 section408(d)(8) QCD.",
+      "sha256": "8016c2fdf5834b1d9e0fb68548aa07659bb2a9cfeb20a62633c51799c5e74004",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 3,
+          "text": "219(b)(5)(A) for an individual making\n       qualified retirement contributions remains unchanged at $6,000.\n\n       The applicable dollar amount under section 219(g)(3)(B)(i) for determining the\n       deductible amount of an IRA contribution for taxpayers who are active\n       participants filing a joint return or as a qualifying widow(er) is increased from\n       $105,000 to $109,000. The applicable dollar amount under section\n       219(g)(3)(B)(ii) for all other taxpayers who are active participants (other than\n       married taxpayers filing separate returns) is increased from $66,000 to $68,000.\n       If an individual or the individual’s spouse is an active participant, the applicable\n       dollar amount under section 219(g)(3)(B)(iii) for a married individual filing a\n       separate return is not subject to an annual cost-of-living adjustment and remains\n       $0. The applicable dollar amount under section 219(g)(7)(A) for a taxpayer who\n       is not an active participant but whose spouse is an active participant is increased\n       from $198,000 to $204,000.\n\n       Accordingly, under section 219(g)(2)(A), the deduction for taxpayers making\n       contributions to a traditional IRA is phased out for single individuals and heads of\n       household who are active participants in a qualified plan (or another retirement\n       plan specified in section 219(g)(5)) and have adjusted gross incomes (as defined\n\n                                             3\n\f      in section 219(g)(3)(A)) between $68,000 and $78,000, increased from between\n      $66,000 and $76,000. For married couples filing jointly, if the spouse who makes\n      the IRA contribution is an active participant, the income phase-out range is\n      between $109,000 and $129,000, increased from betwe"
+        },
+        {
+          "pdf_page": 1,
+          "text": "402(g)(1) on the exclusion for elective deferrals\n       described in section 402(g)(3) is increased from $19,500 to $20,500.\n\n       The annual compensation limit under sections 401(a)(17), 404(l), 408(k)(3)(C),\n       and 408(k)(6)(D)(ii) is increased from $290,000 to $305,000.\n\n       The dollar limitation under section 416(i)(1)(A)(i) concerning the definition of “key\n       employee” in a top-heavy plan is increased from $185,000 to $200,000.\n\n       The dollar amount under section 409(o)(1)(C)(ii) for determining the maximum\n       account balance in an employee stock ownership plan subject to a 5-year\n       distribution period is increased from $1,165,000 to $1,230,000, while the dollar\n       amount used to determine the lengthening of the 5-year distribution period is\n       increased from $230,000 to $245,000.\n\n\n\n                                             1\n\f      The limitation used in the definition of “highly compensated employee” under\n      section 414(q)(1)(B) is increased from $130,000 to $135,000.\n\n      The dollar limitation under section 414(v)(2)(B)(i) for catch-up contributions to an\n      applicable employer plan other than a plan described in section 401(k)(11) or\n      section 408(p) for individuals aged 50 or over remains unchanged at $6,500. The\n      dollar limitation under section 414(v)(2)(B)(ii) for catch-up contributions to an\n      applicable employer plan described in section 401(k)(11) or section 408(p) for\n      individuals aged 50 or over remains unchanged at $3,000.\n\n      The annual compensation limitation under section 401(a)(17) for eligible\n      participants in certain governmental plans that, under the plan as in effect on July\n      1, 1993, allowed cost-of-living adjustments to the compensation limitation under\n      the"
+        }
+      ]
+    },
+    {
+      "id": "notice2023",
+      "title": "Notice 2022-55",
+      "tax_year": 2023,
+      "url": "https://www.irs.gov/pub/irs-drop/n-22-55.pdf",
+      "pinpoint": "Cost-of-living adjusted limits: IRC 219, 25B, 402(g), 408(p), 414(v), 415(c); 2024 section408(d)(8) QCD.",
+      "sha256": "204a8ef116142cb3effaa7b864a10783ef33efb830e285349f2508fd37b92b6f",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 3,
+          "text": "219(b)(5)(A) for an individual making\n       qualified retirement contributions is increased from $6,000 to $6,500.\n\n       The applicable dollar amount under section 219(g)(3)(B)(i) for determining the\n       deductible amount of an IRA contribution for taxpayers who are active\n       participants filing a joint return or as a qualifying widow(er) is increased from\n       $109,000 to $116,000. The applicable dollar amount under\n       section 219(g)(3)(B)(ii) for all other taxpayers who are active participants (other\n       than married taxpayers filing separate returns) is increased from $68,000 to\n       $73,000. If an individual or the individual’s spouse is an active participant, the\n       applicable dollar amount under section 219(g)(3)(B)(iii) for a married individual\n       filing a separate return is not subject to an annual cost-of-living adjustment and\n       remains $0. The applicable dollar amount under section 219(g)(7)(A) for a\n       taxpayer who is not an active participant but whose spouse is an active\n       participant is increased from $204,000 to $218,000.\n\n\n\n\n                                             3\n\f      Accordingly, under section 219(g)(2)(A), the deduction for taxpayers making\n      contributions to a traditional IRA is phased out for single individuals and heads of\n      household who are active participants in a qualified plan (or another retirement\n      plan specified in section 219(g)(5)) and have adjusted gross incomes (as defined\n      in section 219(g)(3)(A)) between $73,000 and $83,000, increased from between\n      $68,000 and $78,000. For married couples filing jointly, if the spouse who makes\n      the IRA contribution is an active participant, the income phase-out range is\n      between $116,000 and $136,000, increased from"
+        },
+        {
+          "pdf_page": 1,
+          "text": "402(g)(1) on the exclusion for elective deferrals\n       described in section 402(g)(3) is increased from $20,500 to $22,500.\n\n       The annual compensation limit under sections 401(a)(17), 404(l), 408(k)(3)(C),\n       and 408(k)(6)(D)(ii) is increased from $305,000 to $330,000.\n\n       The dollar limitation under section 416(i)(1)(A)(i) concerning the definition of “key\n       employee” in a top-heavy plan is increased from $200,000 to $215,000.\n\n       The dollar amount under section 409(o)(1)(C)(ii) for determining the maximum\n       account balance in an employee stock ownership plan subject to a 5-year\n       distribution period is increased from $1,230,000 to $1,330,000, while the dollar\n       amount used to determine the lengthening of the 5-year distribution period is\n       increased from $245,000 to $265,000.\n\n\n\n                                             1\n\f      The limitation used in the definition of “highly compensated employee” under\n      section 414(q)(1)(B) is increased from $135,000 to $150,000.\n\n      The dollar limitation under section 414(v)(2)(B)(i) for catch-up contributions to an\n      applicable employer plan other than a plan described in section 401(k)(11) or\n      section 408(p) for individuals aged 50 or over is increased from $6,500 to $7,500.\n      The dollar limitation under section 414(v)(2)(B)(ii) for catch-up contributions to an\n      applicable employer plan described in section 401(k)(11) or section 408(p) for\n      individuals aged 50 or over is increased from $3,000 to $3,500.\n\n      The annual compensation limitation under section 401(a)(17) for eligible\n      participants in certain governmental plans that, under the plan as in effect on\n      July 1, 1993, allowed cost-of-living adjustments to the compensation limitation"
+        }
+      ]
+    },
+    {
+      "id": "notice2024",
+      "title": "Notice 2023-75",
+      "tax_year": 2024,
+      "url": "https://www.irs.gov/pub/irs-drop/n-23-75.pdf",
+      "pinpoint": "Cost-of-living adjusted limits: IRC 219, 25B, 402(g), 408(p), 414(v), 415(c); 2024 section408(d)(8) QCD.",
+      "sha256": "dbe86eb16e2c19cd1cd61fb33bae82f0c9276edc2ab9c23e82b0c698eab593ad",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 3,
+          "text": "219(b)(5)(A), which limits the amount of an\n       individual’s deductible qualified retirement contributions for a taxable year, is\n       increased from $6,500 to $7,000. The increase in the deductible amount\n       pursuant to section 219(b)(5)(B)(ii) for individuals who have attained age 50\n       before the close of the taxable year remains $1,000.\n\n       The applicable dollar amount under section 219(g)(3)(B)(i) for determining the\n       deductible amount of an IRA contribution for taxpayers who are active\n       participants filing a joint return or as a qualifying widow(er) is increased from\n       $116,000 to $123,000. The applicable dollar amount under\n       section 219(g)(3)(B)(ii) for all other taxpayers who are active participants (other\n       than married taxpayers filing separate returns) is increased from $73,000 to\n\n                                             3\n\f$77,000. If an individual or the individual’s spouse is an active participant, the\napplicable dollar amount under section 219(g)(3)(B)(iii) for a married individual\nfiling a separate return is not subject to an annual cost-of-living adjustment and\nremains $0. The applicable dollar amount under section 219(g)(7)(A) for a\ntaxpayer who is not an active participant but whose spouse is an active\nparticipant is increased from $218,000 to $230,000.\n\nAccordingly, under section 219(g)(2)(A), the deduction for taxpayers making\ncontributions to a traditional IRA is phased out for single individuals and heads of\nhousehold who are active participants in a qualified plan (or another retirement\nplan specified in section 219(g)(5)) and have adjusted gross incomes (as defined\nin section 219(g)(3)(A)) between $77,000 and $87,000, increased from between\n$73,000 and $83,000. For married couples filing jointly,"
+        },
+        {
+          "pdf_page": 1,
+          "text": "402(g)(1) on the exclusion for elective deferrals\n       described in section 402(g)(3) is increased from $22,500 to $23,000.\n\n       The annual compensation limit under sections 401(a)(17), 404(l), 408(k)(3)(C),\n       and 408(k)(6)(D)(ii) is increased from $330,000 to $345,000.\n\n       The dollar limitation under section 416(i)(1)(A)(i) concerning the definition of “key\n       employee” in a top-heavy plan is increased from $215,000 to $220,000.\n\n       The dollar amount under section 409(o)(1)(C)(ii) for determining the maximum\n       account balance in an employee stock ownership plan subject to a 5-year\n       distribution period is increased from $1,330,000 to $1,380,000, while the dollar\n       amount used to determine the lengthening of the 5-year distribution period is\n       increased from $265,000 to $275,000.\n\n\n\n                                             1\n\f        The limitation used in the definition of “highly compensated employee” under\n        section 414(q)(1)(B) is increased from $150,000 to $155,000.\n\n        The dollar limitation under section 414(v)(2)(B)(i) for catch-up contributions to an\n        applicable employer plan other than a plan described in section 401(k)(11) or\n        section 408(p) for individuals aged 50 or over remains $7,500. The dollar\n        limitation under section 414(v)(2)(B)(ii) for catch-up contributions to an applicable\n        employer plan described in section 401(k)(11) or section 408(p) for individuals\n        aged 50 or over remains $3,500.\n\n        The annual compensation limitation under section 401(a)(17) for eligible\n        participants in certain governmental plans that, under the plan as in effect on\n        July 1, 1993, allowed cost-of-living adjustments to the compensation limitation\n        under the pl"
+        }
+      ]
+    },
+    {
+      "id": "mileage2021",
+      "title": "Notice 2021-02",
+      "tax_year": 2021,
+      "url": "https://www.irs.gov/pub/irs-drop/n-21-02.pdf",
+      "pinpoint": "Standard mileage rates: business, medical/moving and charitable; July1 change in2022.",
+      "sha256": "112ef4ba0c11fb7947503eca4194944f6388a87601dd3658eb6aea336a8b7fc5",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 3,
+          "text": "cents per mile for use of an automobile in\n\nrendering gratuitous services to a charitable organization under § 170. See section 5 of\n\nRev. Proc. 2019-46.\n\n      The standard mileage rate is 16 cents per mile for use of an automobile: (1) for\n\nmedical care described in § 213; or (2) as part of a move for which the expenses are\n\ndeductible under § 217(g). See section 5 of Rev. Proc. 2019-46. Section 11049 of the\n\nTCJA suspends the deduction for moving expenses for taxable years beginning after\n\nDecember 31, 2017, and before January 1, 2026. However, the suspension does not\n\f                                          -4-\n\n\napply to members of the Armed Forces on active duty who move pursuant to a military\n\norder and incident to a permanent change of station. Thus, except for taxpayers to\n\nwhom § 217(g) applies, the standard mileage rate provided in this notice is not\n\napplicable for the use of an automobile as part of a move occurring during the\n\nsuspension.\n\nSECTION 4. BASIS REDUCTION AMOUNT\n\n       For automobiles a taxpayer uses for business purposes, the portion of the\n\nbusiness standard mileage rate treated as depreciation is 25 cents per mile for 2017, 25\n\ncents per mile for 2018, 26 cents per mile for 2019, 27 cents per mile for 2020, and 26\n\ncents per mile for 2021. See section 4.04 of Rev. Proc. 2019-46.\n\nSECTION 5. MAXIMUM STANDARD AUTOMOBILE COST\n\n      For purposes of computing the allowance under a FAVR plan, the standard\n\nautomobile cost may not exceed $51,100 for automobiles (including trucks and vans).\n\nSee section 6.02(6) of Rev. Proc. 2019-46.\n\nSECTION 6. MAXIMUM VALUE OF EMPLOYER-PROVIDED AUTOMOBILES\n\n      For purposes of the fleet-average valuation rule in § 1.61-21(d)(5)(v) and the\n\nvehicle cents-per-mile valuation rule in § 1.61-21(e), the maximum FMV"
+        }
+      ]
+    },
+    {
+      "id": "mileage2022",
+      "title": "Notice 2022-03",
+      "tax_year": 2022,
+      "url": "https://www.irs.gov/pub/irs-drop/n-22-03.pdf",
+      "pinpoint": "Standard mileage rates: business, medical/moving and charitable; July1 change in2022.",
+      "sha256": "9bddedb82ef398d2142a2d3bf57fdbeb5046af5d041d86608b0b880f83a146c6",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 3,
+          "text": "cents per mile for use of an automobile in\n\nrendering gratuitous services to a charitable organization under § 170. See section 5 of\n\nRev. Proc. 2019-46.\n\n      The standard mileage rate is 18 cents per mile for use of an automobile: (1) for\n\nmedical care described in § 213; or (2) as part of a move for which the expenses are\n\ndeductible under § 217(g). See section 5 of Rev. Proc. 2019-46. Section 11049 of the\n\nTCJA suspends the deduction for moving expenses for taxable years beginning after\n\nDecember 31, 2017, and before January 1, 2026. However, the suspension does not\n\f                                          -4-\n\n\napply to members of the Armed Forces on active duty who move pursuant to a military\n\norder and incident to a permanent change of station. Thus, except for taxpayers to\n\nwhom § 217(g) applies, the standard mileage rate provided in this notice is not\n\napplicable for the use of an automobile as part of a move occurring during the\n\nsuspension.\n\nSECTION 4. BASIS REDUCTION AMOUNT\n\n       For automobiles a taxpayer uses for business purposes, the portion of the\n\nbusiness standard mileage rate treated as depreciation is 25 cents per mile for 2018, 26\n\ncents per mile for 2019, 27 cents per mile for 2020, 26 cents per mile for 2021, and 26\n\ncents per mile for 2022. See section 4.04 of Rev. Proc. 2019-46.\n\nSECTION 5. MAXIMUM STANDARD AUTOMOBILE COST\n\n      For purposes of computing the allowance under a FAVR plan, the standard\n\nautomobile cost may not exceed $56,100 for automobiles (including trucks and vans).\n\nSee section 6.02(6) of Rev. Proc. 2019-46.\n\nSECTION 6. MAXIMUM VALUE OF EMPLOYER-PROVIDED AUTOMOBILES\n\n      For purposes of the fleet-average valuation rule in § 1.61-21(d)(5)(v) and the\n\nvehicle cents-per-mile valuation rule in § 1.61-21(e), the maximum FMV"
+        }
+      ]
+    },
+    {
+      "id": "mileage2023",
+      "title": "Notice 2023-03",
+      "tax_year": 2023,
+      "url": "https://www.irs.gov/pub/irs-drop/n-23-03.pdf",
+      "pinpoint": "Standard mileage rates: business, medical/moving and charitable; July1 change in2022.",
+      "sha256": "6f86dd927981d7bffcf261c0682fda00acd7b403636a7e027d483ab71c9bfd0d",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 3,
+          "text": "cents per mile for use of an automobile in\n\nrendering gratuitous services to a charitable organization under § 170. See section 5 of\n\nRev. Proc. 2019-46.\n\n      The standard mileage rate is 22 cents per mile for use of an automobile: (1) for\n\nmedical care described in § 213; or (2) as part of a move for which the expenses are\n\ndeductible under § 217(g). See section 5 of Rev. Proc. 2019-46. Section 11049 of the\n\nTCJA suspends the deduction for moving expenses for taxable years beginning after\n\f                                          -4-\n\n\nDecember 31, 2017, and before January 1, 2026. However, the suspension does not\n\napply to members of the Armed Forces on active duty who move pursuant to a military\n\norder and incident to a permanent change of station. Thus, except for taxpayers to\n\nwhom § 217(g) applies, the standard mileage rate provided in this notice is not\n\napplicable for the use of an automobile as part of a move occurring during the\n\nsuspension.\n\nSECTION 4. BASIS REDUCTION AMOUNT\n\n       For automobiles a taxpayer uses for business purposes, the portion of the\n\nbusiness standard mileage rate treated as depreciation is 26 cents per mile for 2019, 27\n\ncents per mile for 2020, 26 cents per mile for 2021, 26 cents per mile for 2022, and 28\n\ncents per mile for 2023. See section 4.04 of Rev. Proc. 2019-46.\n\nSECTION 5. MAXIMUM STANDARD AUTOMOBILE COST\n\n      For purposes of computing the allowance under a FAVR plan, the standard\n\nautomobile cost may not exceed $60,800 for automobiles (including trucks and vans).\n\nSee section 6.02(6) of Rev. Proc. 2019-46.\n\nSECTION 6. MAXIMUM VALUE OF EMPLOYER-PROVIDED AUTOMOBILES\n\n      For purposes of the fleet-average valuation rule in § 1.61-21(d)(5)(v) and the\n\nvehicle cents-per-mile valuation rule in § 1.61-21(e), the maximum FMV"
+        }
+      ]
+    },
+    {
+      "id": "mileage2024",
+      "title": "Notice 2024-08",
+      "tax_year": 2024,
+      "url": "https://www.irs.gov/pub/irs-drop/n-24-08.pdf",
+      "pinpoint": "Standard mileage rates: business, medical/moving and charitable; July1 change in2022.",
+      "sha256": "94545e0c068d2bcb09768975008bdfcc06b4903dbae67236d45439379eefc35d",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 3,
+          "text": "cents per mile for use of an automobile in\n\nrendering gratuitous services to a charitable organization under § 170. See section 5 of\n\nRev. Proc. 2019-46.\n\n      The standard mileage rate is 21 cents per mile for use of an automobile: (1) for\n\nmedical care described in § 213; or (2) as part of a move for which the expenses are\n\ndeductible under § 217(g). See section 5 of Rev. Proc. 2019-46. Section 11049 of the\n\nTCJA suspends the deduction for moving expenses for taxable years beginning after\n\f                                          -4-\n\nDecember 31, 2017, and before January 1, 2026. However, the suspension does not\n\napply to members of the Armed Forces on active duty who move pursuant to a military\n\norder and incident to a permanent change of station. Thus, except for taxpayers to\n\nwhom § 217(g) applies, the standard mileage rate provided in this notice is not\n\napplicable for the use of an automobile as part of a move occurring during the\n\nsuspension.\n\nSECTION 4. BASIS REDUCTION AMOUNT\n\n       For automobiles a taxpayer uses for business purposes, the portion of the\n\nbusiness standard mileage rate treated as depreciation is 27 cents per mile for 2020, 26\n\ncents per mile for 2021, 26 cents per mile for 2022, 28 cents per mile for 2023, and 30\n\ncents per mile for 2024. See section 4.04 of Rev. Proc. 2019-46.\n\nSECTION 5. MAXIMUM STANDARD AUTOMOBILE COST\n\n      For purposes of computing the allowance under a FAVR plan, the standard\n\nautomobile cost may not exceed $62,000 for automobiles (including trucks and vans).\n\nSee section 6.02(6) of Rev. Proc. 2019-46.\n\nSECTION 6. MAXIMUM VALUE OF EMPLOYER-PROVIDED AUTOMOBILES\n\n      For purposes of the fleet-average valuation rule in § 1.61-21(d)(5)(v) and the\n\nvehicle cents-per-mile valuation rule in § 1.61-21(e), the maximum FMV"
+        }
+      ]
+    },
+    {
+      "id": "mileage2022mid",
+      "title": "Announcement 2022-13",
+      "tax_year": 2022,
+      "url": "https://www.irs.gov/pub/irs-drop/a-22-13.pdf",
+      "pinpoint": "Standard mileage rates: business, medical/moving and charitable; July1 change in2022.",
+      "sha256": "782d26f4d5b76773b3ef4a9f98acc3f43210d2aed8f4d90abb10f867d9face4a",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 1,
+          "text": "cents per mile\n\n               (2) Medical and moving            22 cents per mile\n\n       The mileage rate that applies to the deduction for charitable contributions is fixed\n\nunder § 170(i) of the Internal Revenue Code (Code) at 14 cents per mile.\n\n       The revised standard mileage rates set forth in this announcement apply to\n\ndeductible transportation expenses paid or incurred for business, medical, or moving\n\nexpense purposes on or after July 1, 2022, and to mileage allowances that are paid\n\fboth (1) to an employee on or after July 1, 2022, and (2) for transportation expenses\n\npaid or incurred by the employee on or after July 1, 2022.\n\n       The standard mileage rates set forth in Notice 2022-3 continue to apply to\n\ndeductible transportation expenses paid or incurred for business, medical, or moving\n\nexpense purposes before July 1, 2022, and to mileage allowances paid (1) to an\n\nemployee before July 1, 2022, or (2) with respect to transportation expenses paid or\n\nincurred by the employee before July 1, 2022. All other provisions of Notice 2022-3\n\nremain in effect.\n\n       Note that § 11045 of Public Law 115- 97, 131. Stat. 2054 (December 22, 2017),\n\ncommonly referred to as the Tax Cuts and Jobs Act (TCJA), suspends all miscellaneous\n\nitemized deductions that are subject to the two-percent of adjusted gross income floor\n\nunder § 67 of the Code, including unreimbursed employee travel expenses, for taxable\n\nyears beginning after December 31, 2017, and before January 1, 2026. Thus, the\n\nrevised business standard mileage rate provided in this announcement cannot be used\n\nto claim an itemized deduction for unreimbursed employee travel expenses during the\n\nsuspension. Notwithstanding the foregoing suspension of miscellaneous itemized\n\ndeductions, deductions for expense"
+        }
+      ]
+    },
+    {
+      "id": "i88892020",
+      "title": "2020 Instructions for Form8889",
+      "tax_year": 2020,
+      "url": "https://www.irs.gov/pub/irs-prior/i8889--2020.pdf",
+      "pinpoint": "Line3 contribution limits and line7 additional age55 contribution; PartIII testing period.",
+      "sha256": "186e772c139820eacb05e16823018e728891c612c8c392765dd158468c51e553",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 3,
+          "text": "maximum contribution is        amounts rolled over from another HSA\n2020, on line 14a.                          $7,100.                                       or Archer MSA. See Rollovers, earlier.\n• You used any portion of any of your                                                     Also, do not include any qualified HSA\nHSAs as security for a loan at any time     Note. If you are age 55 or older at the\n                                                                                          funding distributions (see line 10).\nin 2020. You must include the fair          end of your tax year, you can make an\n                                                                                          Contributions to an employee's account\nmarket value of the assets used as          additional contribution of $1,000.\n                                                                                          through a cafeteria plan are treated as\nsecurity for the loan as income on line 8                                                 employer contributions and are not\n                                               Your maximum contribution is\nof Schedule 1 (Form 1040).                                                                included on line 2.\n                                            reduced by any employer contributions\n   Any deemed distribution will not be      to your HSA, any contributions made to        Line 3\ntreated as used to pay qualified medical    your Archer MSA, and any qualified\n                                            HSA funding distributions.                    When figuring the amount to enter on\nexpenses. Generally, these distributions                                                  line 3, apply the following rules.\nare subject to the add"
+        }
+      ]
+    },
+    {
+      "id": "auto2021",
+      "title": "Revenue Procedure 2021-31",
+      "tax_year": 2021,
+      "url": "https://www.irs.gov/pub/irs-drop/rp-21-31.pdf",
+      "pinpoint": "Section4, Tables1 and2, depreciation limitations for automobiles placed in service during the specified year.",
+      "sha256": "e4c42486527bee53964fd39ba728c71fb10621a2eed0883eeb5dd43479e99565",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 5,
+          "text": "1st Tax Year                                     $ 18,200\n\f                                         -6-\n\n               2nd Tax Year                                      $ 16,400\n               3rd Tax Year                                       $ 9,800\n           Each Succeeding Year                                   $ 5,860\n\n                              REV. PROC. 2021-** TABLE 2\n        DEPRECIATION LIMITATIONS FOR PASSENGER AUTOMOBILES\n   PLACED IN SERVICE DURING CALENDAR YEAR 2021 FOR WHICH NO § 168(k)\n        ADDITIONAL FIRST YEAR DEPRECIATION DEDUCTION APPLIES\n\n                 Tax Year                                         Amount\n               1st Tax Year                                      $ 10,200\n               2nd Tax Year                                      $ 16,400\n               3rd Tax Year                                       $ 9,800\n           Each Succeeding Year                                   $ 5,860\n\n\n   .02 Inclusions in Income of Lessees of Passenger Automobiles.\n\n      A taxpayer must follow the procedures in § 1.280F-7(a) for determining the\n\ninclusion amounts for passenger automobiles with a lease term beginning in calendar\n\nyear 2021. In applying these procedures, lessees of passenger automobiles should use\n\nTable 3 of this revenue procedure.\n\n\n                            REV. PROC. 2021-** TABLE 3\n               DOLLAR AMOUNTS FOR PASSENGER AUTOMOBILES\n             WITH A LEASE TERM BEGINNING IN CALENDAR YEAR 2021\n\n  Fair Market Value of                      Tax Year During Lease\n Passenger Automobile\n   Over       Not Over        1st        2nd          3rd            4th        5th & later\n\n\n   $51,000     $52,000               0         0             1              0           1\n    52,000      53,000               1         1"
+        }
+      ]
+    },
+    {
+      "id": "auto2022",
+      "title": "Revenue Procedure 2022-17",
+      "tax_year": 2022,
+      "url": "https://www.irs.gov/pub/irs-drop/rp-22-17.pdf",
+      "pinpoint": "Section4, Tables1 and2, depreciation limitations for automobiles placed in service during the specified year.",
+      "sha256": "507e21a21179e763fb079c8a941ba5690809b4f1b7a8b1e1e561486f92c050d2",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 5,
+          "text": "1st Tax Year                                     $ 19,200\n\f                                        -6-\n\n               2nd Tax Year                                   $ 18,000\n               3rd Tax Year                                   $ 10,800\n           Each Succeeding Year                               $ 6,460\n\n                             REV. PROC. 2022-17 TABLE 2\n        DEPRECIATION LIMITATIONS FOR PASSENGER AUTOMOBILES\n   PLACED IN SERVICE DURING CALENDAR YEAR 2022 FOR WHICH NO § 168(k)\n        ADDITIONAL FIRST YEAR DEPRECIATION DEDUCTION APPLIES\n\n                 Tax Year                                     Amount\n               1st Tax Year                                   $ 11,200\n               2nd Tax Year                                   $ 18,000\n               3rd Tax Year                                   $ 10,800\n           Each Succeeding Year                               $ 6,460\n\n\n   .02 Inclusions in Income of Lessees of Passenger Automobiles.\n\n      A taxpayer must follow the procedures in § 1.280F-7(a) for determining the\n\ninclusion amounts for passenger automobiles with a lease term beginning in calendar\n\nyear 2022. In applying these procedures, lessees of passenger automobiles should use\n\nTable 3 of this revenue procedure.\n\f                                  -7-\n\n\n\n                        REV. PROC. 2022-17 TABLE 3\n             DOLLAR AMOUNTS FOR PASSENGER AUTOMOBILES\n           WITH A LEASE TERM BEGINNING IN CALENDAR YEAR 2022\n\n Fair Market Value of                Tax Year During Lease\nPassenger Automobile\n  Over      Not Over     1st       2nd        3rd        4th       5th & later\n $56,000     $57,000         1         1          1            2           2\n  57,000      58,000         2         4          5            7           7\n  58,00"
+        }
+      ]
+    },
+    {
+      "id": "auto2023",
+      "title": "Revenue Procedure 2023-14",
+      "tax_year": 2023,
+      "url": "https://www.irs.gov/pub/irs-drop/rp-23-14.pdf",
+      "pinpoint": "Section4, Tables1 and2, depreciation limitations for automobiles placed in service during the specified year.",
+      "sha256": "2d1cc69eb8b7903cece9ca56f61e918c36f539855486cb47f333d7df95d8bfd4",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 6,
+          "text": "1st Tax Year                               $ 20,200\n               2nd Tax Year                               $ 19,500\n               3rd Tax Year                               $ 11,700\n           Each Succeeding Year                           $ 6,960\n\f                                        -7-\n\n                           REV. PROC. 2023-14 TABLE 2\n       DEPRECIATION LIMITATIONS FOR PASSENGER AUTOMOBILES\n  PLACED IN SERVICE DURING CALENDAR YEAR 2023 FOR WHICH NO § 168(k)\n       ADDITIONAL FIRST YEAR DEPRECIATION DEDUCTION APPLIES\n\n                Tax Year                                      Amount\n              1st Tax Year                                    $ 12,200\n              2nd Tax Year                                    $ 19,500\n              3rd Tax Year                                    $ 11,700\n          Each Succeeding Year                                $ 6,960\n\n\n   .02 Inclusions in Income of Lessees of Passenger Automobiles.\n\n      A taxpayer must follow the procedures in § 1.280F-7(a) for determining the\n\ninclusion amounts for passenger automobiles with a lease term beginning in calendar\n\nyear 2023. In applying these procedures, lessees of passenger automobiles should use\n\nTable 3 of this revenue procedure.\n\f                                       -8-\n\n                       REV. PROC. 2023-14 TABLE 3\n            DOLLAR AMOUNTS FOR PASSENGER AUTOMOBILES\n          WITH A LEASE TERM BEGINNING IN CALENDAR YEAR 2023\n\n\n Fair Market      Fair      1st Tax   2nd Tax     3rd Tax    4th Tax      5th Tax\n  Value of       Market      Year      Year        Year       Year         Year\n Passenger      Value of    During    During      During     During       During\n Automobile    Passenger    Lease     Lease       Lease      Lease       Lease &\n    Over       Auto"
+        }
+      ]
+    },
+    {
+      "id": "auto2024",
+      "title": "Revenue Procedure 2024-13",
+      "tax_year": 2024,
+      "url": "https://www.irs.gov/pub/irs-drop/rp-24-13.pdf",
+      "pinpoint": "Section4, Tables1 and2, depreciation limitations for automobiles placed in service during the specified year.",
+      "sha256": "d0fa9238d5120017f5bb887b493db2c869ce7f5d4879687a561f28f611b8aa88",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 6,
+          "text": "1st Tax Year                                   $ 20,400\n               2nd Tax Year                                   $ 19,800\n               3rd Tax Year                                   $ 11,900\n           Each Succeeding Year                               $ 7,160\n\n                             REV. PROC. 2024-13 TABLE 2\n       DEPRECIATION LIMITATIONS FOR PASSENGER AUTOMOBILES\n  PLACED IN SERVICE DURING CALENDAR YEAR 2024 FOR WHICH NO § 168(k)\n       ADDITIONAL FIRST YEAR DEPRECIATION DEDUCTION APPLIES\n\n                 Tax Year                                     Amount\n               1st Tax Year                                   $ 12,400\n               2nd Tax Year                                   $ 19,800\n               3rd Tax Year                                   $ 11,900\n           Each Succeeding Year                               $ 7,160\n\n   .02 Inclusions in Income of Lessees of Passenger Automobiles.\n\n     A taxpayer must follow the procedures in § 1.280F-7(a) for determining the\n\ninclusion amounts for passenger automobiles with a lease term beginning in calendar\n\nyear 2024. In applying these procedures, lessees of passenger automobiles should use\n\nTable 3 of this revenue procedure.\n\f                                       -7-\n\n                            REV. PROC. 2024-13 TABLE 3\n           DOLLAR AMOUNTS FOR PASSENGER AUTOMOBILES\n         WITH A LEASE TERM BEGINNING IN CALENDAR YEAR 2024\n\nFair Market   Fair Market    1st Tax   2nd Tax   3rd Tax   4th Tax    5th Tax\n Value of      Value of       Year      Year      Year      Year       Year\nPassenger     Passenger      During    During    During    During     During\nAutomobile    Automobile     Lease     Lease     Lease     Lease     Lease &\n   Over        Not Over"
+        }
+      ]
+    },
+    {
+      "id": "p5962021",
+      "title": "Publication596 (2021), Earned Income Credit",
+      "tax_year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/p596--2021.pdf",
+      "pinpoint": "Chapter3 Rule11 (age19/24/18 and no upper age limit); EIC Table; election to use2019 earned income; investment income $10000.",
+      "sha256": "625c1f2bfba2aab8d31eed18451a589051a935a02724e2fb1c4243d6d1837674",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 1,
+          "text": "Rule 11—You Must Meet the Age\n                                                                          Requirements . . . . . . . . . . . . . . . . . . . . . . . . 17\n                                                                        Rule 12—You Cannot Be the Dependent of\n                                                                          Another Person . . . . . . . . . . . . . . . . . . . . . . 18\n                                                                        Rule 13—You Cannot Be a Qualifying Child\n                                                                          of Another Taxpayer . . . . . . . . . . . . . . . . . . . 18\n                                                                        Rule 14—You Must Have Lived in the United\n                                                                          States More Than Half of the Year . . . . . . . . . 19\n                                                                     Chapter 4. Figuring and Claiming the EIC . . . . . 19\n                                                                        Rule 15—Earned Income Limits . . . . . . . . . . . . . 19\n                                                                        IRS Will Figure the EIC for You . . . . . . . . . . . . . 21\n                                                                        How To Figure the EIC Yourself . . . . . . . . . . . . . 21\n                                                                     Chapter 5. Disallowance of the EIC . . . . . . . . . . 22\n                                                                     Chapter 6. Detailed Examples . . . . . . . . . . . . . . 24\n                                                                     How To Get Tax Help . . . . . . . . . . . . . . . ."
+        }
+      ]
+    },
+    {
+      "id": "f62512021",
+      "title": "Form6251 (2021), Alternative Minimum Tax",
+      "tax_year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/f6251--2021.pdf",
+      "pinpoint": "Lines1 and2a: pre-zero-floor taxable income, standard deduction addback excludes2021 line12b charitable deduction.",
+      "sha256": "a2507f08d2ca43c2693f7a01eb817a3b522f32bc6f4d9d7a775340e59324a997",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 1,
+          "text": "Enter the amount from Form 1040 or 1040-SR, line 15, if more than zero. If Form 1040 or 1040-SR, line 15,\n         is zero, subtract line 14 of Form 1040 or 1040-SR from line 11 of Form 1040 or 1040-SR and enter the result\n         here. (If less than zero, enter as a negative amount.) . . . . . . . . . . . . . . . . . .                                    1\n   2a    If filing Schedule A (Form 1040), enter the taxes from Schedule A, line 7; otherwise, enter the amount from\n         Form 1040 or 1040-SR, line 12a . . . . . . . . . . . . . . . . . . . . . . . .                                               2a\n     b   Tax refund from Schedule 1 (Form 1040), line 1 or line 8z . . . . . . . . . . . . . . . .                                    2b (                     )\n     c   Investment interest expense (difference between regular tax and AMT) . . . . . . . . . . . .                                 2c\n     d   Depletion (difference between regular tax and AMT) . . . . . . . . . . . . . . . . . .                                       2d\n     e   Net operating loss deduction from Schedule 1 (Form 1040), line 8a. Enter as a positive amount . . . .                        2e\n     f   Alternative tax net operating loss deduction . . . . . . . . . . . . . . . . . . . .                                          2f (                    )\n     g   Interest from specified private activity bonds exempt from the regular tax . . . . . . . . . . .                             2g\n     h   Qualified small business stock, see instructions . . . . . . . . . . . . . . . . . . .                                       2h\n     i   Exercise of incentive stock options (excess of AMT income over regular tax income) . . . . . . . .                            2i\n     j   Estates and trusts (amount from"
+        }
+      ]
+    },
+    {
+      "id": "i1040sca2021",
+      "title": "2021 Instructions for ScheduleA",
+      "tax_year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/i1040sca--2021.pdf",
+      "pinpoint": "Gifts to Charity; cash qualified contributions and mortgage insurance premiums.",
+      "sha256": "dabdcc727779b89caa2969cc5274b716ce7588855e1d8605bd81e195a6ef333d",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 9,
+          "text": "Mortgage Insurance\nonly deduct your share of the interest.          !    information about the recipient\n                                              CAUTION or let the recipient know your\n                                                                                            Premiums\n   Shared interest reported on your           SSN, you may have to pay a $50 penalty.       Enter the qualified mortgage insurance\nForm 1098. If the shared interest was                                                       premiums you paid under a mortgage in-\nreported on the Form 1098 you received,       Interest reported on someone else’s           surance contract issued after December\ndeduct only your share of the interest on     Form 1098. If you and at least one oth-       31, 2006, in connection with home ac-\nline 8a. Let each of the other borrowers      er person (other than your spouse if fil-     quisition debt that was secured by your\nknow what his or her share is.                ing jointly) were liable for and paid in-     first or second home. Box 5 of Form\n                                              terest on the mortgage, and the home          1098 shows the amount of premiums\n    Shared interest reported on someone\n                                              mortgage interest paid was reported on        you paid in 2021. If you and at least one\nelse's Form 1098. If the shared interest\n                                              the other person’s Form 1098, identify        other person (other than your spouse if\nwas reported on the other person's Form\n                                              the name and address of the person or         filing jointly) were liable for and paid\n1098, report your share of the interest on"
+        },
+        {
+          "pdf_page": 10,
+          "text": "Gifts to Charity                                                                • Churches, mosques, synagogues,\nduction.                                                                                                                                            temples, and other religious organiza-\n                                                                       You can deduct contributions or gifts                                        tions.\nLine 9                                                                 you gave to organizations that are reli-                                        • Boy Scouts, Boys and Girls Clubs\n                                                                       gious, charitable, educational, scientific,                                  of America, CARE, Girl Scouts, Good-\nInvestment Interest                                                    or literary in purpose. You can also de-                                     will Industries, Red Cross, Salvation Ar-\nInvestment interest is interest paid on                                duct what you gave to organizations that                                     my, and United Way.\nmoney you borrowed that is allocable to                                work to prevent cruelty to children or                                          • Fraternal orders, if the gifts will be\nproperty held for investment. It doesn't                               animals. Certain whaling captains may                                        used for the purposes listed under Gifts\ninclude any interest allocable to passive                              be able to deduct expenses paid in 2021                                      to Charity, earlier.\nactivities or to securities that generate"
+        }
+      ]
+    },
+    {
+      "id": "p5262021",
+      "title": "Publication526 (2021), Charitable Contributions",
+      "tax_year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/p526--2021.pdf",
+      "pinpoint": "Qualified Contributions and Worksheet2: election to deduct qualified cash after other deductions up to100% AGI; excess carries under60% category.",
+      "sha256": "c3194bb626efa0c5f281f910295cab292691cb8959dd0f61becbb1373317532c",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 15,
+          "text": "Qualified contributions don’t in-\n 10. Private nonoperating foundations that                                                                   clude a contribution to a segregated fund or ac-\n                                                      more information about applying the 50% limit\n     make qualifying distributions of 100% of                                                                count for which you (or any person you appoint\n                                                      to a QCC, see Qualified conservation contribu-\n     contributions within 21/2 months following                                                              or designate) have or expect to have advisory\n                                                      tions, later, under Limits based on 50% of ad-\n     the year they receive the contribution. A                                                               privileges with respect to distributions or invest-\n                                                      justed gross income.\n     deduction for charitable contributions to                                                               ments based on your contribution.\n     any of these private nonoperating founda-           Qualified farmer or rancher. You are a\n     tions must be supported by evidence from         qualified farmer or rancher if your gross income           Carryover rule. You can carry over any\n     the foundation confirming it made the            from the trade or business of farming is more          qualified contributions you aren’t able to deduct\n     qualifying distributions timely. Attach a        than 50% of your gross income for the year.            in 2021 because of this limit.\n     copy of this supporting data to your tax re-\n     turn."
+        }
+      ]
+    },
+    {
+      "id": "i1040sh2021",
+      "title": "2021 Instructions for ScheduleH",
+      "tax_year": 2021,
+      "url": "https://www.irs.gov/pub/irs-prior/i1040sh--2021.pdf",
+      "pinpoint": "Social Security and Medicare Taxes, cash-wage threshold; FUTA $1000 quarterly threshold.",
+      "sha256": "5ccd258422a459b77e1708735d9ee22b90bf7e8b13bb9f9e6c6c5f33c6d14956",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 1,
+          "text": "cash wages of $2,300 or more in 2021 to any one household employee. See Did\n                                                      you have a household employee? and the Line A instructions for more information.\n                                                      You need to pay federal unemployment tax if you paid total cash wages of $1,000 or\n                                                      more in any calendar quarter of 2020 or 2021 to household employees. See the Part II.\n                                                      Federal Unemployment (FUTA) Tax instructions for more information.\n                                                      How do I file Schedule H? File Schedule H with your Form 1040, 1040-SR,\n                                                      1040-NR, 1040-SS, or 1041. If you’re not filing a 2021 tax return, file Schedule H by\n                                                      itself.\n                                                      Do I make a separate payment? No. You pay both income and employment taxes to\n                                                      the United States Treasury when you file Schedule H with your return.\n                                                      When do I pay? Most filers must pay by April 18, 2022.\n                                                      How many copies of Form W-3 do I send to the SSA? Send one copy of Form W-3\n                                                      with Copy A of Form(s) W-2 to the SSA, and keep one copy of Form W-3 for your\n                                                      records.\n                                                      Important Dates\n                                                       By . . . . . . . . . . . . . . . . . . . .     Y"
+        }
+      ]
+    },
+    {
+      "id": "i1040sh2022",
+      "title": "2022 Instructions for ScheduleH",
+      "tax_year": 2022,
+      "url": "https://www.irs.gov/pub/irs-prior/i1040sh--2022.pdf",
+      "pinpoint": "Social Security and Medicare Taxes, cash-wage threshold; FUTA $1000 quarterly threshold.",
+      "sha256": "2a3385a0b8751a821725027131df57af5e62292169abce1134d29788ea379f38",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 1,
+          "text": "cash wages of $2,400 or more in 2022 to any one household employee. See Did\n                                                      you have a household employee? and the Line A instructions, later, for more informa-\n                                                      tion. You need to pay federal unemployment tax if you paid total cash wages of\n                                                      $1,000 or more in any calendar quarter of 2021 or 2022 to household employees. See\n                                                      the Part II. Federal Unemployment (FUTA) Tax instructions, later, for more informa-\n                                                      tion.\n                                                      How do I file Schedule H? File Schedule H with your Form 1040, 1040-SR,\n                                                      1040-NR, 1040-SS, or 1041. If you’re not filing a 2022 tax return, file Schedule H by\n                                                      itself.\n                                                      Do I make a separate payment? No. You pay both income and employment taxes to\n                                                      the United States Treasury when you file Schedule H with your return.\n                                                      When do I pay? Most filers must pay by April 18, 2023.\n                                                      How many copies of Form W-3 do I send to the SSA? Send one copy of Form W-3\n                                                      with Copy A of Form(s) W-2 to the SSA, and keep one copy of Form W-3 for your\n                                                      records.\n                                                      Important Dates"
+        }
+      ]
+    },
+    {
+      "id": "i1040sh2023",
+      "title": "2023 Instructions for ScheduleH",
+      "tax_year": 2023,
+      "url": "https://www.irs.gov/pub/irs-prior/i1040sh--2023.pdf",
+      "pinpoint": "Social Security and Medicare Taxes, cash-wage threshold; FUTA $1000 quarterly threshold.",
+      "sha256": "15697f69b011ed3b53b1f1d52d446a2273310c8e4c6b7058a90a72638216fdc2",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 1,
+          "text": "cash wages of $2,600 or more in 2023 to any one household employee. See Did\n                                                      you have a household employee? and the Line A instructions, later, for more informa-\n                                                      tion. You need to pay federal unemployment tax if you paid total cash wages of $1,000\n                                                      or more in any calendar quarter of 2022 or 2023 to household employees. See the Part\n                                                      II. Federal Unemployment (FUTA) Tax instructions, later, for more information.\n                                                      How do I file Schedule H? File Schedule H with your Form 1040, 1040-SR,\n                                                      1040-NR, 1040-SS, or 1041. If you’re not filing a 2023 tax return, file Schedule H by\n                                                      itself.\n                                                      Do I make a separate payment? No. You pay both income and employment taxes to\n                                                      the United States Treasury when you file Schedule H with your return.\n\n                                                      Note. Taxpayers in Puerto Rico pay their income tax to the Department of the Treas-\n                                                      ury, Government of Puerto Rico.\n                                                      When do I pay? Most filers must pay by April 15, 2024.\n                                                      How many copies of Form W-3 do I send to the SSA? Send one copy of Form W-3\n                                                      with Copy A of Form(s) W-2 to the SSA, and keep one copy of Form W-3 fo"
+        }
+      ]
+    },
+    {
+      "id": "i1040sh2024",
+      "title": "2024 Instructions for ScheduleH",
+      "tax_year": 2024,
+      "url": "https://www.irs.gov/pub/irs-prior/i1040sh--2024.pdf",
+      "pinpoint": "Social Security and Medicare Taxes, cash-wage threshold; FUTA $1000 quarterly threshold.",
+      "sha256": "d35bb51088257973c483020342f41b89c95be32a7aae997be43d318bef21d8c0",
+      "retrieved_on": "2026-10-30",
+      "retained_excerpts": [
+        {
+          "pdf_page": 1,
+          "text": "cash wages of $2,700 or more in 2024 to any one household employee. See Did\n                                                     you have a household employee? and Line A, later, for more information. You need to\n                                                     pay federal unemployment tax under the Federal Unemployment Tax Act (FUTA), if\n                                                     you paid total cash wages of $1,000 or more in any calendar quarter of 2023 or 2024\n                                                     to household employees. See Part II. Federal Unemployment (FUTA) Tax, later, for\n                                                     more information.\n                                                     How do I file Schedule H? File Schedule H with your Form 1040, 1040-SR,\n                                                     1040-SS, 1040-NR, or 1041. If you’re not filing a 2024 tax return, file Schedule H by\n                                                     itself.\n                                                     Do I make a separate payment? No. You pay both income and employment taxes to\n                                                     the United States Treasury when you file Schedule H with your return.\n\n                                                     Note. Taxpayers in Puerto Rico pay their income tax to the Department of the Treas-\n                                                     ury, Government of Puerto Rico.\n                                                     When do I pay? Most filers must pay by April 15, 2025.\n                                                     How many copies of Form W-3 do I send to the SSA? Send one copy of Form W-3\n                                                     with Copy A of Form(s"
+        }
+      ]
+    }
+  ],
+  "tax_table_source_reconciliation": {
+    "2021": {
+      "parsed_rows": 2052,
+      "compared_cells": 8208,
+      "differences": 0,
+      "method": "Independent public-source research: extracted six-column Tax Table rows compared with RevProc rate-schedule midpoint tax using decimal half-up rounding. Not a product test or IRS certification. No claim concerning the10 rows not parsed."
+    },
+    "2022": {
+      "parsed_rows": 2052,
+      "compared_cells": 8208,
+      "differences": 0,
+      "method": "Independent public-source research: extracted six-column Tax Table rows compared with RevProc rate-schedule midpoint tax using decimal half-up rounding. Not a product test or IRS certification. No claim concerning the10 rows not parsed."
+    },
+    "2023": {
+      "parsed_rows": 2052,
+      "compared_cells": 8208,
+      "differences": 0,
+      "method": "Independent public-source research: extracted six-column Tax Table rows compared with RevProc rate-schedule midpoint tax using decimal half-up rounding. Not a product test or IRS certification. No claim concerning the10 rows not parsed."
+    },
+    "2024": {
+      "parsed_rows": 2052,
+      "compared_cells": 8208,
+      "differences": 0,
+      "method": "Independent public-source research: extracted six-column Tax Table rows compared with RevProc rate-schedule midpoint tax using decimal half-up rounding. Not a product test or IRS certification. No claim concerning the10 rows not parsed."
+    }
+  },
+  "historical_eic_review": {
+    "method": "Independent public-source research, not execution of product code or tests. Parse $50 EIC rows from archived IRS instructions and compare every numeric cell with decimal half-up arithmetic. Starred terminal cells are excluded from the full-band counts; all eight terminal footnotes per year were separately extracted, reconciled with decimal midpoint arithmetic, and transcribed into regressions. No claim is made for unparsed rows.",
+    "maximum_rounding": "2021–2023 retain creditRate * earnedIncomeAmount before subtracting phaseout, including terminal bands. The 2024 table uses rounded maxCredit for both full and terminal bands. Applying unrounded maximum to 2024 full bands causes 454 differences; rounded maximum causes zero differences in the parsed cells. All 32 historical terminal footnotes agree with these annual conventions. The existing 2025/2026 profile remains unchanged: rounded full-band maximum, unrounded terminal-band maximum.",
+    "terminal_rounding_example": "2024 nonjoint/no-child $18,550–$18,591 uses midpoint 18570.5: rounded maximum 632 minus 0.0765 * (18570.5 - 10330) = 1.60175, rounding to the printed $2. Unrounded maximum 631.89 would incorrectly yield $1. Nonjoint/one-child $49,050–$49,084 similarly yields the printed $3 with rounded maximum 4213, rather than $2 with unrounded maximum 4212.6.",
+    "terminal_footnote_columns": ["children", "nonjoint_end", "nonjoint_credit", "joint_end", "joint_credit"],
+    "sources": [
+      {
+        "title": "2021 Form 1040 Tax and Earned Income Credit Tables",
+        "tax_year": 2021,
+        "url": "https://www.irs.gov/pub/irs-prior/i1040tt--2021.pdf",
+        "sha256": "09d99a12d69d5531fcb21793babcb4727b1f26f6fd910509e3f9c2e9f8bd929b",
+        "pinpoint": "EIC Table pages 17–20: $11,600–$11,650 / $11,650–$11,700 single/no-child cells 1502 / 1493; $17,550–$17,600 / $17,600–$17,650 joint/no-child cells 1502 / 1493. Childless terminal footnotes at 21400–21430 and 27350–27380: credit 2.",
+        "parsed_rows": 1142,
+        "compared_cells": 9131,
+        "terminal_footnotes": [[0, 21430, 2, 27380, 2], [1, 42158, 1, 48108, 1], [2, 47915, 2, 53865, 2], [3, 51464, 2, 57414, 2]],
+        "terminal_compared_cells": 8,
+        "terminal_differences": 0,
+        "differences": 0
+      },
+      {
+        "title": "2022 Form 1040 Tax and Earned Income Credit Tables",
+        "tax_year": 2022,
+        "url": "https://www.irs.gov/pub/irs-prior/i1040tt--2022.pdf",
+        "sha256": "3c39b0db2ada9f9fe5ab60183860c0c3cfe675920f46dc539aab6448e7c1301b",
+        "pinpoint": "EIC Table pages 17–19: $11,050–$11,100 single/no-child cell 413; $9,150–$9,200 / $9,200–$9,250 cells 560 / 555. Childless terminal footnotes at 16450–16480: credit 1; 22600–22610: credit 0.",
+        "parsed_rows": 1179,
+        "compared_cells": 9426,
+        "terminal_footnotes": [[0, 16480, 1, 22610, 0], [1, 43492, 3, 49622, 2], [2, 49399, 5, 55529, 3], [3, 53057, 1, 59187, 4]],
+        "terminal_compared_cells": 8,
+        "terminal_differences": 0,
+        "differences": 0
+      },
+      {
+        "title": "2023 Form 1040 Tax and Earned Income Credit Tables",
+        "tax_year": 2023,
+        "url": "https://www.irs.gov/pub/irs-prior/i1040tt--2023.pdf",
+        "sha256": "d3d2ad3a1f167a3a9db369fecc2faa4b15b94ec6918e7263db00eac95e066ed4",
+        "pinpoint": "EIC Table pages 17–19: $9,950–$10,000 single/no-child cell 586; $9,750–$9,800 / $9,800–$9,850 cells 600 / 598. Childless terminal footnotes at 17600–17640: credit 2; 24200–24210: credit 0.",
+        "parsed_rows": 1263,
+        "compared_cells": 10098,
+        "terminal_footnotes": [[0, 17640, 2, 24210, 0], [1, 46560, 1, 53120, 2], [2, 52918, 2, 59478, 3], [3, 56838, 4, 63398, 5]],
+        "terminal_compared_cells": 8,
+        "terminal_differences": 0,
+        "differences": 0
+      },
+      {
+        "title": "2024 Form 1040 Tax and Earned Income Credit Tables",
+        "tax_year": 2024,
+        "url": "https://www.irs.gov/pub/irs-prior/i1040tt--2024.pdf",
+        "sha256": "fb82d748af260815c65e50591ec69cfb566e9c71ea7589abee06ac7de9a7be09",
+        "pinpoint": "EIC Table pages 17–20: $10,300–$10,350 / $10,350–$10,400 single/no-child cells 632 / 629; joint $17,250–$17,300 cell 630. Childless terminal footnotes at 18550–18591: credit 2; 25500–25511: credit 0.",
+        "parsed_rows": 1332,
+        "compared_cells": 10650,
+        "terminal_footnotes": [[0, 18591, 2, 25511, 0], [1, 49084, 3, 56004, 0], [2, 55768, 2, 62688, 4], [3, 59899, 5, 66819, 2]],
+        "terminal_compared_cells": 8,
+        "terminal_differences": 0,
+        "differences": 0
+      },
+      {
+        "title": "2021 Form 1040, U.S. Individual Income Tax Return",
+        "tax_year": 2021,
+        "url": "https://www.irs.gov/pub/irs-prior/f1040--2021.pdf",
+        "sha256": "41026e1bab58b13c69819a7fb5c836798cbfedf7c99452b2ddd242a28d061a04",
+        "pinpoint": "Page 2, checkbox immediately below line 27a",
+        "retained_excerpt": "Check here if you were born after January 1, 1998, and before January 2, 2004, and you satisfy all the other requirements for taxpayers who are at least age 18, to claim the EIC. See instructions."
+      }
+    ]
+  },
+  "notes": [
+    "2021 Revenue Procedure2020-45 predates ARPA: childless EIC uses Publication596(2021) instead of the obsolete543 credit/3650 investment ceiling. Expanded child CTC and refundable dependent-care claims remain separately capability-gated.",
+    "2023 MFS capital-gain15% ceiling is276900; 2024 is291850, not an unrounded half of the joint amount.",
+    "2021 MFS section199A threshold is164925, not164900.",
+    "2024 Revenue Procedure2023-34 printed the over191950 bracket subtraction as191150; use the interval boundary191950 and the published base39110.50 (single/MFS) or37417 (HOH), agreeing with the final1040 instructions.",
+    "2021 nonitemizer cash deduction is below AGI (1040 line12b), not a2020 above-line adjustment. It also reduces the QBI taxable-income cap.",
+    "Getters for foreign housing, excluded business credits and farming penalty tables fail explicitly; no later-year tables or invented zero amounts are supplied.",
+    "No state or corporate tax preparation, transmission, payment, or amended returns are added."
+  ]
+}

@@ -7,7 +7,7 @@
  *
  * Usage: bun scripts/testing/sandbox.ts [--json]
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { builtinModules } from "node:module";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -70,14 +70,15 @@ function scanner(path: string): Bun.Transpiler {
 
 /** Every module reachable from the entry, and every rule it breaks. */
 export function inspectSandbox(root = ROOT, entry = ENTRY) {
+  const canonicalRoot = realpathSync(root);
   const seen = new Set<string>();
   const problems: SandboxProblem[] = [];
-  const pending = [join(root, entry)];
+  const pending = [join(canonicalRoot, entry)];
   while (pending.length > 0) {
     const file = pending.pop()!;
     if (seen.has(file)) continue;
     seen.add(file);
-    const name = relative(root, file);
+    const name = relative(canonicalRoot, file);
     if (/\.(pdf|json)$/.test(file)) continue; // embedded data, not code
     // The transpiler API rejects a leading #! line that `bun` itself skips.
     const source = readFileSync(file, "utf8").replace(/^#!.*/, "");
@@ -113,7 +114,7 @@ export function inspectSandbox(root = ROOT, entry = ENTRY) {
     }
   }
   return {
-    modules: [...seen].map((file) => relative(root, file)).sort(),
+    modules: [...seen].map((file) => relative(canonicalRoot, file)).sort(),
     problems,
   };
 }

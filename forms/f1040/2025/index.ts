@@ -1,5 +1,5 @@
 import { preparePublicForm8886Return } from "./domains/general/filing/form8886/public-return.ts";
-import type { FormDefinition } from "../../../core/types/form-definition.ts";
+import type { MefFormDefinition } from "../../../core/types/form-definition.ts";
 import type { ExecuteResult } from "../../../core/runtime/executor.ts";
 import type { FilerIdentity } from "../mef/header.ts";
 import type { MefFormsPending } from "./mef/types.ts";
@@ -17,11 +17,27 @@ const context = {
   formType: F1040_2025_CONFIG.formType,
 };
 
-function executeReturn(inputs: Record<string, unknown>): ExecuteResult {
-  return executeF1040Return(inputs, context);
+function executeReturn(
+  inputs: Record<string, unknown>,
+  options?: { readonly captureExecution?: boolean },
+): ExecuteResult {
+  // Adoption, Form 8990, and QEF deferral project filed values outside the
+  // executor. Their pre-projection/counterfactual traces are not final evidence.
+  const captureExecution = options?.captureExecution &&
+    inputs.form8839 === undefined && inputs.form8990 === undefined &&
+    !(Array.isArray(inputs.f8621) && inputs.f8621.some((item) =>
+      item !== null && typeof item === "object" &&
+      "qef_1294_election" in item && item.qef_1294_election !== undefined
+    ));
+  return executeF1040Return(
+    inputs,
+    captureExecution ? { ...context, captureExecution: true } : context,
+  );
 }
 
-export const f1040_2025: FormDefinition = {
+export const f1040_2025: MefFormDefinition = {
+  preparationMode: "mef",
+  paperAvailable: true,
   ...F1040_2025_CONFIG,
   inputNodes,
   registry,

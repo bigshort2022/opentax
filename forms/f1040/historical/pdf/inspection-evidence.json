@@ -1,0 +1,61 @@
+{
+  "authority": "https://www.irs.gov/prior-year-forms-and-instructions",
+  "source_manifest": "template-sources.json",
+  "field_inventory": "field-maps.json",
+  "inspection_method": "Downloaded official IRS final PDFs; extracted actual named AcroForm widgets, page rectangles, adjacent printed text using PyMuPDF/pypdf. Historical rows were joined by printed labels and manually corrected for actual layout differences. Runtime uses only retained historical mappings and SHA-256-pinned bytes. No runtime current-year offset or URL substitution.",
+  "observed_layout_differences": [
+    "2021 Form1040 single wages line1; separate12a standard/itemized,12b nonitemizercharity,12c sum; EITC27a and lookback27c.",
+    "2021\u201323 Schedule2 AMTline1 and APTCrepaymentline2, unlike2024 line1a and2.",
+    "2021\u201324 ScheduleC otherexpenses27a;2021\u201322 line27b reserved;2023\u201324 line27b energy-efficient commercialbuilding deduction.",
+    "2021\u201324 Form8949 fourteen transaction rows perpage;A/B/C andD/E/F only.",
+    "2021 Form8962 unemploymentcheckboxA and separateMFSexceptionB;laterforms onlyMFSexceptionA.",
+    "2021 Form7203 Dec2021 stockblockdescription ratherthanlateroriginalshareholder checkbox.",
+    "2021 ScheduleE page2 totals widgets differ from2022\u201324; nonpassiveloss totalisf2_38 ratherthanf2_42.",
+    "2021 ScheduleA mortgageinsurance8d remains deductible onlyfromyear-correct computedallowedamount.",
+    "Form8880 line9 preprints0.; fill onlythedecimaldigit.",
+    "MFS spouse-name widget is FilingStatus.f1_01 in2021, f1_01 in2022, and f1_18 in2023/2024; it is distinct from the joint-return spouse name row.",
+    "2021 ScheduleB line7b has one country field f1_67;2022-2024 have two fields. Long lists use an actual-year continuation.",
+    "All four Form8962 instruction revisions require QSEHRA in the top margin on page1. Inspected annual blank margins support the retained annotation coordinates.",
+    "Form8582 losses1b/1c/2b/2c havepreprintedparentheses; printpositivefigures. Ifline3>=0 stopbeforePartsII/III."
+  ],
+  "visual_research": "Viewed official blank1040 firstpagesallfouryears;2021ScheduleE/8889/8582/7203/A/B;2021and2024ScheduleC27a/b,Form8962checkboxes,Form8949rows,ScheduleSEyearprintedwagecaps. Follow-up inspected actual MFS labels/widgets for each year,2021ScheduleB single country field,and all four8962 top margins. Filled packet visual review is intentionally reserved for parent integrated verification.",
+  "verification_status": "No builds, tests, lint, formatter, or filled-packet smoke runs executed by worker. Consumer regressions and synthetic fixtures supplied for parent.",
+  "document_inventory": "Canonical TaxNode.contextFields excludes pure return-wide context without suppressing computation. Conditional attachment predicates retain allocated-tip obligations, misclassified-wage forms, Schedule J elections(includingzero), negative Form8978 claims,and actual-year Form461 requirements. The half-single per-line Form461 filing trigger begins2024,not2021-2023. Underscore-named form_1116 claims and actual-method Form8829 claims block. Final emitted taxes/deductions independently require supporting documents. Historical Schedule1A input context is not an attachment; a claimed output is blocked.",
+  "real_engine_regressions": "builder.test.ts supplies real wage,ScheduleC/SE,Marketplace repayment,annual/monthlyPublication974,foreign-interest-credit,investment-adjustment and reviewed rental-allocation graph sources. Packet regressions cover MFS text coordinates,country continuation,QSEHRA top-margin readback,signed loss/nominee rounding,Form5329 owner-row binding,and Form8582 PartVI applicability/eligible-only totals. Both Schedule2 joins independently compare canonical source totals to1040,then separately derive/reconcile printed aggregates. Assertions are supplied for parent execution,not claimed passing by worker.",
+  "annotation_authorities": [
+    {"year":2021,"url":"https://www.irs.gov/pub/irs-prior/i8962--2021.pdf","sha256":"e4b4e5fa151c6964ec763c727288efc36672ecec1536a006aa0449f9adb6dd48","page":1},
+    {"year":2022,"url":"https://www.irs.gov/pub/irs-prior/i8962--2022.pdf","sha256":"de69b83a5d1630b8193f6a61ebf7c140916d1cc3f47bea1634126b9dc182afb0","page":1},
+    {"year":2023,"url":"https://www.irs.gov/pub/irs-prior/i8962--2023.pdf","sha256":"a9a9e5989ac3a64239afb8aff4ee03c255b998580ef7ced8b86042a5bcd0e787","page":1},
+    {"year":2024,"url":"https://www.irs.gov/pub/irs-prior/i8962--2024.pdf","sha256":"c7aade0f20fe7e32a2a34e6af6d30288f563bc46efc43a682626134e48b899b9","page":1}
+  ],
+  "worksheet_authorities": [
+    {"year":2023,"url":"https://www.irs.gov/pub/irs-prior/i7206--2023.pdf","sha256":"99a3ddda6687882664e98012ccc9d4363d296138b08a51ca760395522e41c1ce","section":"How to figure the deduction"},
+    {"year":2024,"url":"https://www.irs.gov/pub/irs-prior/i7206--2024.pdf","sha256":"c84ba34c145bf0924f2c95af5ff388e7e87c44a3daba24e05098972919929d14","section":"How to figure the deduction"}
+  ],
+  "publication974_print_contract": "One identified ScheduleC business,nootherSEincome,noForm2555/noLTC uses the applicable Publication974 worksheet rather than fabricated7206 arithmetic. Adapter rederives pub974_filing_row,binds owner/business,checks Schedule1line17 and8962line24,and prints WorksheetW/X plus iteration/result evidence.",
+  "spouse_owner_contract": "An identified spouse on an MFS return is filing-status identity,not a joint-return owner. The shared paper owner selector requires MFJ before selecting any spouse-owned business,health or basis form. Regression uses a real computed Form5329 S-owner row and a below-SE-threshold spouse ScheduleC.",
+  "inactive_carryover_print_contract": "After canonical source projection,ScheduleE retains a full-personal-use inactive property only when isInactivePersonalCarryover confirms its durable activity identity,reviewed reconstructed operatingPAL,and absence of current rental/expense/disposition facts. Form8582 allowances remain keyed by activity_id; property order is preserved. Real-engine two-property regression expects1000profit less410former-rentalPAL=590and checks both source orders.",
+  "signed_business_loss_inventory": "Form461 consumes signed historical_k1_business_income_loss for the known-business aggregate. Its separate2024line5 attachmenttest uses complete post-basis/PAL ScheduleE through the shared owner-loss coverage helper,not the ordinary-business marker alone. Regression sources include issuedK1rows,reviewed limitations,completeSchedule1contributions,offsetting businesses,and obsolete-marker rejection.",
+  "loss_filing_authority": {"year":2024,"url":"https://www.irs.gov/pub/irs-prior/i461--2024.pdf","sha256":"9a9746b7e1d3865a458ce9aec298cc2064a42876b6ed19daf240c25384af8378","section":"What's New; Who Must File"},
+  "capital_column_contract": "Parent observed a real2021singleBoxC sale with100proceeds/11100basis/-11000gain omitted fromScheduleDline3 although8949andline7were populated. Native ScheduleD projection assumed transaction was an array; executor preserves a single object. Historical projection now normalizes the complete forwarded and publicD-screen source inventory,validates source forwarding/math/holdingperiod,uses canonical reported-dollar rules,and reuses the native column projector with an array. Printed direct and A-F rows independently reconcile lines7/15/16 and1040line7. Existing actual-year mappings remain unchanged. Zero-net reported sales still attachScheduleD,and D-screen rows requiring8949 actually attach it.",
+  "capital_consumer_regressions": "For every2021-2024year: six independent single-sale realgraph cases; accumulated A-F plus fractional-cent direct-sales and direct aggregate amounts; bbox readback in each annual ScheduleD widget rectangle; D-screen-source8949 packet inclusion; zero-net-saleScheduleD inclusion; tampered net-total rejection. No fabricatedpendingtotals are used by these capital regressions.",
+  "foreign_only_schedule_b_regression": "Each historicalyear exercises an actual public foreign-account declaration with wages but zero interest/dividends: truthful account/FBAR/trust checkbox projection,actualcountryreadback,and blocking source-versus-canonical boolean/country mismatches. Parent owns canonical PartIII reconciliation/includeWhen integration.",
+  "parent_commands": [
+    "bun test forms/f1040/historical/pdf/builder.test.ts",
+    "bun -e 'import {buildHistoricalPdfBytes} from \"./forms/f1040/historical/pdf/builder.ts\"; import {syntheticFiler,syntheticPaperPending,syntheticMixedStockRental} from \"./forms/f1040/historical/pdf/fixtures.ts\"; for (const year of [2021,2022,2023,2024] as const) { await Bun.write(`/tmp/historical-${year}.pdf`,await buildHistoricalPdfBytes(year,syntheticPaperPending(year),syntheticFiler)); await Bun.write(`/tmp/historical-mixed-${year}.pdf`,await buildHistoricalPdfBytes(year,syntheticMixedStockRental(year),syntheticFiler)); }'",
+    "bun -e 'import {executeF1040Return} from \"./forms/f1040/2025/return-processing/execute_return.ts\"; import {buildHistoricalPdfBytes} from \"./forms/f1040/historical/pdf/builder.ts\"; import {syntheticFiler,syntheticPub974Inputs} from \"./forms/f1040/historical/pdf/fixtures.ts\"; for(const year of [2021,2022,2023,2024] as const){const result=executeF1040Return(syntheticPub974Inputs(year),{taxYear:year,formType:\"f1040\"}); if(result.diagnostics.length)throw Error(JSON.stringify(result.diagnostics)); await Bun.write(`/tmp/historical-pub974-${year}.pdf`,await buildHistoricalPdfBytes(year,result.pending,syntheticFiler));}'",
+    "pdftoppm -png -r 120 /tmp/historical-2021.pdf /tmp/historical-2021",
+    "pdftotext -layout /tmp/historical-mixed-2024.pdf -"
+  ],
+  "explicit_required_document_blocks": [
+    "Unmapped required forms/schedules and unresolved core1040 totals; graph context alone is not a filing requirement",
+    "ActualForm1116filingclaims(noimplementedexceptionelection),actual-methodhomeofficeForm8829,andrequiredForm461",
+    "Shareholderdebt inventory, bindingpartnershipbasis/at-risk, propertydispositionForm4797",
+    "QBIaggregation/cooperativesrequiringseparatelyreviewedschedules",
+    "ScheduleAunsupportedclaimsupportForm4952/4684/8283andunclassifiedline16",
+    "Former-spousejointestimatedpaymentwrite-in/statement",
+    "HealthForm5329nonhealthtaxnotrepresentedbyPartVI/VII",
+    "2025-onlySchedule1A/additionaldeductions andfixed2026estimatedtaxapplication"
+  ],
+  "synthetic_fixtures": "fixtures.ts supplies synthetic identities,already-computed layout examples,and real-source syntheticPub974Inputs(year,monthly). Builder regressions use public source schemas and real computed owner rows; no taxpayer data or fake spouse discriminator."
+}

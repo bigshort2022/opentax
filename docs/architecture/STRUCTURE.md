@@ -1,6 +1,6 @@
 # Repository Structure
 
-Public entrypoints are `mod.ts`, `catalog.ts`, `cli/main.ts`, and `forms/f1040/2025/index.ts`. See [repository organization](./repository-organization.md) for the responsibilities of each boundary.
+Public entrypoints are `mod.ts`, `catalog.ts`, `cli/main.ts`, and the cataloged `forms/f1040/<year>/index.ts` products. See [repository organization](./repository-organization.md) for the responsibilities of each boundary.
 
 ```text
 /
@@ -18,6 +18,11 @@ Public entrypoints are `mod.ts`, `catalog.ts`, `cli/main.ts`, and `forms/f1040/2
 │   ├── validation/                # Business-rule engine
 │   └── test-utils/
 ├── forms/f1040/
+│   ├── 2021/ … 2024/
+│   │   └── index.ts               # Historical paper products with actual-year context
+│   ├── historical/
+│   │   ├── capabilities.ts / validation.ts # Bounded public source schemas and preparation checks
+│   │   └── pdf/                   # Pinned final-year templates, projections and document inventory
 │   ├── 2025/
 │   │   ├── index.ts / config.ts    # Public year entrypoint and year constants
 │   │   ├── inputs.ts / registry.ts # Stable input and node registration
@@ -38,6 +43,7 @@ Public entrypoints are `mod.ts`, `catalog.ts`, `cli/main.ts`, and `forms/f1040/2
 │   └── e2e/                       # Return contracts by domain; ATS scenarios together
 ├── docs/
 │   ├── architecture/              # Internal design and repository navigation
+│   ├── historical-federal/        # Annual-rule, health, loss and published-line oracle evidence
 │   ├── mef/ty2025/                # Readiness, inventory and source evidence by topic
 │   ├── ty2026/                    # Source research by topic
 │   ├── ats/                       # ATS preparation and correspondence drafts
@@ -50,7 +56,7 @@ Public entrypoints are `mod.ts`, `catalog.ts`, `cli/main.ts`, and `forms/f1040/2
 │   ├── release/                   # Compiled binary checks
 │   └── site/                      # Static site statistics
 ├── benchmark/
-│   ├── run_benchmark.ts           # Expected-output comparison against IRS ground truth
+│   ├── run_benchmark.ts           # Expected-value comparison with explicit verification limits
 │   ├── check_cases.ts             # Case contract without running the engine
 │   ├── cases/baseline.json        # Known-invalid cases, with reason and expiry
 │   ├── cases/<form>/<year>/ledger.json # Every expected-value change, with its publication
@@ -60,6 +66,25 @@ Public entrypoints are `mod.ts`, `catalog.ts`, `cli/main.ts`, and `forms/f1040/2
 ```
 
 Tax-facing boundaries use General, Income, Adjustments, Deductions, Credits, Taxes, and Payments. Business, retirement, investments, foreign and health are subgroups inside the relevant return section. Node inputs, intermediate forms/worksheets/aggregations and outputs retain their roles, with the same physical tax-section subfolders inside each role. Tests, fixtures and family research travel with their contracts. Runtime and tooling remain under separate role boundaries.
+
+Historical products share the pure graph, but not the TY2025 electronic filing
+contract. `FormDefinition.preparationMode` separates paper products from MeF
+products. A paper product declares accepted source schemas, a raw-field guard,
+source/preparation diagnostics and its own PDF builder. A reachable computed node
+does not by itself establish a supported input or printable form.
+
+The CLI checks those source boundaries before persistence. Paper readiness requires
+identified sources, complete calculations, current reviewed loss dependencies and
+all required printable documents; it does not require electronic credentials or
+claim IRS acceptance. The carryover store previews without writing, binds explicit
+reviews to financial fingerprints, and validates the complete destination before
+one atomic write. Linked field snapshots prevent overwriting independent amounts
+or silently retaining balances removed from their source.
+
+Historical PDF mappings retain each template's actual-year digest and field
+geometry. Projections reconcile printed amounts and owners with calculated/source
+amounts; unsupported required documents block ordinary export. Diagnostic drafts
+carry page watermarks and an unresolved-item inventory.
 
 ## Structure contract
 
@@ -89,7 +114,7 @@ a reason, an expiry date and an approver; the check fails only on new ones, on
 expired entries, and on entries that no longer match anything.
 
 Every year runs the same nodes, so shared code (`forms/f1040/nodes/`, outside
-`config/2025.ts`, `2026.ts` and `index.ts`, and the MeF, PDF, domain,
+the annual `config/<year>.ts` data modules and `config/index.ts`, and the MeF, PDF, domain,
 validation and return-processing code they feed) must read the year from
 `ctx.taxYear` and `CONFIG_BY_YEAR[ctx.taxYear]`. The check fails on a
 `CONFIG_BY_YEAR[2025]` index, a year comparison other than an onset gate
@@ -166,8 +191,26 @@ in `scripts/testing/year-pinned-baseline.json`; a count may only fall, and
 }
 ```
 
-**Required** (benchmark pass/fail): `line24_total_tax`, `line35a_refund`, `line37_amount_owed`
+**Full-return fixtures require** `line24_total_tax`, `line35a_refund`, and
+`line37_amount_owed`. Other numeric expectations, including AGI, taxable income,
+and payments, are scored when supplied; unmapped expectations fail.
 
-**Optional** (shown for debugging): `line11_agi`, `line15_taxable_income`, `line33_total_payments`
+Explicit `published_lines` fixtures score only their cited lines with exact
+dollar equality. `reviewed_synthetic` fixtures retain the three final-balance
+assertions and score every expected key exactly, using validated per-assertion
+bindings and provenance. Their execution evidence distinguishes actual return
+lines, an observed ordinary-rate tax base, and zero-activity contributions.
+Missing or failed execution is never evidence of zero.
 
-Values must come directly from an IRS publication. The `source` field must cite the specific pub, exercise, and page. Never compute values.
+An IRS-published example must cite the specific publication, exercise and page;
+its expected values come from that publication, never from the engine or another
+calculator. A reviewed synthetic regression must instead identify which amounts
+are published, which apply IRS instructions to explicitly synthetic facts, and
+which are benchmark representation conventions. It is not a published completed
+return or eligibility certification. Numeric changes still require the oracle
+ledger; metadata repairs do not authorize changing expected dollars.
+
+See the [benchmark contract](../../benchmark/README.md#reviewed-synthetic-assertions)
+for required source metadata and binding limits, and the
+[reporting contract](../../benchmark/README.md#reading-the-report) for exclusions,
+issue categories, assertion evidence and verification limits.

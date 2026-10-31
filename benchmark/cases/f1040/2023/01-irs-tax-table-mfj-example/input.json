@@ -1,0 +1,33 @@
+{
+  "year": 2023,
+  "scenario": "2023 IRS published joint-return example at $25,300 taxable income, exercised through synthetic wage inputs",
+  "source": "IRS 2023 Instructions for Form 1040 Tax and Earned Income Credit Tables, PDF/printed page 3, Example (married couple filing jointly); https://www.irs.gov/pub/irs-prior/i1040tt--2023.pdf. Standard-deduction input construction: IRS 2023 Form 1040, page 1 Standard Deduction for sidebar; https://www.irs.gov/pub/irs-prior/f1040--2023.pdf. Retained PDF digests and rendered evidence: docs/historical-federal/benchmark-sources.json.",
+  "synthetic_inputs": "Explicitly synthetic consumer inputs, not an IRS-published complete household or W-2. Wages $53,000 = published taxable income $25,300 + sourced 2023 married-filing-jointly basic standard deduction $27,700. Synthetic filers are under 65, nonblind, not dependents, with no other income, adjustments or itemized deductions. W-2 withholding is synthetic zero required by its schema. Only the published taxable-income and tax-table lines are scored; no total-tax, payments, refund or amount-owed oracle is asserted.",
+  "forms": [
+    {
+      "node_type": "start",
+      "data": {
+        "general": {
+          "filing_status": "mfj",
+          "taxpayer_dob": "1980-01-01",
+          "taxpayer_blind": false,
+          "taxpayer_age_65_or_older": false,
+          "taxpayer_claimed_as_dependent": false,
+          "taxpayer_can_be_claimed_as_dependent": false,
+          "dependents": [],
+          "spouse_dob": "1981-01-01",
+          "spouse_blind": false,
+          "spouse_age_65_or_older": false,
+          "spouse_can_be_claimed_as_dependent": false
+        }
+      }
+    },
+    {
+      "node_type": "w2",
+      "data": {
+        "box1_wages": 53000,
+        "box2_fed_withheld": 0
+      }
+    }
+  ]
+}

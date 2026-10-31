@@ -1,10 +1,12 @@
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import type { FilerIdentity } from "../../../../../../mef/header.ts";
+import { roundWholeDollars } from "../../../../../../whole-dollars.ts";
 
 export async function appendScheduleBNomineeDividendStatement(
   document: PDFDocument,
   fields: Record<string, unknown>,
   filer: FilerIdentity | undefined,
+  taxYear: number,
 ): Promise<void> {
   const nominee = fields.dividend_nominee;
   if (typeof nominee !== "number" || nominee <= 0) return;
@@ -25,7 +27,7 @@ export async function appendScheduleBNomineeDividendStatement(
   const regular = await document.embedFont(StandardFonts.Helvetica);
   const bold = await document.embedFont(StandardFonts.HelveticaBold);
   const page = document.addPage([612, 792]);
-  page.drawText("Schedule B (Form 1040) 2025 - Nominee Dividends", {
+  page.drawText(`Schedule B (Form 1040) ${taxYear} - Nominee Dividends`, {
     x: 36,
     y: 748,
     size: 11,
@@ -62,7 +64,7 @@ export async function appendScheduleBNomineeDividendStatement(
       size: 9,
       font: index === 2 ? bold : regular,
     });
-    page.drawText(String(Math.round(amount)), {
+    page.drawText(String(roundWholeDollars(amount)), {
       x: 490,
       y,
       size: 9,

@@ -1,0 +1,12 @@
+{
+  "case": "02-irs-tax-table-single-sample",
+  "scenario": "2024 IRS published single sample-table row at $25,300 taxable income, exercised through synthetic wage inputs",
+  "year": 2024,
+  "oracle_scope": "published_lines",
+  "source": "IRS 2024 Instructions for Form 1040 Tax and Earned Income Credit Tables, PDF/printed page 3, Sample Table, Single column, taxable income $25,300\u2013$25,350 row; https://www.irs.gov/pub/irs-prior/i1040tt--2024.pdf. Standard-deduction input construction: IRS 2024 Form 1040, page 1 Standard Deduction for sidebar; https://www.irs.gov/pub/irs-prior/f1040--2024.pdf. Retained PDF digests and rendered evidence: docs/historical-federal/benchmark-sources.json.",
+  "synthetic_inputs": "Explicitly synthetic consumer inputs, not an IRS-published complete household or W-2. Wages $39,900 = published taxable income $25,300 + sourced 2024 single basic standard deduction $14,600. Synthetic filers are under 65, nonblind, not dependents, with no other income, adjustments or itemized deductions. W-2 withholding is synthetic zero required by its schema. Only the published taxable-income and tax-table lines are scored; no total-tax, payments, refund or amount-owed oracle is asserted.",
+  "correct": {
+    "line15_taxable_income": 25300,
+    "line16_income_tax": 2807
+  }
+}

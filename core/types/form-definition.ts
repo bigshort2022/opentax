@@ -25,14 +25,48 @@ export type InputNodeEntry =
     readonly isArray: false;
   };
 
-export interface FormDefinition {
-  readonly formType: string; // e.g. "f1040"
-  readonly taxYear: number; // e.g. 2025
-  readonly mefSchemaVersion: string; // e.g. "2025v3.0"
+interface FormDefinitionBase {
+  readonly formType: string;
+  readonly taxYear: number;
+  readonly paperAvailable: boolean;
   readonly inputNodes: readonly InputNodeEntry[];
   readonly registry: Record<string, TaxNode>;
   /** Single form-owned execution entrypoint for validated source inputs. */
-  readonly executeReturn: (inputs: Record<string, unknown>) => ExecuteResult;
+  readonly executeReturn: (
+    inputs: Record<string, unknown>,
+    options?: { readonly captureExecution?: boolean },
+  ) => ExecuteResult;
+  readonly buildPdfBytes: (
+    pending: Record<string, unknown>,
+    filer?: FilerIdentity,
+    options?: { readonly draft?: boolean; readonly issues?: readonly PreparationIssue[] },
+  ) => Promise<Uint8Array>;
+  readonly buildPending: (
+    pending: Record<string, unknown>,
+  ) => Record<string, unknown>;
+}
+
+export interface PreparationIssue {
+  readonly code: string;
+  readonly message: string;
+  readonly form: string;
+}
+
+export interface PaperFormDefinition extends FormDefinitionBase {
+  readonly preparationMode: "paper";
+  /** The public composite schema, restricted to this product's supported inputs. */
+  readonly sourceSchema: ZodTypeAny;
+  /** Inspect raw fields before parsing can discard unsupported historical facts. */
+  readonly assertInput: (nodeType: string, data: unknown) => void;
+  readonly preparationIssues: (
+    inputs: Readonly<Record<string, unknown>>,
+    pending: Readonly<Record<string, Record<string, unknown>>>,
+  ) => readonly PreparationIssue[];
+}
+
+export interface MefFormDefinition extends FormDefinitionBase {
+  readonly preparationMode: "mef";
+  readonly mefSchemaVersion: string;
   /** Build linked native documents once and retain their printable source. */
   readonly prepareReturn: (
     pending: Record<string, unknown>,
@@ -46,16 +80,11 @@ export interface FormDefinition {
     pending: Record<string, unknown>,
     filer?: FilerIdentity,
   ) => string;
-  readonly buildPdfBytes: (
-    pending: Record<string, unknown>,
-    filer?: FilerIdentity,
-  ) => Promise<Uint8Array>;
-  readonly buildPending: (
-    pending: Record<string, unknown>,
-  ) => Record<string, unknown>;
   /** A submission type with its own rule set; absent means the Form 1040 rules. */
   readonly mefRuleReport?: (
     pending: Readonly<Record<string, unknown>>,
     xml: string,
   ) => DiagnosticsReport;
 }
+
+export type FormDefinition = MefFormDefinition | PaperFormDefinition;

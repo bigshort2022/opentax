@@ -28,6 +28,7 @@ import {
 import {
   computePropertyNet,
   inputSchema as scheduleEInputSchema,
+  projectScheduleEItems,
   qualifiedEntireDispositionGain,
   qualifiedEntireDispositionLoss,
 } from "../../../../../nodes/inputs/income/rental-passthrough/schedule_e/index.ts";
@@ -224,9 +225,13 @@ function buildIRS4797(fields: Input, context?: MefBuildContext): string {
     );
   }
   if (passiveSales.length > 0 && context?.pending) {
-    const scheduleE = scheduleEInputSchema.parse(
+    const rawScheduleE = scheduleEInputSchema.parse(
       context.pending.schedule_e ?? {},
     );
+    const scheduleE = {
+      ...rawScheduleE,
+      schedule_es: projectScheduleEItems(rawScheduleE.schedule_es, mefTaxYear(context)),
+    };
     for (const sale of passiveSales) {
       const matches = scheduleE.schedule_es.filter((item) =>
         item.activity_id === sale.activity_id &&

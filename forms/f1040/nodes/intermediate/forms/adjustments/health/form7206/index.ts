@@ -28,7 +28,7 @@ import { schedule1 } from "../../../../../outputs/general/return-assembly/schedu
 import { schedule1a } from "../../../deductions/additional/schedule1a/index.ts";
 import { form8995 } from "../../../deductions/business/form8995/index.ts";
 import type { NodeContext } from "../../../../../../../../core/types/node-context.ts";
-import { CONFIG_BY_YEAR } from "../../../../../config/index.ts";
+import { CONFIG_BY_YEAR, isHistoricalTaxYear } from "../../../../../config/index.ts";
 import { form8962 } from "../../../credits/health/form8962/index.ts";
 import { TS } from "../../../../../types.ts";
 import { assertPremiumRecordsInYear } from "./policy-records.ts";
@@ -262,15 +262,17 @@ class Form7206Node extends TaxNode<typeof inputSchema> {
     }
     if (input.pub974_single_business) {
       if (
-        ctx.taxYear !== 2025 ||
         input.marketplace_ptc_premium_overlap !== true ||
         input.single_schedule_c_plan !== undefined
       ) {
         throw new Error(
-          "Form 7206 Publication 974 route needs only verified 2025 single-business source facts and positive Marketplace overlap",
+          "Form 7206 Publication 974 route needs verified single-business source facts and positive Marketplace overlap",
         );
       }
       const source = input.pub974_single_business;
+      if (isHistoricalTaxYear(ctx.taxYear) && !source.owner_identity) {
+        throw new Error("Historical Publication 974 deduction needs the actual proprietor owner identity");
+      }
       const business = source.worksheet_w.business;
       if (business.kind !== "self_employed") {
         throw new Error(
@@ -304,11 +306,15 @@ class Form7206Node extends TaxNode<typeof inputSchema> {
           "Publication 974 Worksheet W business income and deductions must match the identified Schedule C, Schedule SE, and retirement source",
         );
       }
-      const result = calculatePub974SingleBusinessIterative(source);
+      const result = calculatePub974SingleBusinessIterative(ctx.taxYear, source);
       const f = source.form8962_source;
       return {
         outputs: [
           ...buildOutput(result.schedule1_line17_deduction),
+          ...(result.filing_row ? [{
+            nodeType: this.nodeType,
+            fields: { pub974_filing_row: result.filing_row },
+          }] : []),
           output(form8962, {
             pub974_reconciliation: {
               monthly_premiums: f.monthly_premiums!,
@@ -352,8 +358,9 @@ class Form7206Node extends TaxNode<typeof inputSchema> {
               filing_status: source.worksheet_x.filing_status,
               total_premium_tax_credit: result.form8962_fields
                 .total_premium_tax_credit as number,
-              worksheet_x_repayment_limit:
-                result.worksheet_x.line25_repayment_limit,
+              ...(cfg.ptcRepaymentCaps.length > 0 ? {
+                worksheet_x_repayment_limit: result.worksheet_x.line25_repayment_limit,
+              } : {}),
               specified_premiums: result.worksheet_w.line1_specified_premiums,
               attributable_specified_ptc: result.attributable_specified_ptc,
               specified_deduction: result.schedule1_line17_deduction -

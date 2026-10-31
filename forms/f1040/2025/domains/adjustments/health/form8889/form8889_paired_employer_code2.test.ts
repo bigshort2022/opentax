@@ -67,8 +67,8 @@ function pairedEmployerCode2Case(employerOwner: "T" | "S" = "T") {
     spouse_has_separate_hsa: true,
     last_month_rule_elected: false,
     employer_contribution_years: {
-      made_in_2025_for_2024_in_w2: 0,
-      made_in_2026_for_2025: 0,
+      made_in_tax_year_for_prior_year_in_w2: 0,
+      made_in_following_year_for_tax_year: 0,
     },
   };
   const source = inputSchema.parse({

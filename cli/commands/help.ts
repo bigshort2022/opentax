@@ -38,6 +38,11 @@ export type ParsedArgs = {
   readonly document?: string;
   readonly full?: boolean;
   readonly "list-documents"?: boolean;
+  readonly "source-returnId"?: string;
+  readonly "target-returnId"?: string;
+  readonly "evidence-reference"?: string;
+  readonly provenance?: string;
+  readonly "source-complete"?: boolean;
   readonly json?: boolean;
   readonly help?: boolean;
 };

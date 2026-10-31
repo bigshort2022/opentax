@@ -15,9 +15,9 @@ function configFor(taxYear: number) {
 }
 
 /**
- * Tax Table or Tax Computation Worksheet tax for one year. TY2025 uses the
- * published table; a later year derives the table cell from its rate schedule
- * until IRS publishes that year's table.
+ * Tax Table or Tax Computation Worksheet tax for one year. Historical table
+ * cells use the published intervals and exact-cent midpoint rounding; see
+ * docs/historical-federal/annual-rules-sources.json for archived comparisons.
  */
 export function ordinaryTaxForYear(
   income: number,

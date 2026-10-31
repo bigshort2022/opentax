@@ -210,3 +210,44 @@ test("Form 8582-CR line 6 binds every rental amount and owner independent of ord
   assertThrows(() => run({ ...worksheet, ...review }, rentals));
   assertThrows(() => run({ ...review, passive_income_sources: [] }, rentals));
 });
+
+test("Form 8582-CR line 6 reconciles independently allocated rental expenses", () => {
+  const allocated = {schedule_es:[{
+    ...scheduleE.schedule_es[0],rent_income:22000,
+    expense_allocation_source:{
+      tax_year:2025,activity_id:"rental-1",source_reference:"Synthetic expense ledger",
+      use_pattern:"rental-only",rental_period:{from:"2025-01-01",through:"2025-12-31"},
+      no_personal_use_during_rental_period:true,amounts_before_ownership_allocation:true,
+      expenses:[{expense_id:"insurance",category:"expense_insurance",transaction_kind:"expense",
+        source_amount:4000,source_reference:"Synthetic insurer",paid_on:"2025-01-01",
+        expense_period:{from:"2025-01-01",through:"2025-12-31"},
+        method:"documented-share",rental_share:0.5,method_reference:"Reviewed rental-unit share"}],
+    },
+  }]};
+  const before = JSON.stringify(allocated);
+  const result = calculateForm8582CRLine6OrdinaryWorksheet(
+    worksheet,allocated,form8582cr,form1040,schedule1,general,undefined,2025,
+  );
+  assertEquals(result.line6,taxAll-taxWithout);
+  assertEquals(JSON.stringify(allocated),before);
+});
+
+test("Form 8582-CR ordinary worksheet does not silently discard an inactive prior PAL", () => {
+  const inactive = {
+    ...scheduleE.schedule_es[0],activity_id:"inactive",fair_rental_days:0,personal_use_days:365,
+    rent_income:0,prior_unallowed_passive_operating:410,
+    prior_unallowed_passive_4797_part1:0,prior_unallowed_passive_4797_part2:0,
+    reconstructed_prior_loss_source:{
+      tax_year:2024,activity_id:"inactive",provenance:"calculated-unfiled",
+      evidence_reference:"Reviewed synthetic PAL",operating:410,form4797_part1:0,form4797_part2:0,
+    },
+    loss_limitations_review:{
+      basis_resolved:true,at_risk_resolved:true,qbi_transition_resolved:true,
+      evidence_reference:"Reviewed synthetic limitations",
+    },
+  };
+  assertThrows(()=>calculateForm8582CRLine6OrdinaryWorksheet(
+    worksheet,{schedule_es:[...scheduleE.schedule_es,inactive]},form8582cr,
+    form1040,schedule1,general,undefined,2025,
+  ),Error,"a complete sourced passive Schedule E income inventory");
+});

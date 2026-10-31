@@ -115,11 +115,11 @@ test("post-year employer owner payment rejects absent, late, misdirected and 202
       delete input.form8889.retained_employer_postyear_evidence;
     },
     (input) => {
-      input.form8889.retained_employer_postyear_evidence.filed_2025_w2.sha256 =
+      input.form8889.retained_employer_postyear_evidence.filed_tax_year_w2.sha256 =
         "0".repeat(64);
     },
     (input) => {
-      input.form8889.retained_employer_postyear_evidence.trustee_2026_payment
+      input.form8889.retained_employer_postyear_evidence.following_year_trustee_payment
         .bytes_base64 += "A";
     },
     (input) => {
@@ -134,12 +134,12 @@ test("post-year employer owner payment rejects absent, late, misdirected and 202
   }
   for (
     const [kind, field, value] of [
-      ["trustee_2026_payment", "paid_to", "employer"],
-      ["trustee_2026_payment", "transaction_date", "2026-04-16"],
-      ["trustee_2026_payment", "earnings", 49],
-      ["trustee_2026_payment", "principal", 699],
-      ["trustee_2026_payment", "transaction_type", "ordinary_distribution"],
-      ["owner_2026_receipt", "owner_ssn", "999887777"],
+      ["following_year_trustee_payment", "paid_to", "employer"],
+      ["following_year_trustee_payment", "transaction_date", "2026-04-16"],
+      ["following_year_trustee_payment", "earnings", 49],
+      ["following_year_trustee_payment", "principal", 699],
+      ["following_year_trustee_payment", "transaction_type", "ordinary_distribution"],
+      ["following_year_owner_receipt", "owner_ssn", "999887777"],
     ] as const
   ) {
     const altered = structuredClone(source) as any;

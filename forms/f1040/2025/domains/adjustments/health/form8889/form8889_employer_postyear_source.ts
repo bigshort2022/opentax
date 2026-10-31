@@ -37,7 +37,7 @@ const receiptFacts = z.object({
   total_received: z.number().positive(),
 }).strict();
 type Document = z.infer<
-  typeof employerPostyearEvidenceSchema.shape.filed_2025_w2
+  typeof employerPostyearEvidenceSchema.shape.filed_tax_year_w2
 >;
 function retained<T>(record: Document, schema: z.ZodType<T>): T {
   const bytes = Buffer.from(record.bytes_base64, "base64");
@@ -54,18 +54,21 @@ function retained<T>(record: Document, schema: z.ZodType<T>): T {
   return value;
 }
 
+const postyearWithdrawalSchema = z.object({
+  principal: z.number().positive(),
+  earnings: z.number().nonnegative(),
+  withdrawal_tax_year: z.number().int(),
+  form1099_sa_source_reference: z.string().optional(),
+});
+
 /** Validates a 2026 transaction; it does not represent a 2025 1099-SA. */
 export function assertEmployerPostyearOwnerSources(
   source: Readonly<Record<string, unknown>>,
   allPending: Readonly<Record<string, unknown>> | undefined,
   ownerForm: Readonly<Record<string, unknown>>,
-  withdrawal: {
-    principal: number;
-    earnings: number;
-    withdrawal_tax_year: 2025 | 2026;
-    form1099_sa_source_reference?: string;
-  },
+  rawWithdrawal: unknown,
 ): number {
+  const withdrawal = postyearWithdrawalSchema.parse(rawWithdrawal);
   const evidence = employerPostyearEvidenceSchema.parse(
     source.retained_employer_postyear_evidence,
   );
@@ -75,9 +78,9 @@ export function assertEmployerPostyearOwnerSources(
   if (new Set(refs).size !== 3) {
     throw new Error("Form 8889 post-year source references must be distinct");
   }
-  const w = retained(evidence.filed_2025_w2, w2Facts);
-  const t = retained(evidence.trustee_2026_payment, trusteeFacts);
-  const r = retained(evidence.owner_2026_receipt, receiptFacts);
+  const w = retained(evidence.filed_tax_year_w2, w2Facts);
+  const t = retained(evidence.following_year_trustee_payment, trusteeFacts);
+  const r = retained(evidence.following_year_owner_receipt, receiptFacts);
   const ownerSsn = z.string().regex(/^\d{9}$/).parse(ownerForm.beneficiary_ssn);
   const filed = w2InputSchema.parse(allPending?.w2).w2s.filter((row) =>
     row.source_document_reference === w.source_document_reference

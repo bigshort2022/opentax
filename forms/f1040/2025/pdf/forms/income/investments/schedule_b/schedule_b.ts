@@ -1,5 +1,6 @@
 import type { PdfFieldEntry, PdfFormDescriptor } from "../../../../review-support/form-descriptor.ts";
 import { rgb, StandardFonts } from "pdf-lib";
+import { mefTaxYear } from "../../../../../mef/support/year-config.ts";
 import { appendScheduleBInterestStatement } from "./schedule_b_interest_statement.ts";
 import { appendScheduleBDividendStatement } from "./schedule_b_dividend_statement.ts";
 import { appendScheduleBSellerFinancedStatement } from "./schedule_b_seller_financed_statement.ts";
@@ -206,11 +207,12 @@ export const scheduleBPdf: PdfFormDescriptor = {
         fields["form8814_foreign_trust"] === true,
     }),
   async appendSupplementalPages(document, fields, filer) {
+    const taxYear = mefTaxYear();
     await appendScheduleBSellerFinancedStatement(document, fields, filer);
     await appendScheduleBInterestStatement(document, fields, filer);
-    await appendScheduleBInterestAdjustmentsStatement(document, fields, filer);
+    await appendScheduleBInterestAdjustmentsStatement(document, fields, filer, taxYear);
     await appendScheduleBDividendStatement(document, fields, filer);
-    await appendScheduleBNomineeDividendStatement(document, fields, filer);
-    await appendScheduleBForeignCountriesStatement(document, fields, filer);
+    await appendScheduleBNomineeDividendStatement(document, fields, filer, taxYear);
+    await appendScheduleBForeignCountriesStatement(document, fields, filer, taxYear);
   },
 };

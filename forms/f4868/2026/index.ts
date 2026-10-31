@@ -1,4 +1,4 @@
-import type { FormDefinition } from "../../../core/types/form-definition.ts";
+import type { MefFormDefinition } from "../../../core/types/form-definition.ts";
 import type { ExecuteResult } from "../../../core/runtime/executor.ts";
 import { execute } from "../../../core/runtime/executor.ts";
 import { buildExecutionPlan } from "../../../core/runtime/planner.ts";
@@ -23,7 +23,9 @@ const unsupportedPdf = (): Promise<Uint8Array> =>
   Promise.reject(new Error("Form 4868 has no PDF export; use --type mef"));
 
 /** Form 4868 (2026): automatic extension of time to file, its own MeF submission. */
-export const f4868_2026: FormDefinition = {
+export const f4868_2026: MefFormDefinition = {
+  preparationMode: "mef",
+  paperAvailable: false,
   formType: F4868_2026_CONFIG.formType,
   taxYear: F4868_2026_CONFIG.taxYear,
   mefSchemaVersion: F4868_2026_CONFIG.mefSchemaVersion,

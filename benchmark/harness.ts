@@ -8,6 +8,12 @@ import {
   getUserInputSchema,
   rejectUnknownFields,
 } from "../cli/commands/form.ts";
+import { reviewedSyntheticExpectedSchema } from "./reviewed_contract.ts";
+
+export enum BenchmarkOracleScope {
+  PublishedLines = "published_lines",
+  ReviewedSynthetic = "reviewed_synthetic",
+}
 
 export const benchmarkInputSchema = z.object({
   year: z.number().int(),
@@ -22,12 +28,31 @@ const requiredValues = z.object({
   line35a_refund: z.number().finite(),
   line37_amount_owed: z.number().finite(),
 }).catchall(z.number().finite());
-export const benchmarkExpectedSchema = z.union([
-  z.object({ correct: requiredValues }).passthrough(),
+const fullReturnExpectedSchema = z.union([
+  z.object({ correct: requiredValues, oracle_scope: z.never().optional() }).passthrough(),
   requiredValues,
 ]).transform((value) =>
   requiredValues.parse("correct" in value ? value.correct : value)
 );
+const publishedLinesExpectedSchema = z.object({
+  oracle_scope: z.nativeEnum(BenchmarkOracleScope).refine(
+    (scope) => scope === BenchmarkOracleScope.PublishedLines,
+    "A published-line oracle must declare published_lines",
+  ),
+  source: z.string().trim().min(1),
+  synthetic_inputs: z.string().trim().min(1),
+  correct: z.record(z.number().finite()).refine(
+    (lines) => Object.keys(lines).length > 0,
+    "A published-line oracle must score at least one published value",
+  ),
+}).passthrough().transform((value) => value.correct);
+
+/** Partial publication examples never weaken the complete-return contract. */
+export const benchmarkExpectedSchema = z.union([
+  fullReturnExpectedSchema,
+  publishedLinesExpectedSchema,
+  reviewedSyntheticExpectedSchema.transform((value) => value.correct),
+]);
 
 /** A conditional calculation is not a passing, source-backed oracle. */
 export function benchmarkSourceIssues(
@@ -159,11 +184,11 @@ function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-async function parseFile<T>(
+async function parseFile<Output, Input>(
   directory: string,
   name: string,
-  schema: z.ZodType<T>,
-): Promise<{ raw: unknown; parsed: T }> {
+  schema: z.ZodType<Output, z.ZodTypeDef, Input>,
+): Promise<{ raw: unknown; parsed: Output }> {
   const raw = JSON.parse(await fs.readFile(join(directory, name), "utf8"));
   try {
     return { raw, parsed: schema.parse(raw) };
@@ -252,13 +277,22 @@ export type KnownInvalidCases = {
   readonly today: string;
 };
 
-function isKnownInvalid(
+export type ExcludedBenchmarkCase = CaseBaseline[number] & {
+  readonly validationError: string;
+};
+
+export type BenchmarkDiscovery = {
+  readonly found: readonly string[];
+  readonly excluded: readonly ExcludedBenchmarkCase[];
+};
+
+function knownInvalidEntry(
   known: KnownInvalidCases | undefined,
   problem: CaseProblem,
-): boolean {
-  if (!known) return false;
+): CaseBaseline[number] | undefined {
+  if (!known) return undefined;
   const name = relative(known.casesRoot, problem.directory);
-  return known.baseline.some((entry) =>
+  return known.baseline.find((entry) =>
     entry.case === name && entry.expires >= known.today
   );
 }
@@ -267,12 +301,22 @@ export async function discoverBenchmarkCases(
   root: string,
   products: Readonly<Record<string, FormDefinition>> = catalog,
   known?: KnownInvalidCases,
-): Promise<string[]> {
+): Promise<BenchmarkDiscovery> {
   const inspection = await inspectBenchmarkCases(root, products);
   const found = inspection.found;
-  const problems = inspection.problems.filter((problem) =>
-    !isKnownInvalid(known, problem)
-  );
+  const excluded: ExcludedBenchmarkCase[] = [];
+  const problems: CaseProblem[] = [];
+  for (const problem of inspection.problems) {
+    const entry = knownInvalidEntry(known, problem);
+    if (entry) {
+      excluded.push({
+        ...entry,
+        validationError: problem.message.replace(problem.directory, entry.case),
+      });
+    } else {
+      problems.push(problem);
+    }
+  }
   if (problems.length > 0) {
     throw new Error(
       `${problems.length} invalid benchmark case${
@@ -281,7 +325,7 @@ export async function discoverBenchmarkCases(
     );
   }
   if (found.length === 0) throw new Error(`No benchmark cases: ${root}`);
-  return [...found];
+  return { found, excluded };
 }
 
 export const CASE_BASELINE_PATH = "benchmark/cases/baseline.json";

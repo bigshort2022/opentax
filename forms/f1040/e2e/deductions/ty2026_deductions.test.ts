@@ -1,7 +1,7 @@
 import { setDefaultTimeout, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { fileURLToPath as fromFileUrl } from "node:url";
-import { assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import * as sys from "../../../../scripts/support/sys.ts";
 import { catalog } from "../../../../catalog.ts";
 import { signed } from "../../../../scripts/testing/mef.ts";
@@ -95,6 +95,7 @@ function f1098(interest: number): Record<string, unknown> {
 
 function run(inputs: Record<string, unknown>) {
   const def = catalog["f1040:2026"];
+  assert(def.preparationMode === "mef");
   const input = signed(inputs);
   const g = input.general as Record<string, unknown>;
   g.taxpayer_signature_date = "2027-02-01";

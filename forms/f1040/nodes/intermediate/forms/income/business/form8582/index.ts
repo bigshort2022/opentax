@@ -1,3 +1,4 @@
+import { reconstructedPriorLossSourceSchema } from "./reconstructed-source.ts";
 import { allocateCurrentPassiveForms } from "./current-form-allocation.ts";
 import { currentPassiveFormsSchema } from "./current-form-schema.ts";
 import { z } from "zod";
@@ -111,6 +112,7 @@ export const inputSchema = z.object({
     current_net: z.number(),
     prior_unallowed_operating: z.number().nonnegative(),
     prior_year_8582_source: priorYear8582SourceSchema.optional(),
+    reconstructed_prior_loss_source: reconstructedPriorLossSourceSchema.optional(),
     first_year_activity_source: firstYearActivitySourceSchema.optional(),
     prior_active_participation: z.boolean().optional(),
     prior_unallowed_4797_part1: z.number().nonnegative(),
@@ -483,6 +485,15 @@ export function assertPriorYear8582Evidence(input: Form8582Input): void {
       const prior = activity.prior_unallowed_operating +
         activity.prior_unallowed_4797_part1 +
         activity.prior_unallowed_4797_part2;
+      const reconstructed = activity.reconstructed_prior_loss_source;
+      if (reconstructed) {
+        return activity.prior_year_8582_source !== undefined ||
+          reconstructed.activity_id !== activity.activity_id ||
+          reconstructed.operating !== activity.prior_unallowed_operating ||
+          reconstructed.form4797_part1 !== activity.prior_unallowed_4797_part1 ||
+          reconstructed.form4797_part2 !== activity.prior_unallowed_4797_part2 ||
+          sales.some((sale) => sale.activity_id === activity.activity_id);
+      }
       const source = activity.prior_year_8582_source;
       const prior4797 = activity.prior_unallowed_4797_part1 > 0 ||
         activity.prior_unallowed_4797_part2 > 0;
@@ -671,6 +682,8 @@ export function allocateOtherPassivePrior4797(
     ) ||
     activities.some((activity) => activity.reporting_form === undefined) ||
     (activities.some((activity) => activity.activity_type === "A") &&
+      !(activities.every((activity) => activity.reconstructed_prior_loss_source !== undefined) &&
+        (input.current_4797_sale_gains?.length ?? 0) === 0) &&
       (activities.length !== 1 ||
         activities[0].prior_active_participation !== true ||
         input.modified_agi === undefined ||
@@ -1053,6 +1066,16 @@ class Form8582Node extends TaxNode<typeof inputSchema> {
 
   compute(_ctx: NodeContext, rawInput: Form8582Input): NodeResult {
     const input = inputSchema.parse(rawInput);
+    for (const activity of input.activities ?? []) {
+      if (activity.first_year_activity_source &&
+        Number(activity.first_year_activity_source.activity_acquired_on.slice(0, 4)) !== _ctx.taxYear) {
+        throw new Error("Form 8582 first-year activity acquisition must match the return year");
+      }
+      if (activity.reconstructed_prior_loss_source &&
+        activity.reconstructed_prior_loss_source.tax_year !== _ctx.taxYear - 1) {
+        throw new Error("Form 8582 reconstructed prior losses must come from the immediately prior year");
+      }
+    }
 
     if (
       input.filing_status === FilingStatus.MFS &&
@@ -1120,9 +1143,9 @@ class Form8582Node extends TaxNode<typeof inputSchema> {
       const allocation = allocateOtherPassivePrior4797(input);
       const line4 = allocation.allowedPartI + allocation.allowedPartII;
       const mixedCurrentSale = (input.current_4797_sale_gains?.length ?? 0) > 0;
-      const activeRentalSale = input.activities?.some((activity) =>
+      const activeRentalSale = mixedCurrentSale && (input.activities?.some((activity) =>
         activity.activity_type === "A"
-      ) ?? false;
+      ) ?? false);
       if (activeRentalSale) {
         const grossPartI = (input.current_4797_sale_gains ?? [])
           .filter((sale) => sale.part === "I")

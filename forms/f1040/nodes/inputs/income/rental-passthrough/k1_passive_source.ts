@@ -2,11 +2,9 @@ import { z } from "zod";
 import type { K1PassiveEicItem } from "./k1_passive_eic.ts";
 
 const reference = z.string().trim().min(1);
-const currentDate = z.string().date().refine((date) =>
-  date.startsWith("2025-")
-);
+const currentDate = z.string().date();
 export const k1PassiveIncomeSourceSchema = z.object({
-  tax_year: z.literal(2025),
+  tax_year: z.number().int(),
   issuer_ein: z.string().regex(/^\d{9}$/),
   recipient_tin: z.string().regex(/^\d{9}$/),
   issued_k1_reference: reference,
@@ -14,7 +12,7 @@ export const k1PassiveIncomeSourceSchema = z.object({
   participation_workpaper_reference: reference,
   entity_status_record: z.object({
     issuer_ein: z.string().regex(/^\d{9}$/),
-    tax_year: z.literal(2025),
+    tax_year: z.number().int(),
     publicly_traded_partnership: z.literal(false),
     source_document_reference: reference,
   }).strict(),
@@ -87,6 +85,8 @@ export function passiveK1Activities(
     }
     if (source) {
       if (
+        source.entity_status_record.tax_year !== source.tax_year ||
+        source.activities.some((row) => Number(row.ownership_acquired_on.slice(0, 4)) !== source.tax_year) ||
         source.issuer_ein !== ein ||
         source.recipient_tin !== item.recipient_tin ||
         source.issued_k1_reference !== item.source_document_reference ||

@@ -177,3 +177,16 @@ test("TY2026 Form 461 uses the $256,000 Rev. Proc. 2025-32 threshold", () => {
   assertEquals(fields(result)?.line16_excess_business_loss, -144_000);
   assertEquals(result.carryforwards?.excess_business_loss_nol_origin, 144_000);
 });
+
+test("Form461 2021-2023 omit a non-excess loss while the new2024 line trigger requires attachment", () => {
+  const source = inputSchema.parse({
+    filing_status: "single", line2_schedule_c: -200000, line6_schedule_f: 0,
+    scope_review: { ...review, line2_schedule_c_amount: -200000, line6_schedule_f_amount: 0 },
+  });
+  for (const taxYear of [2021, 2022, 2023]) {
+    assertEquals(form461.compute({ taxYear, formType: "f1040" }, source).outputs, []);
+  }
+  const filed = fields(form461.compute({ taxYear: 2024, formType: "f1040" }, source));
+  assertEquals(filed?.line15_threshold, 305000);
+  assertEquals(filed?.line16_excess_business_loss, 105000);
+});

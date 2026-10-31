@@ -10,7 +10,7 @@
 
 Built and maintained by AI agents using official IRS publications as the sole source of truth.
 
-> Covers Form 1040 for TY2025, with TY2026 Form 1040 and Form 4868 started. Additional forms and state returns coming.
+> Form 1040 supports bounded federal paper preparation for TY2021–2024, the existing TY2025 product, and the partial TY2026 product. State returns are not implemented.
 
 ---
 
@@ -138,6 +138,84 @@ $55,000 in wages, $15,750 standard deduction, $39,250 taxable income, $4,475 tax
 from the Tax Table, $725 refund. The output is abridged; it also lists the forms
 computed and any carryforwards. Returns are stored under `./.state/returns`.
 
+## Preparing prior years
+
+Work from the oldest unresolved year forward. TY2021 can reconstruct opening
+history for TY2022–2024; reviewed capital and rental passive losses can then
+continue into TY2025. A reconstructed calculation is not a filed or accepted return.
+
+```bash
+opentax return supported --json
+opentax return create --year 2021 --json
+opentax node template general --year 2021 --full
+opentax node inspect --node_type schedule_e --year 2024
+```
+
+Use the returned IDs with the normal `form add`, `form update`, `return get`,
+and `return validate` commands. Historical inputs cover wages,
+interest/dividends, unemployment, supported Schedule C/SE/QBI and owner K-1
+paths, capital transactions, rental income/losses, Marketplace insurance and
+HSAs. Annual limits and final-year IRS PDF mappings are selected by return year.
+Unsupported source fields and wrong-year capital dispositions are rejected
+before they replace saved inputs.
+
+**Review before carrying anything forward.** Set `SOURCE_ID` and `TARGET_ID` to
+consecutive-year returns for the same taxpayer, with matching rental activity
+IDs where applicable:
+
+```bash
+opentax carryover preview --source-returnId "$SOURCE_ID" --target-returnId "$TARGET_ID"
+# Only after reviewing complete sources and the preview:
+opentax carryover review --source-returnId "$SOURCE_ID" --target-returnId "$TARGET_ID" \
+  --evidence-reference "Reviewed source inventory and closing-loss workpaper" \
+  --provenance calculated-unfiled --source-complete
+opentax carryover apply --source-returnId "$SOURCE_ID" --target-returnId "$TARGET_ID"
+```
+
+Preview does not write. Review records an explicit completeness assertion and
+evidence reference, not IRS acceptance or automatic verification of documents.
+Apply preserves unrelated inputs and refuses conflicting balances. Reapplying
+the same reviewed transfer is idempotent. An upstream financial edit makes
+downstream links stale; review and reapply chronologically. A removed source
+balance does not silently erase or authenticate an old destination balance.
+
+Opening short- and long-term capital losses must be separately known, including
+reviewed zero. Unknown acquisition basis or pre-2021 history is not treated as
+zero. Rental PALs retain activity, owner, character and participation history.
+Per-expense rental/personal allocation preserves source amounts and applies
+ownership once. A fully personal carryover-only property can retain suspended
+PALs without invented rental days or current deductions. An expense's personal
+or nondeductible remainder does not establish a Schedule A deduction: allocated
+mortgage interest/taxes require a separately reviewed personal deduction rather
+than Schedule E's automatic personal-expense routing.
+
+For a standalone historical return, review the complete sources before export:
+
+```bash
+opentax return review --returnId "$RETURN_ID" \
+  --evidence-reference "Reviewed complete source inventory" \
+  --provenance calculated-unfiled --source-complete
+opentax return validate --returnId "$RETURN_ID"
+opentax return export --returnId "$RETURN_ID" --type pdf --output return.pdf
+```
+
+`paperPreparation.readyForPaper` is separate from `canFile`. Historical packets
+are unsigned paper returns: no e-file PIN, prior-year e-file AGI or transmitter
+credentials are needed, and MeF/submission export is unavailable. `--force`
+cannot bypass missing sources, stale carryovers, calculation errors or missing
+required forms. `--draft` instead marks every page **NOT FOR FILING** and lists
+unresolved issues. Signing, mailing, IRS acceptance and state filing remain
+outside this preparation status.
+
+Historical coverage is limited to single, MFJ and MFS returns without dependent
+claims. HOH/QSS, native CA/MA returns, corporate returns, Form 1040-X, rental
+dispositions, vacation-home deduction-limit worksheets, unsupported
+basis/at-risk/passive-loss paths, K-1-inclusive Form 461 obligations and other
+unmapped required documents are not certified by this workflow. Do not
+substitute a different tax classification to bypass
+a blocker. HSA source/evidence fields use tax-year-relative names; obtain the
+selected year's template instead of reusing retired fixed-2024/2025 fields.
+
 ---
 
 ## More commands
@@ -157,7 +235,7 @@ opentax form list --returnId a1b2c3
 opentax form update --returnId a1b2c3 --entryId w2_01 '{"box1_wages": 60000, "box2_fed_withheld": 5800}'
 opentax form delete --returnId a1b2c3 --entryId w2_01
 
-# Run the IRS MeF business rules offline
+# Validate preparation requirements or the selected product's IRS MeF rules
 opentax return validate --returnId a1b2c3
 
 # Add a PDF filed with the return, under the file name its inputs use
@@ -190,10 +268,11 @@ Run `opentax <command> --help` for every flag.
 
 - `return get` works on partial returns; check its `warnings` before relying on
   amounts. Export also needs the filer's identity (SSN and name).
-- `return validate` and export run the IRS MeF business rules offline. A clean
-  run is not IRS acceptance. It also lists, as `OPENTAX_HINT` alerts, claims the
-  entered facts point to but the return does not make (the same hints
-  `return get` puts in `warnings`); they never block filing.
+- For MeF products, `return validate` and export run IRS business rules offline.
+  Historical paper products instead report source, calculation, carryover and
+  document-preparation requirements. Neither status is IRS acceptance.
+  `OPENTAX_HINT` alerts describe claims suggested by entered facts; those hints
+  are distinct from blocking preparation issues.
 - Export blocks on every calculation diagnostic. `--force` overrides only
   reject-level business rules; `--draft` produces visibly labeled diagnostic
   output (a DRAFT comment in XML, a watermark on each PDF page). In the API,
@@ -230,12 +309,14 @@ shows the current one.
 
 | Form      | Year | Inputs                                                                           |
 | --------- | ---- | -------------------------------------------------------------------------------- |
+| Form 1040 | 2021–2024 | 26 exposed source types with bounded historical calculation and unsigned paper coverage; use `return supported` and year-scoped inspection |
 | Form 1040 | 2025 | 195 input nodes: W-2s, 1099s, schedules, credits, capital transactions and more  |
 | Form 1040 | 2026 | `general`, `w2`, `f8888`; other inputs are refused until their TY2026 rules land |
 | Form 4868 | 2026 | Extension request                                                                |
 
-[`catalog.ts`](./catalog.ts) lists the form definitions; `opentax node list` and
-`opentax node inspect` show every node and its schema.
+[`catalog.ts`](./catalog.ts) lists the form definitions. Use `opentax return supported`,
+`opentax node list --year <year>` and `opentax node inspect --node_type <node> --year <year>`
+to distinguish a year's accepted source inputs from its computed graph nodes.
 
 ---
 
@@ -243,8 +324,12 @@ shows the current one.
 
 The engine is a directed graph of **nodes**. Each node is a pure function:
 validated input in, typed output out. Schemas are Zod, with types inferred;
-routing between nodes is type-checked. 137 TY2025 benchmark cases check it
-against values from cited IRS publications.
+routing between nodes is type-checked. Benchmark failures and unsupported oracle
+checks remain visible; a passing case does not certify every possible return.
+The eight historical IRS Tax Table examples use explicit `published_lines`
+oracles: taxable income and income tax are checked exactly, while constructed
+source inputs and unscored refund/payment balances are disclosed. Publication
+URLs, pinpoints and digests are retained in [`docs/historical-federal`](./docs/historical-federal/).
 
 AI agents maintain the codebase: they read IRS instructions, write nodes, source
 test cases from IRS exercises, fix regressions, and prove each change with the

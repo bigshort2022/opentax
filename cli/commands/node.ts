@@ -1,22 +1,32 @@
 import { catalog } from "../../catalog.ts";
 import { zodToLines } from "../utils/zod-doc.ts";
+import type { FormDefinition } from "../../core/types/form-definition.ts";
 
-const defaultDef = catalog["f1040:2025"];
+function definitionForYear(year = 2025): FormDefinition {
+  const definition = catalog[`f1040:${year}`];
+  if (!definition) throw new Error(`Unsupported year: ${year}`);
+  return definition;
+}
 
 export type NodeInspectArgs = {
   readonly nodeType: string;
   readonly json: boolean;
+  readonly year?: number;
 };
 
 /**
  * Prints all registered node types in sorted columns.
  */
-export function nodeListCommand(): void {
-  const types = Object.keys(defaultDef.registry).sort();
-  console.log(`Registered Nodes (${types.length})\n`);
+export function nodeListCommand(args: { readonly year?: number } = {}): void {
+  const defaultDef = definitionForYear(args.year);
+  const types = defaultDef.preparationMode === "paper"
+    ? defaultDef.inputNodes.map((entry) => entry.inputKey ?? entry.node.nodeType).sort()
+    : Object.keys(defaultDef.registry).sort();
+  console.log(`${defaultDef.preparationMode === "paper" ? "Supported Inputs" : "Registered Nodes"} (${types.length}) — TY${defaultDef.taxYear}\n`);
 
   for (const line of nodeListLines(types)) console.log(`  ${line}`);
   console.log("");
+  if (defaultDef.preparationMode === "paper") return;
 
   const keyed = defaultDef.inputNodes.flatMap((entry) =>
     entry.inputKey ? [entry.inputKey] : []
@@ -44,8 +54,12 @@ export function nodeListLines(types: readonly string[]): string[] {
  * With --json, prints structured JSON instead.
  */
 export function nodeInspectCommand(args: NodeInspectArgs): void {
+  const defaultDef = definitionForYear(args.year);
+  if (defaultDef.preparationMode === "paper") {
+    if (args.nodeType !== "start") return publicInputInspect(args, defaultDef);
+  }
   const node = defaultDef.registry[args.nodeType];
-  if (!node) return publicInputInspect(args);
+  if (!node) return publicInputInspect(args, defaultDef);
 
   if (args.json) {
     const schemaLines = zodToLines(node.inputSchema, undefined, 0);
@@ -89,9 +103,9 @@ export function nodeInspectCommand(args: NodeInspectArgs): void {
 }
 
 /** A keyed public input (form add --node_type <key>) that feeds another node. */
-function publicInputInspect(args: NodeInspectArgs): void {
-  const entry = defaultDef.inputNodes.find((candidate) =>
-    candidate.inputKey === args.nodeType
+function publicInputInspect(args: NodeInspectArgs, definition: FormDefinition): void {
+  const entry = definition.inputNodes.find((candidate) =>
+    (candidate.inputKey ?? candidate.node.nodeType) === args.nodeType
   );
   if (!entry) throw new Error(`Unknown node type: ${args.nodeType}`);
   const schema = entry.isArray ? entry.itemSchema : entry.inputSchema;

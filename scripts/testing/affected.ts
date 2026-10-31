@@ -1,5 +1,5 @@
 /** Local fast path: which tests and gates a change can reach. CI still runs everything. */
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 import * as sys from "../support/sys.ts";
 import { repositoryFiles } from "./repository.ts";
@@ -23,9 +23,10 @@ export type Graph = ReadonlyMap<string, ReadonlySet<string>>;
 /** Repository-relative imports of every TypeScript file, resolved the way Bun loads them. */
 export function importGraph(root: string, files: readonly string[]): Graph {
   const transpiler = new Bun.Transpiler({ loader: "ts" });
+  const canonicalRoot = realpathSync(root);
   const graph = new Map<string, Set<string>>();
   for (const path of files.filter((file) => file.endsWith(".ts"))) {
-    const file = join(root, path);
+    const file = join(canonicalRoot, path);
     const deps = new Set<string>();
     let imports: { path: string }[] = [];
     try {
@@ -39,7 +40,7 @@ export function importGraph(root: string, files: readonly string[]): Graph {
       if (/^(node|bun):/.test(entry.path)) continue;
       try {
         const resolved = relative(
-          root,
+          canonicalRoot,
           Bun.resolveSync(entry.path, dirname(file)),
         );
         if (

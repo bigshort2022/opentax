@@ -180,6 +180,11 @@ class ScheduleCNode extends TaxNode<typeof inputSchema> {
     if (!cfg) throw new Error(`No f1040 config for year ${ctx.taxYear}`);
     // Validate schema — throws on invalid data (negative amounts, bad enums)
     inputSchema.parse(input);
+    for (const item of input.schedule_cs) {
+      if (item.restaurant_meals?.some((row) => Number(row.paid_or_incurred_on.slice(0, 4)) !== ctx.taxYear)) {
+        throw new Error("Schedule C restaurant meal source must match the return tax year");
+      }
+    }
     assertTy2025OnlyFacts(ctx.taxYear, input);
     assertDistinctMiningSources(input.schedule_cs);
     assertDistinctLongTermContractSources(input.schedule_cs);

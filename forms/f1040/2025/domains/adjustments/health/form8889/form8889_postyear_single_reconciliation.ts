@@ -67,8 +67,8 @@ export function reconcileSolePostyearForm8889(
     source.medicare_enrollment !== undefined ||
     source.other_disqualifying_coverage !== undefined ||
     source.employer_hsa_contributions !== undefined ||
-    source.employer_contribution_years?.made_in_2025_for_2024_in_w2 !== 0 ||
-    source.employer_contribution_years?.made_in_2026_for_2025 !== 0 ||
+    source.employer_contribution_years?.made_in_tax_year_for_prior_year_in_w2 !== 0 ||
+    source.employer_contribution_years?.made_in_following_year_for_tax_year !== 0 ||
     (source.taxpayer_hsa_contributions ?? 0) !== 0 ||
     source.qualified_hsa_funding_distributions !== undefined ||
     source.hsa_excluded_distributions !== undefined ||

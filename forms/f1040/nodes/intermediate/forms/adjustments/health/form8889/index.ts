@@ -17,7 +17,7 @@ import { schedule1 } from "../../../../../outputs/general/return-assembly/schedu
 import { schedule2 } from "../../../../aggregation/taxes/other/schedule2/index.ts";
 import { form5329 } from "../../../taxes/retirement/form5329/index.ts";
 import type { NodeContext } from "../../../../../../../../core/types/node-context.ts";
-import { CONFIG_BY_YEAR } from "../../../../../config/index.ts";
+import { CONFIG_BY_YEAR, HSA_LIMITS_BY_YEAR } from "../../../../../config/index.ts";
 import { TS } from "../../../../../types.ts";
 
 // ─── Constants — mathematical/statutory rates, unchanged across years ─────────
@@ -45,7 +45,7 @@ const beneficiaryInputSchema = z.object({
   // ── Coverage (determines contribution limit) ─────────────────────────────
   // Each entry is the eligible HDHP coverage on the first day of Jan-Dec,
   // or null when not an eligible individual (including Medicare enrollment).
-  // Distribution-only filers may have no 2025 HDHP.
+  // Distribution-only filers may have no current-year HDHP.
   eligible_hdhp_coverage_by_month: z.array(
     z.nativeEnum(CoverageType).nullable(),
   )
@@ -64,26 +64,26 @@ const beneficiaryInputSchema = z.object({
   // ── Part I: Contributions ────────────────────────────────────────────────
   // Line 2: Taxpayer's own HSA contributions (not through payroll)
   taxpayer_hsa_contributions: z.number().nonnegative().optional(),
-  // 2025 W-2 box 12 code W amount. Form 8889 line 9 may differ after the
+  // current-year W-2 box 12 code W amount. Form 8889 line 9 may differ after the
   // Employer Contribution Worksheet's prior/next-year adjustments.
   employer_hsa_contributions: z.number().nonnegative().optional(),
   employer_contribution_years: z.object({
-    made_in_2025_for_2024_in_w2: z.number().nonnegative(),
-    made_in_2026_for_2025: z.number().nonnegative(),
-  }).optional(),
+    made_in_tax_year_for_prior_year_in_w2: z.number().nonnegative(),
+    made_in_following_year_for_tax_year: z.number().nonnegative(),
+  }).strict().optional(),
   employer_excess_treatment: z.object({
     amount_included_in_w2_box1: z.number().nonnegative(),
     // Null is an explicit retained-excess answer. A later-year timely
-    // withdrawal reduces the 2025 excess base but is not a 2025 distribution.
+    // withdrawal reduces the current-year excess base but is not a current-year distribution.
     timely_withdrawal: z.union([
       z.null(),
       z.object({
         principal: z.number().positive(),
         earnings: z.number().nonnegative(),
-        withdrawal_tax_year: z.union([z.literal(2025), z.literal(2026)]),
+        withdrawal_tax_year: z.number().int(),
         withdrawn_by_return_due_date: z.literal(true),
-        // A 2025 payment to the HSA owner reaches lines 14a/14b and must
-        // match its code-2 Form 1099-SA. A 2026 payment is not on this return.
+        // A current-year payment to the HSA owner reaches lines 14a/14b and must
+        // match its code-2 Form 1099-SA. A following-year payment is not on this return.
         form1099_sa_source_reference: z.string().trim().min(1).optional(),
       }),
     ]),
@@ -92,13 +92,13 @@ const beneficiaryInputSchema = z.object({
   post_year_personal_excess_withdrawal: z.object({
     principal: z.number().positive(),
     earnings: z.number().nonnegative(),
-    withdrawal_tax_year: z.literal(2026),
+    withdrawal_tax_year: z.number().int(),
     withdrawn_by_return_due_date: z.literal(true),
   }).optional(),
-  // Carryover is sourced from the filed 2024 Form 5329, not inferred from
-  // the 2025 HSA balance. A zero prior-year line 49 stops the carryover.
+  // Carryover is sourced from the filed prior-year Form 5329, not inferred from
+  // the current-year HSA balance. A zero prior-year line 49 stops the carryover.
   prior_year_hsa_excess: z.object({
-    tax_year: z.literal(2024),
+    tax_year: z.number().int(),
     filed_form5329_reference: z.string().trim().min(1),
     filed_return_reviewed: z.literal(true),
     owner_ssn: z.string().regex(/^\d{3}-?\d{2}-?\d{4}$/),
@@ -251,10 +251,10 @@ const beneficiaryInputSchema = z.object({
   // qualified HSA funding distribution. Death and disability do not trigger
   // recapture; callers affirm that neither exception applies before routing.
   testing_period_failure: z.object({
-    // The 2025 line 18 is recalculated from the filed 2024 contribution lines
-    // and the 2024 monthly limitation, not accepted as an entered tax amount.
+    // The current-year line 18 is recalculated from the filed prior-year contribution lines
+    // and the prior-year monthly limitation, not accepted as an entered tax amount.
     last_month_rule_evidence: z.object({
-      contribution_year: z.literal(2024),
+      contribution_year: z.number().int(),
       eligible_hdhp_coverage_by_month: z.array(
         z.nativeEnum(CoverageType).nullable(),
       ).length(12),
@@ -302,10 +302,10 @@ export const inputSchema = beneficiaryInputSchema.extend({
   retained_employer_postyear_evidence: employerPostyearEvidenceSchema
     .optional(),
   spouse_hsa: beneficiaryInputSchema.optional(),
-  // A 2024 married-family election with two HSAs can only be redetermined
+  // A prior-year married-family election with two HSAs can only be redetermined
   // from both filed owner forms and the spouses' actual allocation agreement.
   prior_year_paired_family_allocation: z.object({
-    contribution_year: z.literal(2024),
+    contribution_year: z.number().int(),
     equal_allocation_agreed: z.literal(true),
     allocation_source_reference: z.string().trim().min(1),
     primary_filed_form8889_source_reference: z.string().trim().min(1),
@@ -331,12 +331,14 @@ function verifyPriorYearSpouseFacts(
   evidence: LastMonthEvidence,
   pairedPriorYear: boolean,
 ): void {
+  const limits = HSA_LIMITS_BY_YEAR[evidence.contribution_year];
+  if (!limits) throw new Error("Form 8889 prior-year HSA limits are unavailable");
   if (
     evidence.married_at_year_end &&
     evidence.spouse_has_separate_hsa !== pairedPriorYear
   ) {
     throw new Error(
-      "Form 8889 married 2024 last-month-rule recapture needs both spouse-HSA status and filed-form reconciliation",
+      "Form 8889 married prior-year last-month-rule recapture needs both spouse-HSA status and filed-form reconciliation",
     );
   }
   if (
@@ -344,7 +346,7 @@ function verifyPriorYearSpouseFacts(
     evidence.spouse_has_separate_hsa !== undefined
   ) {
     throw new Error(
-      "Form 8889 unmarried 2024 last-month-rule evidence cannot include a spouse HSA answer",
+      "Form 8889 unmarried prior-year last-month-rule evidence cannot include a spouse HSA answer",
     );
   }
   if (!evidence.married_at_year_end) return;
@@ -355,29 +357,29 @@ function verifyPriorYearSpouseFacts(
       priorCoverage.some((month, index) =>
         index === 11 ? month !== CoverageType.Family : month !== null
       ) ||
-      evidence.filed_form8889_line3 !== 8_300 ||
-      evidence.filed_form8889_line5 !== 8_300 ||
-      evidence.filed_form8889_line6 !== 4_150 ||
+      evidence.filed_form8889_line3 !== limits.family ||
+      evidence.filed_form8889_line5 !== limits.family ||
+      evidence.filed_form8889_line6 !== limits.family / 2 ||
       evidence.filed_form8889_line7 !== 0 ||
-      evidence.filed_form8889_line8 !== 4_150
+      evidence.filed_form8889_line8 !== limits.family / 2
     ) {
       throw new Error(
-        "Form 8889 paired 2024 recapture supports only a sourced equal family allocation with December-only eligibility and no catch-up",
+        "Form 8889 paired prior-year recapture supports only a sourced equal family allocation with December-only eligibility and no catch-up",
       );
     }
     return;
   }
-  // December family coverage makes elected line 3 the $8,300 family limit.
+  // December family coverage makes elected line 3 the prior-year family limit.
   // With December self-only coverage and earlier family months, the filed
-  // line 3 is the greater of the 2024 monthly worksheet and $4,150.
+  // line 3 is the greater of the prior-year monthly worksheet and self-only limit.
   // For an age-55 owner the self-only months include the catch-up in that
   // worksheet, while eligible family months put their catch-up on line 7.
   const december = evidence.eligible_hdhp_coverage_by_month[11];
   const selfOnly = december === CoverageType.SelfOnly;
   const mixedToSelfOnly = selfOnly &&
     evidence.eligible_hdhp_coverage_by_month.includes(CoverageType.Family);
-  const baseLimit = selfOnly ? 4_150 : 8_300;
-  const catchup = evidence.age_55_or_older ? 1_000 : 0;
+  const baseLimit = selfOnly ? limits.selfOnly : limits.family;
+  const catchup = evidence.age_55_or_older ? limits.catchup : 0;
   const familyMonths =
     evidence.eligible_hdhp_coverage_by_month.filter((month) =>
       month === CoverageType.Family
@@ -385,16 +387,16 @@ function verifyPriorYearSpouseFacts(
   const line7Catchup = !selfOnly
     ? catchup
     : evidence.age_55_or_older && familyMonths > 0
-    ? Math.round(familyMonths * 1_000 / 12)
+    ? Math.round(familyMonths * limits.catchup / 12)
     : 0;
   const monthlyWorksheet = Math.round(
     evidence.eligible_hdhp_coverage_by_month.reduce(
       (sum, coverage) =>
         sum +
         (coverage === CoverageType.Family
-          ? 8_300
+          ? limits.family
           : coverage === CoverageType.SelfOnly
-          ? 4_150 + (evidence.age_55_or_older ? 1_000 : 0)
+          ? limits.selfOnly + (evidence.age_55_or_older ? limits.catchup : 0)
           : 0),
       0,
     ) / 12,
@@ -412,26 +414,32 @@ function verifyPriorYearSpouseFacts(
     evidence.filed_form8889_line8 !== electedLine3 + line7Catchup
   ) {
     throw new Error(
-      "Form 8889 married 2024 recapture needs filed lines 3-8 showing the December coverage limit and catch-up without spouse allocation",
+      "Form 8889 married prior-year recapture needs filed lines 3-8 showing the December coverage limit and catch-up without spouse allocation",
     );
   }
 }
 
-// 2025 Part III line 18 uses the 2024 Line 3 Limitation Chart and Worksheet.
+// current-year Part III line 18 uses the prior-year Line 3 Limitation Chart and Worksheet.
 // This path supports one beneficiary, including a married taxpayer whose
 // spouse had no separate HSA, plus the separately reconciled equal-allocation
-// 2024 paired-family case. A sole December 2024 IRA funding transfer with no
+// prior-year paired-family case. A sole December prior-year IRA funding transfer with no
 // other contribution is reconciled below; broader combinations stay closed.
 function lastMonthRuleIncome(
   input: Form8889Input,
   pairedPriorYear: boolean,
+  taxYear: number,
 ): number {
   const evidence = input.testing_period_failure?.last_month_rule_evidence;
   if (!evidence) return 0;
+  if (evidence.contribution_year !== taxYear - 1) {
+    throw new Error("Form 8889 last-month evidence must be from the immediately preceding tax year");
+  }
+  const limits = HSA_LIMITS_BY_YEAR[evidence.contribution_year];
+  if (!limits) throw new Error("Form 8889 prior-year HSA limits are unavailable");
   const currentCoverage = input.eligible_hdhp_coverage_by_month;
   if (!currentCoverage || !currentCoverage.includes(null)) {
     throw new Error(
-      "Form 8889 last-month rule needs twelve 2025 eligibility facts showing a testing-period failure",
+      "Form 8889 last-month rule needs twelve current-year eligibility facts showing a testing-period failure",
     );
   }
   const priorCoverage = evidence.eligible_hdhp_coverage_by_month;
@@ -441,12 +449,12 @@ function lastMonthRuleIncome(
     december === null || !priorCoverage.slice(0, 11).includes(null)
   ) {
     throw new Error(
-      "Form 8889 last-month rule needs a 2024 eligibility gap and December 1 HDHP coverage",
+      "Form 8889 last-month rule needs a prior-year eligibility gap and December 1 HDHP coverage",
     );
   }
   const transferEvidence = input.testing_period_failure
     ?.qualified_funding_transfer_evidence;
-  if (transferEvidence?.transfer_year === 2024) {
+  if (transferEvidence?.transfer_year === taxYear - 1) {
     const transfer = transferEvidence.transfers[0];
     if (
       pairedPriorYear || evidence.married_at_year_end ||
@@ -455,23 +463,23 @@ function lastMonthRuleIncome(
         index === 11 ? month !== CoverageType.SelfOnly : month !== null
       ) ||
       transferEvidence.transfers.length !== 1 || !transfer ||
-      transfer.transfer_month !== 12 || transfer.amount > 4_150 ||
+      transfer.transfer_month !== 12 || transfer.amount > limits.selfOnly ||
       transferEvidence.filed_prior_year_form8889_line10 !== transfer.amount ||
       JSON.stringify(
           transferEvidence.prior_year_eligible_hdhp_coverage_by_month,
         ) !== JSON.stringify(priorCoverage) ||
       evidence.filed_form8889_line2 !== 0 ||
-      evidence.filed_form8889_line3 !== 4_150 ||
-      evidence.filed_form8889_line5 !== 4_150 ||
-      evidence.filed_form8889_line6 !== 4_150 ||
+      evidence.filed_form8889_line3 !== limits.selfOnly ||
+      evidence.filed_form8889_line5 !== limits.selfOnly ||
+      evidence.filed_form8889_line6 !== limits.selfOnly ||
       evidence.filed_form8889_line7 !== 0 ||
-      evidence.filed_form8889_line8 !== 4_150 ||
+      evidence.filed_form8889_line8 !== limits.selfOnly ||
       evidence.filed_form8889_line9 !== 0 ||
       evidence.filed_form8889_line10 !== transfer.amount ||
       evidence.filed_form8889_line13 !== 0
     ) {
       throw new Error(
-        "Form 8889 combined 2024 last-month-rule and IRA funding recapture needs one reconciled December self-only transfer and zero other contributions",
+        "Form 8889 combined prior-year last-month-rule and IRA funding recapture needs one reconciled December self-only transfer and zero other contributions",
       );
     }
   } else if (evidence.filed_form8889_line10 !== 0) {
@@ -481,8 +489,8 @@ function lastMonthRuleIncome(
   }
   const annualLimit = (coverage: CoverageType | null): number => {
     if (coverage === null) return 0;
-    return (coverage === CoverageType.Family ? 8_300 : 4_150) +
-      (evidence.age_55_or_older ? 1_000 : 0);
+    return (coverage === CoverageType.Family ? limits.family : limits.selfOnly) +
+      (evidence.age_55_or_older ? limits.catchup : 0);
   };
   const redeterminedFamilyLimit = Math.round(
     priorCoverage.reduce((sum, coverage) => sum + annualLimit(coverage), 0) /
@@ -495,19 +503,19 @@ function lastMonthRuleIncome(
         priorCoverage.reduce(
           (sum, coverage) =>
             sum + (coverage === CoverageType.Family
-              ? 8_300
+              ? limits.family
               : coverage === CoverageType.SelfOnly
-              ? 5_150
+              ? limits.selfOnly + limits.catchup
               : 0),
           0,
         ) / 12,
       ) + Math.round(
         priorCoverage.filter((coverage) => coverage === CoverageType.Family)
-          .length * 1_000 / 12,
+          .length * limits.catchup / 12,
       )
       : redeterminedFamilyLimit;
   const enhancedLimit = pairedPriorYear
-    ? 4_150
+    ? limits.family / 2
     : evidence.married_at_year_end &&
         december === CoverageType.SelfOnly &&
         priorCoverage.includes(CoverageType.Family)
@@ -524,7 +532,7 @@ function lastMonthRuleIncome(
     evidence.filed_form8889_line13 !== evidence.filed_form8889_line2
   ) {
     throw new Error(
-      "Form 8889 last-month rule needs filed 2024 contribution lines that reconcile to the elected limit",
+      "Form 8889 last-month rule needs filed prior-year contribution lines that reconcile to the elected limit",
     );
   }
   return Math.max(0, contributed - redeterminedLimit);
@@ -631,10 +639,10 @@ function verifyFundingTestingPeriod(
 
 // ─── Pure Helper Functions ────────────────────────────────────────────────────
 
-// The 2025 line 3 worksheet averages one limit for each eligible month. An
+// The current-year line 3 worksheet averages one limit for each eligible month. An
 // elected last-month rule uses December coverage for the full year; someone
 // eligible all year with changing coverage receives the greater worksheet or
-// December-coverage amount. See 2025 Instructions for Form 8889, line 3.
+// December-coverage amount. See current-year Instructions for Form 8889, line 3.
 function contributionLimitLines(
   input: Form8889Input,
   selfOnlyLimit: number,
@@ -769,16 +777,16 @@ function employerContributionsForTaxYear(input: Form8889Input): number {
   const years = input.employer_contribution_years;
   if (codeW > 0 && !years) {
     throw new Error(
-      "Form 8889 employer contributions need the 2025 Employer Contribution Worksheet year facts",
+      "Form 8889 employer contributions need the current-year Employer Contribution Worksheet year facts",
     );
   }
-  const priorYear = years?.made_in_2025_for_2024_in_w2 ?? 0;
+  const priorYear = years?.made_in_tax_year_for_prior_year_in_w2 ?? 0;
   if (priorYear > codeW) {
     throw new Error(
       "Form 8889 prior-year employer contributions exceed W-2 box 12 code W",
     );
   }
-  return codeW - priorYear + (years?.made_in_2026_for_2025 ?? 0);
+  return codeW - priorYear + (years?.made_in_following_year_for_tax_year ?? 0);
 }
 
 function totalContributions(
@@ -859,14 +867,14 @@ function excludedDistributions(input: Form8889Input, taxYear: number): {
     );
   }
   const employerTimely = input.employer_excess_treatment?.timely_withdrawal;
-  const employerCurrentYear = employerTimely?.withdrawal_tax_year === 2025
+  const employerCurrentYear = employerTimely?.withdrawal_tax_year === taxYear
     ? employerTimely.principal + employerTimely.earnings
     : 0;
   return {
     excluded: (rollover?.amount ?? 0) +
       (timely?.amount_including_earnings ?? 0) + employerCurrentYear,
     earnings: personalEarnings +
-      (employerTimely?.withdrawal_tax_year === 2025
+      (employerTimely?.withdrawal_tax_year === taxYear
         ? employerTimely.earnings
         : 0),
   };
@@ -952,15 +960,15 @@ function verifyDistributionSources(
   }
   const timely = input.hsa_excluded_distributions?.timely_excess_withdrawal;
   const employerTimely = input.employer_excess_treatment?.timely_withdrawal;
-  const employerCode2 = employerTimely?.withdrawal_tax_year === 2025
+  const employerCode2 = employerTimely?.withdrawal_tax_year === taxYear
     ? employerTimely
     : undefined;
   if (
-    employerTimely?.withdrawal_tax_year === 2026 &&
+    employerTimely?.withdrawal_tax_year === taxYear + 1 &&
     employerTimely.form1099_sa_source_reference !== undefined
   ) {
     throw new Error(
-      "Form 8889 post-year employer excess withdrawal cannot claim a 2025 Form 1099-SA source",
+      "Form 8889 post-year employer excess withdrawal cannot claim a current-year Form 1099-SA source",
     );
   }
   const code2 =
@@ -1175,7 +1183,7 @@ function nonQualifiedPenalty(
       (exclusions && !rollover) ||
       exclusions?.timely_excess_withdrawal ||
       input.employer_excess_treatment?.timely_withdrawal
-          ?.withdrawal_tax_year === 2025
+          ?.withdrawal_tax_year === taxYear
     ) {
       throw new Error(
         "Form 8889 age-65 exception supports line 14b only for a sourced rollover allocation",
@@ -1271,7 +1279,7 @@ function nonQualifiedPenalty(
       (exclusions && !rollover) ||
       exclusions?.timely_excess_withdrawal ||
       input.employer_excess_treatment?.timely_withdrawal
-          ?.withdrawal_tax_year === 2025
+          ?.withdrawal_tax_year === taxYear
     ) {
       throw new Error(
         "Form 8889 disability exception supports line 14b only for a sourced rollover allocation",
@@ -1456,6 +1464,17 @@ class Form8889Node extends TaxNode<typeof inputSchema> {
     const cfg = CONFIG_BY_YEAR[ctx.taxYear];
     if (!cfg) throw new Error(`No f1040 config for year ${ctx.taxYear}`);
     const input = beneficiaryInputSchema.parse(rawInput);
+    const withdrawalYear = input.employer_excess_treatment?.timely_withdrawal?.withdrawal_tax_year;
+    if (withdrawalYear !== undefined && withdrawalYear !== ctx.taxYear && withdrawalYear !== ctx.taxYear + 1) {
+      throw new Error("Form 8889 employer excess withdrawal must be in the tax year or following tax year");
+    }
+    if (input.post_year_personal_excess_withdrawal &&
+        input.post_year_personal_excess_withdrawal.withdrawal_tax_year !== ctx.taxYear + 1) {
+      throw new Error("Form 8889 post-year personal excess withdrawal must be in the following tax year");
+    }
+    if (input.prior_year_hsa_excess && input.prior_year_hsa_excess.tax_year !== ctx.taxYear - 1) {
+      throw new Error("Form 8889 prior excess must be from the immediately preceding tax year");
+    }
     const medicareMonth = input.medicare_enrollment?.first_ineligible_month;
     if (
       medicareMonth !== undefined &&
@@ -1645,7 +1664,7 @@ class Form8889Node extends TaxNode<typeof inputSchema> {
       (employerTreatment?.amount_included_in_w2_box1 ?? 0);
     const penalty = nonQualifiedPenalty(input, taxable, ctx.taxYear);
     const failure = input.testing_period_failure;
-    const lastMonthIncome = lastMonthRuleIncome(input, pairedPriorYear);
+    const lastMonthIncome = lastMonthRuleIncome(input, pairedPriorYear, ctx.taxYear);
     const partIIIIncome = failure
       ? lastMonthIncome +
         failure.qualified_funding_distribution_amount
@@ -1664,7 +1683,7 @@ class Form8889Node extends TaxNode<typeof inputSchema> {
     ];
 
     // Self-emit only the applicable printed parts for MeF and PDF. A
-    // distribution-only or Part III-only filer need not have 2025 HDHP coverage.
+    // distribution-only or Part III-only filer need not have current-year HDHP coverage.
     if (
       !hasContributions && !hasPriorYearExcess &&
       (input.hsa_distributions ?? 0) <= 0 &&
@@ -1746,6 +1765,9 @@ class Form8889Node extends TaxNode<typeof inputSchema> {
       retained_employer_postyear_evidence: _retainedEmployerPostyearEvidence,
       ...primary
     } = input;
+    if (priorAllocation && priorAllocation.contribution_year !== ctx.taxYear - 1) {
+      throw new Error("Form 8889 paired family allocation must be from the immediately preceding tax year");
+    }
     if ((primary.spouse_has_separate_hsa === true) !== (spouse !== undefined)) {
       throw new Error(
         "Form 8889 separate spouse HSA answer must match the two beneficiary sources",
@@ -1848,10 +1870,10 @@ class Form8889Node extends TaxNode<typeof inputSchema> {
         priorAllocation.primary_filed_form8889_source_reference ===
           priorAllocation.spouse_filed_form8889_source_reference ||
         (taxpayer.filed_form8889_line6 ?? 0) +
-              (spouseEvidence.filed_form8889_line6 ?? 0) !== 8_300
+              (spouseEvidence.filed_form8889_line6 ?? 0) !== HSA_LIMITS_BY_YEAR[ctx.taxYear - 1]?.family
       ) {
         throw new Error(
-          "Form 8889 paired 2024 last-month-rule recapture needs both distinct filed owner forms and the sourced family allocation",
+          "Form 8889 paired prior-year last-month-rule recapture needs both distinct filed owner forms and the sourced family allocation",
         );
       }
     }

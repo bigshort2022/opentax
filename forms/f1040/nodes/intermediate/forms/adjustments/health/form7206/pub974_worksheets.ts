@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { FPL_BASE_2025, FPL_INCREMENT_2025 } from "../../../../../config/2025.ts";
+import { CONFIG_BY_YEAR } from "../../../../../config/index.ts";
 import { FilingStatus } from "../../../../../types.ts";
 import {
   form8962,
   inputSchema as form8962InputSchema,
 } from "../../../credits/health/form8962/index.ts";
-import { attributableSpecifiedPtc } from "./pub974_attribution.ts";
+import { attributableAnnualSpecifiedPtc, attributableSpecifiedPtc } from "./pub974_attribution.ts";
 
 // Publication 974 (2025), pp. 49-51. These are record-only calculations.
 // They do not route a deduction or an assumed MAGI into the tax graph.
@@ -163,22 +163,32 @@ export interface WorksheetXResult {
 }
 
 function povertyLine(
+  taxYear: number,
   size: number,
   region: WorksheetXSource["fpl_region"],
 ): number {
+  const cfg = CONFIG_BY_YEAR[taxYear];
+  if (!cfg) throw new Error(`No f1040 config for year ${taxYear}`);
   const [base, increment] = region === "alaska"
-    ? [18_810, 6_730]
+    ? [cfg.fplBaseAlaska, cfg.fplIncrementAlaska]
     : region === "hawaii"
-    ? [17_310, 6_190]
-    : [FPL_BASE_2025, FPL_INCREMENT_2025];
+    ? [cfg.fplBaseHawaii, cfg.fplIncrementHawaii]
+    : [cfg.fplBase, cfg.fplIncrement];
   return base + increment * (size - 1);
 }
 
 export function calculateWorksheetX(
+  taxYear: number,
   raw: WorksheetXSource,
   worksheetW: WorksheetWResult,
+  unemploymentCompensation2021 = false,
 ): WorksheetXResult {
   const source = worksheetXSourceSchema.parse(raw);
+  const cfg = CONFIG_BY_YEAR[taxYear];
+  if (!cfg) throw new Error(`No f1040 config for year ${taxYear}`);
+  if (unemploymentCompensation2021 && taxYear !== 2021) {
+    throw new Error("Publication 974 unemployment treatment applies only to 2021");
+  }
   const line19 = worksheetW.line19_remaining_limit_for_worksheet_x;
   if (line19 === null) {
     throw new Error(
@@ -199,20 +209,18 @@ export function calculateWorksheetX(
   const line14 = cents(
     line8 + source.required_filing_dependents_modified_agi,
   );
-  const fpl = povertyLine(source.household_size, source.fpl_region);
+  const fpl = povertyLine(taxYear, source.household_size, source.fpl_region);
   const single = source.filing_status === FilingStatus.Single;
-  const caps = single ? [375, 975, 1_625] : [750, 1_950, 3_250];
-  const percentage = (income: number) =>
-    Math.floor(Math.max(0, income) / fpl * 100);
-  let line25: number;
-  if (percentage(line14 - Math.min(line19, caps[0])) < 200) {
-    line25 = caps[0];
-  } else if (percentage(line14 - Math.min(line19, caps[1])) < 300) {
-    line25 = caps[1];
-  } else if (percentage(line14 - Math.min(line19, caps[2])) < 400) {
-    line25 = caps[2];
-  } else {
-    line25 = worksheetW.line2_attributable_aptc;
+  const percentage = (income: number) => unemploymentCompensation2021
+    ? 133
+    : Math.floor(Math.max(0, income) / fpl * 100);
+  let line25 = worksheetW.line2_attributable_aptc;
+  for (const tier of cfg.ptcRepaymentCaps) {
+    const cap = single ? tier.singleCap : tier.otherCap;
+    if (percentage(line14 - Math.min(line19, cap)) < tier.maxFplPct) {
+      line25 = cap;
+      break;
+    }
   }
   const line30 = Math.min(
     worksheetW.line1_specified_premiums,
@@ -232,6 +240,10 @@ export function calculateWorksheetX(
 }
 
 export const pub974SingleBusinessSourceSchema = z.object({
+  owner_identity: z.object({
+    recipient: z.literal("T"),
+    recipient_ssn: z.string().regex(/^\d{9}$/),
+  }).strict().optional(),
   worksheet_w: worksheetWSourceSchema,
   worksheet_x: worksheetXSourceSchema,
   // Every Form 1095-A covered policy/month, including months that are not
@@ -253,7 +265,19 @@ export type Pub974SingleBusinessSource = z.infer<
   typeof pub974SingleBusinessSourceSchema
 >;
 
+export interface Pub974FilingRow {
+  recipient: "T";
+  recipient_ssn: string;
+  business_reference: string;
+  line14: number;
+  worksheet_w: WorksheetWResult;
+  worksheet_x: WorksheetXResult;
+  attributable_specified_ptc: number;
+  iterations: number;
+}
+
 export interface Pub974IterativeResult {
+  filing_row?: Pub974FilingRow;
   worksheet_w: WorksheetWResult;
   worksheet_x: WorksheetXResult;
   schedule1_line17_deduction: number;
@@ -266,6 +290,7 @@ export interface Pub974IterativeResult {
 // trial Form 8962 results inside the call. The ordinary AGI -> 8962 graph must
 // not be used to feed PTC backward into a premium deduction.
 export function calculatePub974SingleBusinessIterative(
+  taxYear: number,
   raw: Pub974SingleBusinessSource,
 ): Pub974IterativeResult {
   const source = pub974SingleBusinessSourceSchema.parse(raw);
@@ -287,7 +312,8 @@ export function calculatePub974SingleBusinessIterative(
       "Publication 974 single-business iterative route requires attributable APTC",
     );
   }
-  const x = calculateWorksheetX(source.worksheet_x, w);
+  const x = calculateWorksheetX(taxYear, source.worksheet_x, w,
+    source.form8962_source.unemployment_compensation_2021 !== undefined);
   const f = source.form8962_source;
   const premiums = f.monthly_premiums;
   const aptcs = f.monthly_aptcs;
@@ -357,6 +383,13 @@ export function calculatePub974SingleBusinessIterative(
       "Publication 974 policy and specified months must reconcile to Form 1095-A coverage, enrollment premium, SLCSP, and APTC month",
     );
   }
+  const annualLine11Eligible = coverageMonths.size === 12 &&
+    premiums.every((amount) => amount > 0 && amount === premiums[0]) &&
+    f.monthly_slcsps!.every((amount) => amount > 0 && amount === f.monthly_slcsps![0]);
+  if (f.annual_line11_eligible !== undefined &&
+    f.annual_line11_eligible !== annualLine11Eligible) {
+    throw new Error("Publication 974 annual/monthly mode disagrees with the actual Form 1095-A columns");
+  }
   const baselineTaxpayerMagi = cents(
     source.worksheet_x.form1040_line9_total_income +
       source.worksheet_x.form1040_line2a_tax_exempt_interest +
@@ -370,8 +403,9 @@ export function calculatePub974SingleBusinessIterative(
     specifiedPtc: number;
     fields: Record<string, unknown>;
   } {
-    const result = form8962.compute({ taxYear: 2025, formType: "f1040" }, {
+    const result = form8962.compute({ taxYear, formType: "f1040" }, {
       ...f,
+      annual_line11_eligible: annualLine11Eligible,
       taxpayer_modified_agi: cents(baselineTaxpayerMagi - totalDeduction),
       dependents_modified_agi:
         source.worksheet_x.required_filing_dependents_modified_agi,
@@ -391,16 +425,14 @@ export function calculatePub974SingleBusinessIterative(
       month_code: string;
       allowed_credit: number;
     }[] | undefined;
-    if (!monthlyRows) {
+    if (!monthlyRows && !annualLine11Eligible) {
       throw new Error("Publication 974 needs monthly Form 8962 PTC rows");
     }
     return {
       ptc: fields.total_premium_tax_credit,
-      specifiedPtc: attributableSpecifiedPtc(
-        monthlyRows,
-        specifiedMonths,
-        coverageMonths,
-      ),
+      specifiedPtc: monthlyRows
+        ? attributableSpecifiedPtc(monthlyRows, specifiedMonths, coverageMonths)
+        : attributableAnnualSpecifiedPtc(fields.total_premium_tax_credit, specifiedMonths, coverageMonths),
       fields,
     };
   }
@@ -444,6 +476,18 @@ export function calculatePub974SingleBusinessIterative(
         Math.abs(finalSpecified - refiguredSpecified) < 1
       ) {
         return {
+          ...(source.owner_identity ? {
+            filing_row: {
+              recipient: source.owner_identity.recipient,
+              recipient_ssn: source.owner_identity.recipient_ssn,
+              business_reference: source.worksheet_w.business.establishing_business_reference,
+              line14: finalDeduction,
+              worksheet_w: w,
+              worksheet_x: x,
+              attributable_specified_ptc: final.specifiedPtc,
+              iterations: iteration,
+            },
+          } : {}),
           worksheet_w: w,
           worksheet_x: x,
           schedule1_line17_deduction: finalDeduction,
