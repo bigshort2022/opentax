@@ -271,13 +271,22 @@ export type KnownInvalidCases = {
   readonly today: string;
 };
 
-function isKnownInvalid(
+export type ExcludedBenchmarkCase = CaseBaseline[number] & {
+  readonly validationError: string;
+};
+
+export type BenchmarkDiscovery = {
+  readonly found: readonly string[];
+  readonly excluded: readonly ExcludedBenchmarkCase[];
+};
+
+function knownInvalidEntry(
   known: KnownInvalidCases | undefined,
   problem: CaseProblem,
-): boolean {
-  if (!known) return false;
+): CaseBaseline[number] | undefined {
+  if (!known) return undefined;
   const name = relative(known.casesRoot, problem.directory);
-  return known.baseline.some((entry) =>
+  return known.baseline.find((entry) =>
     entry.case === name && entry.expires >= known.today
   );
 }
@@ -286,12 +295,22 @@ export async function discoverBenchmarkCases(
   root: string,
   products: Readonly<Record<string, FormDefinition>> = catalog,
   known?: KnownInvalidCases,
-): Promise<string[]> {
+): Promise<BenchmarkDiscovery> {
   const inspection = await inspectBenchmarkCases(root, products);
   const found = inspection.found;
-  const problems = inspection.problems.filter((problem) =>
-    !isKnownInvalid(known, problem)
-  );
+  const excluded: ExcludedBenchmarkCase[] = [];
+  const problems: CaseProblem[] = [];
+  for (const problem of inspection.problems) {
+    const entry = knownInvalidEntry(known, problem);
+    if (entry) {
+      excluded.push({
+        ...entry,
+        validationError: problem.message.replace(problem.directory, entry.case),
+      });
+    } else {
+      problems.push(problem);
+    }
+  }
   if (problems.length > 0) {
     throw new Error(
       `${problems.length} invalid benchmark case${
@@ -300,7 +319,7 @@ export async function discoverBenchmarkCases(
     );
   }
   if (found.length === 0) throw new Error(`No benchmark cases: ${root}`);
-  return [...found];
+  return { found, excluded };
 }
 
 export const CASE_BASELINE_PATH = "benchmark/cases/baseline.json";

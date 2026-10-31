@@ -1,6 +1,7 @@
 # benchmark
 
-Accuracy benchmark for the `tax` engine — 133 checked-in TY2025 scenarios.
+Federal tax-engine benchmarks. Each run reports the discovered corpus separately
+from runnable, executed, and known-invalid excluded cases.
 Expected values are regression fixtures, not proof of IRS certification or
 universal tax correctness; independently verify their provenance before treating
 them as authority.
@@ -10,7 +11,7 @@ For folder layout and file formats, see
 
 ## Cases
 
-133 scenarios covering the common return types:
+Examples of TY2025 scenarios; the runner reports current corpus counts:
 
 | Range | Filing status | Key features tested                                                                                                                                      |
 | ----- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -33,9 +34,11 @@ oracle namespace; only explicitly named metadata fields may be nonnumeric.
 Malformed oracles, including unmapped ones, fail.
 
 **Pass criteria:** compare supported expected output keys, including AGI and
-payments, not only tax/refund/owed; no unsupported oracles, command failures or
-diagnostics. Each must have a finite numeric actual value within an inclusive
-absolute $5 legacy tolerance. This inherited tolerance accommodates existing
+payments, not only tax/refund/owed; unsupported oracles, command failures, and
+executor/source errors prevent a pass.
+Full-return fixtures require a finite numeric actual within an inclusive absolute
+$5 legacy tolerance. `published_lines` fixtures require exact dollar equality
+only for their cited, scored lines. The legacy tolerance accommodates existing
 fixture rounding; it is not an IRS-approved discrepancy allowance. Missing
 values never become zero. Singleton numeric arrays are accepted; empty,
 multi-entry, nonnumeric and nonfinite actuals fail. Nonfinite expectations,
@@ -43,20 +46,75 @@ invalid tolerances and no numeric expectations fail rather than silently
 passing. Descriptive nonnumeric metadata is not scored.
 
 Raw `lines` values take precedence over normalized summary values. Executor
-diagnostics and failed CLI subprocesses fail the case. Any failing case,
-skipped/incomplete case directory or empty case set makes the command exit
-nonzero. The trailing JSON keeps `failing` as case-name strings and adds
-`failures` with `lineFailures`, `unsupportedChecks` and `errors`.
+diagnostics, declared source limitations, and failed CLI subprocesses fail the
+case. Any failing case, unexecuted runnable case, or empty runnable set makes
+the command exit nonzero. Active baseline exclusions alone do not change the
+exit status; they remain explicitly outside the executed-case PASS/FAIL counts.
 
 Some fixtures expect intermediate names not exposed by `return get`. These are
 reported as unsupported checks, not missing filed lines. The omitted refund side
-becomes zero only when a positive amount owed is present, and conversely for
-omitted amount owed with a positive refund. When both are omitted, both become
+becomes zero only when a nonnegative amount owed is present, and conversely for
+omitted amount owed with a nonnegative refund. When both are omitted, both become
 zero only if finite tax and payments totals are equal. Explicit nulls, arrays
 and malformed values are never replaced, and no other missing filed line
 receives a default. Resolving mappings/output coverage needs independent review,
 not changes to expected values or relaxed tolerances. A red benchmark is not by
 itself proof that every reported discrepancy is a tax-engine arithmetic error.
+
+## Reading the report
+
+The console table labels each failing row with issue tags:
+
+| Tag | Meaning |
+| --- | --- |
+| `NUM` | A compared numeric value differs beyond its applicable tolerance |
+| `OUT` | A compared actual is missing, nonfinite, or not a single numeric value |
+| `MAP` | An expected numeric field has no approved output mapping |
+| `SRC` | The fixture declares an unresolved source limitation |
+| `EXEC` | An executor diagnostic rejected a node; amounts may be partial or defaults |
+| `ERR` | Another command, parsing, or scoring error |
+
+Green values indicate only agreement within the applicable comparison tolerance.
+Unscored columns are dim, not failed comparisons. `N/A` means an unavailable or
+invalid value, never an invented zero. A passing row is not IRS certification.
+
+The footer distinguishes:
+
+- **Corpus and execution:** discovered = runnable + known-invalid exclusions;
+  runnable = executed + not run; executed = passed + failed. A case with a
+  command or scoring error counts as executed because it produced a failure result.
+- **Disjoint failure groups:** compared-line failures; errors without compared-line
+  failures; unmapped checks only. Each failed case belongs to exactly one group.
+- **Overlapping causes:** each issue tag counts affected cases, not individual
+  messages or fields. A case may have several causes; these counts must not be summed.
+- **Citation metadata, for executed cases only:** present, missing, or unavailable
+  because the expected-value file could not be read or validated. Passing cases
+  without a citation are named. Presence of a nonempty top-level `source` or
+  `sources` value does not establish that a publication supports the expected values.
+- **Oracle scope and limits:** full-return legacy tolerance versus exact
+  published-line checks; no independent source verification or full-return certification.
+- **Known-invalid exclusions:** every excluded case includes its validation error,
+  baseline reason, approver, and expiry. Exclusions are not hidden in a zero skip count.
+
+With `--json`, the final stdout line is a JSON report after the console output.
+The report contains:
+
+| Field | Contract |
+| --- | --- |
+| `form`, `year` | Product and tax year evaluated |
+| `counts` | `discovered`, `runnable`, `executed`, `excludedKnownInvalid`, `notRun`, `passed`, `failed` |
+| `failureBreakdown` | Disjoint `comparedLineFailures`, `errorsWithoutLineFailures`, `unmappedOnly` counts |
+| `failureCauses` | Overlapping case counts keyed by descriptive issue names |
+| `failing`, `failures` | Failing names and per-case `issues`, `lineFailures`, `unsupportedChecks`, and `errors` |
+| `excludedCases`, `notRunCases` | Baseline exclusion records and names of unexecuted runnable cases |
+| `provenance` | Citation coverage, missing-citation cases, passing cases without citations, and source-limited cases |
+| `oracleScopes`, `publishedLineCases` | Scope counts and the scored keys for published-line cases |
+| `caseProvenance` | Each executed case's declared scope, citations, and source issues; `oracle: null` when unavailable |
+| `validationLimits` | USD tolerances, lack of independent verification/certification, and partial-output warning |
+
+The explicit `counts` object replaces the ambiguous `total` and `skipped` JSON
+fields. Reporting does not change tax calculations, expected values, baseline
+eligibility, or pass/fail criteria.
 
 ## How to run
 
@@ -64,7 +122,7 @@ itself proof that every reported discrepancy is a tax-engine arithmetic error.
 # Every case in cases/<form>/<year>/<case>/ (defaults: f1040, 2025)
 bun run bench --form f1040 --year 2025
 
-# Machine-readable totals and per-case failures
+# Console detail plus a final machine-readable report
 bun run bench --form f1040 --year 2025 --json
 
 # Validate every case's inputs and sources without running the engine
@@ -102,18 +160,21 @@ fixtures.
 
 Discovery recursively validates every leaf before starting the CLI: the shared
 input and expected-value schemas, the product read from `<form>/<year>/<case>`,
-each form entry against the node schema `form add` applies (unknown fields
-rejected, required fields named), and any `source`, which must cite a
-publication and never the engine. Every invalid case is reported in one error;
-`bun run check:cases` runs only this step, without the engine, allowing the
-known-invalid cases listed in `benchmark/cases/baseline.json` (with a reason,
-an expiry and an approver) until their entry expires. Empty or
-incomplete directories and malformed fixtures terminate with an error; no
-partial-success JSON report is emitted. Each valid expected record includes
-total tax, refund and amount owed. CLI output must pass the shared
-computed-return schema before the stricter per-field comparisons run. This
-preserves current-main validation while retaining the draft’s explicit
-unsupported-oracle diagnostics.
+and each form entry against the node schema `form add` applies (unknown fields
+rejected, required fields named). Supplied citations must be nonempty and cannot
+name the engine as their source; a missing citation is currently allowed and
+reported, not independently verified by this check.
+
+`bun run check:cases` performs this validation without running the engine,
+allowing the known-invalid cases listed in `benchmark/cases/baseline.json`
+until their entries expire. The benchmark reports those exclusions with their
+reasons and approvals. Unbaselined invalid cases, expired exclusions, empty or
+incomplete directories, and empty runnable inventories terminate with an error
+before execution; no partial-success JSON report is emitted.
+
+Full-return expected records include total tax, refund, and amount owed.
+Published-line records retain their narrower explicit scope. CLI output must
+pass the shared computed-return schema before per-field comparisons run.
 
 ## Issue 77 reconciliation
 

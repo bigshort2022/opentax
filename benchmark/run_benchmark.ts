@@ -7,18 +7,33 @@ import * as sys from "../scripts/support/sys.ts";
  * Run: bun benchmark/run_benchmark.ts
  */
 
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath as fromFileUrl } from "node:url";
 import {
   BenchmarkOracleScope,
+  benchmarkExitCode,
   benchmarkExpectedSchema,
   benchmarkInputSchema,
   benchmarkReturnSchema,
   benchmarkSourceIssues,
   createdReturnSchema,
   discoverBenchmarkCases,
+  type KnownInvalidCases,
   readCaseBaseline,
 } from "./harness.ts";
+import {
+  BENCHMARK_ISSUE_TAGS,
+  type BenchmarkCaseResult,
+  type BenchmarkOracle,
+  buildBenchmarkReport,
+  classifyBenchmarkIssues,
+  describeBenchmarkOracle,
+  formatBenchmarkSummary,
+  LEGACY_BENCHMARK_TOLERANCE,
+  type NumericLineFailure,
+  PUBLISHED_LINE_TOLERANCE,
+  type UnsupportedCheck,
+} from "./report.ts";
 
 const SCRIPT_DIR = dirname(fromFileUrl(import.meta.url));
 const TAX_DIR = join(SCRIPT_DIR, "..");
@@ -78,20 +93,9 @@ async function tax(...args: string[]): Promise<string> {
 }
 
 function displayScalar(val: unknown): number {
-  if (Array.isArray(val)) return typeof val[0] === "number" ? val[0] : 0;
-  return typeof val === "number" ? val : 0;
+  const actual = singleNumericActual(val);
+  return typeof actual === "number" ? actual : NaN;
 }
-
-export type NumericLineFailure = {
-  readonly line: string;
-  readonly expected: number;
-  readonly actual: unknown;
-  readonly reason: "missing" | "multi_entry" | "nonfinite" | "mismatch";
-  readonly tolerance: number;
-};
-
-// Retained legacy absolute dollar tolerance, inclusive per line, not an IRS rule.
-const ROUNDING_TOLERANCE = 5;
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
@@ -136,7 +140,7 @@ export function benchmarkActualLines(
 export function compareExpectedNumericLines(
   actual: Readonly<Record<string, unknown>>,
   expected: Readonly<Record<string, unknown>>,
-  tolerance = ROUNDING_TOLERANCE,
+  tolerance = LEGACY_BENCHMARK_TOLERANCE,
 ): NumericLineFailure[] {
   if (!Number.isFinite(tolerance) || tolerance < 0) {
     throw new Error("Benchmark tolerance must be finite and nonnegative");
@@ -187,12 +191,6 @@ export function compareExpectedNumericLines(
 }
 
 // ── Table layout ─────────────────────────────────────────────────────────────
-
-export type UnsupportedCheck = {
-  readonly field: string;
-  readonly expected: number;
-  readonly kind: "unmapped_oracle";
-};
 
 // Exact public summary keys: cli/commands/return.ts ReturnSummary/extractSummary.
 // Additional exact raw output keys: forms/f1040/nodes/outputs/general/return-assembly/f1040/index.ts inputSchema.
@@ -273,6 +271,7 @@ const COLS = [
   { label: "Refund", width: 10, align: "r" },
   { label: "Owed", width: 10, align: "r" },
   { label: "Result", width: 6, align: "c" },
+  { label: "Issues", width: 24, align: "l" },
 ] as const;
 
 function pad(s: string, w: number, align: "l" | "r" | "c"): string {
@@ -309,31 +308,25 @@ function headerRow(): string {
 
 // ── Case runner ───────────────────────────────────────────────────────────────
 
-type CaseResult = {
-  name: string;
+type CaseResult = BenchmarkCaseResult & {
   engAgi: number;
   engTi: number;
   engTax: number;
   engPay: number;
   engRef: number;
   engOwe: number;
-  correct: Record<string, number>;
-  lineFailures: NumericLineFailure[];
-  unsupportedChecks: UnsupportedCheck[];
-  errors: string[];
-  ok: boolean;
-  oracleScope?: BenchmarkOracleScope;
 };
 
-async function runCase(name: string): Promise<CaseResult> {
-  const caseDir = join(CASES_DIR, name);
+async function runCase(
+  name: string,
+  caseDir: string,
+  correct: Readonly<Record<string, unknown>>,
+  oracle: BenchmarkOracle,
+): Promise<CaseResult> {
   const inputFile = join(caseDir, "input.json");
-  const correctFile = join(caseDir, "correct.json");
   const caseData = benchmarkInputSchema.parse(
     JSON.parse(await fs.readFile(inputFile, "utf8")),
   );
-  const correct = JSON.parse(await fs.readFile(correctFile, "utf8"));
-  benchmarkExpectedSchema.parse(correct);
   const rid = createdReturnSchema.parse(JSON.parse(
     await tax("return", "create", "--year", String(caseData.year), "--json"),
   )).returnId;
@@ -358,24 +351,30 @@ async function runCase(name: string): Promise<CaseResult> {
   // Raw lines take precedence: summary normalization must not hide malformed values.
   const actualLines = benchmarkActualLines(l, sm);
   const errors: string[] = [
-    ...benchmarkSourceIssues(correct),
+    ...oracle.sourceIssues,
     ...(eng.warnings ?? []).filter((warning: string) =>
       warning.startsWith("[EXECUTOR_")
     ),
   ];
 
-  const engAgi = displayScalar(actualLines.line11_agi ?? 0);
-  const engTi = displayScalar(actualLines.line15_taxable_income ?? 0);
-  const engTax = displayScalar(actualLines.line24_total_tax ?? 0);
-  const engPay = displayScalar(actualLines.line33_total_payments ?? 0);
-  const engRef = displayScalar(actualLines.line35a_refund ?? 0);
-  const engOwe = displayScalar(actualLines.line37_amount_owed ?? 0);
+  const engAgi = displayScalar(actualLines.line11_agi);
+  const engTi = displayScalar(actualLines.line15_taxable_income);
+  const engTax = displayScalar(actualLines.line24_total_tax);
+  const engPay = displayScalar(actualLines.line33_total_payments);
+  const engRef = displayScalar(actualLines.line35a_refund);
+  const engOwe = displayScalar(actualLines.line37_amount_owed);
 
   const { expectedLines: c, unsupportedChecks } = classifyFixtureExpectations(
     correct,
   );
   const lineFailures = Object.keys(c).length > 0
-    ? compareExpectedNumericLines(actualLines, c, correct.oracle_scope === BenchmarkOracleScope.PublishedLines ? 0 : ROUNDING_TOLERANCE)
+    ? compareExpectedNumericLines(
+      actualLines,
+      c,
+      correct.oracle_scope === BenchmarkOracleScope.PublishedLines
+        ? PUBLISHED_LINE_TOLERANCE
+        : LEGACY_BENCHMARK_TOLERANCE,
+    )
     : [];
   if (Object.keys(c).length === 0 && unsupportedChecks.length === 0) {
     errors.push("No numeric expected benchmark values");
@@ -396,24 +395,35 @@ async function runCase(name: string): Promise<CaseResult> {
     unsupportedChecks,
     errors,
     ok,
-    ...(correct.oracle_scope === BenchmarkOracleScope.PublishedLines ? { oracleScope: BenchmarkOracleScope.PublishedLines } : {}),
+    oracle,
+    issues: classifyBenchmarkIssues(lineFailures, unsupportedChecks, errors),
   };
 }
 
-function colorNum(eng: number, cor: number, width: number): string {
+function colorNum(
+  eng: number,
+  cor: number | undefined,
+  width: number,
+  tolerance: number,
+): string {
+  if (!Number.isFinite(eng)) return `${DIM}${"N/A".padStart(width)}${RST}`;
   const s = Math.round(eng).toLocaleString().padStart(width);
-  return Math.abs(eng - cor) <= 5 ? `${GRN}${s}${RST}` : `${RED}${s}${RST}`;
+  if (cor === undefined) return `${DIM}${s}${RST}`;
+  return Math.abs(eng - cor) <= tolerance ? `${GRN}${s}${RST}` : `${RED}${s}${RST}`;
 }
 
 function resultRow(r: CaseResult, idx: number): string {
   const numW = COLS[2].width; // all number columns share this width
+  const tolerance = r.oracle?.scope === "published_lines"
+    ? PUBLISHED_LINE_TOLERANCE
+    : LEGACY_BENCHMARK_TOLERANCE;
   const nums = [
-    colorNum(r.engAgi, r.correct.line11_agi, numW),
-    colorNum(r.engTi, r.correct.line15_taxable_income, numW),
-    colorNum(r.engTax, r.correct.line24_total_tax, numW),
-    colorNum(r.engPay, r.correct.line33_total_payments, numW),
-    colorNum(r.engRef, r.correct.line35a_refund, numW),
-    colorNum(r.engOwe, r.correct.line37_amount_owed, numW),
+    colorNum(r.engAgi, r.correct.line11_agi, numW, tolerance),
+    colorNum(r.engTi, r.correct.line15_taxable_income, numW, tolerance),
+    colorNum(r.engTax, r.correct.line24_total_tax, numW, tolerance),
+    colorNum(r.engPay, r.correct.line33_total_payments, numW, tolerance),
+    colorNum(r.engRef, r.correct.line35a_refund, numW, tolerance),
+    colorNum(r.engOwe, r.correct.line37_amount_owed, numW, tolerance),
   ];
   const result = r.ok ? `${GRN} PASS ${RST}` : `${RED} FAIL ${RST}`;
   // Plain cells use pad(); pre-padded colored cells are inserted directly.
@@ -421,7 +431,9 @@ function resultRow(r: CaseResult, idx: number): string {
     ` ${pad(String(idx + 1), COLS[0].width, "r")} │` +
     ` ${pad(r.name, COLS[1].width, "l")} │` +
     nums.map((n) => ` ${n} `).join("│") + "│" +
-    ` ${result} │`;
+    ` ${result} │ ` +
+    pad(r.issues.map((issue) => BENCHMARK_ISSUE_TAGS[issue]).join(",") || "-", COLS[9].width, "l") +
+    " │";
 }
 
 // ── Progress + streaming output (all on stdout) ───────────────────────────────
@@ -445,7 +457,7 @@ function progressLine(done: number, total: number, running: number): string {
 
 const CONCURRENCY = 8;
 
-async function runAll(caseNames: string[]): Promise<CaseResult[]> {
+async function runAll(casesDir: string, caseNames: readonly string[]): Promise<CaseResult[]> {
   const allResults: CaseResult[] = [];
   let idx = 0, done = 0, printed = 0;
   const total = caseNames.length;
@@ -459,10 +471,21 @@ async function runAll(caseNames: string[]): Promise<CaseResult[]> {
       const name = caseNames[idx++];
       const activeCount = Math.min(CONCURRENCY, total - done);
 
-      let result: CaseResult | null;
+      let result: CaseResult;
+      let oracle: BenchmarkOracle | null = null;
       try {
-        result = await runCase(name);
+        const caseDir = join(casesDir, name);
+        const correct = JSON.parse(
+          await fs.readFile(join(caseDir, "correct.json"), "utf8"),
+        );
+        benchmarkExpectedSchema.parse(correct);
+        oracle = describeBenchmarkOracle(correct, benchmarkSourceIssues(correct));
+        result = await runCase(name, caseDir, correct, oracle);
       } catch (error) {
+        const errors = [
+          ...(oracle?.sourceIssues ?? []),
+          error instanceof Error ? error.message : String(error),
+        ];
         result = {
           name,
           engAgi: NaN,
@@ -474,17 +497,19 @@ async function runAll(caseNames: string[]): Promise<CaseResult[]> {
           correct: {},
           lineFailures: [],
           unsupportedChecks: [],
-          errors: [error instanceof Error ? error.message : String(error)],
+          errors,
+          issues: classifyBenchmarkIssues([], [], errors),
           ok: false,
+          oracle,
         };
       }
       done++;
-      if (result) allResults.push(result);
+      allResults.push(result);
 
       // Clear progress bar, print completed row, redraw progress bar
-      const row = result ? resultRow(result, printed++) : null;
+      const row = resultRow(result, printed++);
       write(CLEAR_LINE);
-      if (row) write(row + "\n");
+      write(row + "\n");
       if (done < total) write(progressLine(done, total, activeCount - 1));
     }
   }
@@ -494,60 +519,32 @@ async function runAll(caseNames: string[]): Promise<CaseResult[]> {
   return allResults;
 }
 
-if (import.meta.main) {
-  const paths = await discoverBenchmarkCases(CASES_DIR, undefined, {
-    casesRoot: join(SCRIPT_DIR, "cases"),
-    baseline: await readCaseBaseline(join(SCRIPT_DIR, "..")),
-    today: new Date().toISOString().slice(0, 10),
-  });
-  const names = paths.map((path) => path.slice(CASES_DIR.length + 1));
-
-  const results = await runAll(names);
-
-  // ── Footer ────────────────────────────────────────────────────────────────────
-
-  write(BOT + "\n");
-
-  const pass = results.filter((r) => r.ok).length;
-  const fail = results.length - pass;
-  const skipped = names.length - results.length;
-  const emptyCaseSet = results.length === 0;
-
-  write(
-    `\n  ${GRN}${pass} PASS${RST}  ${RED}${fail} FAIL${RST}  ${YEL}${skipped} SKIP${RST}  ${DIM}out of ${results.length} runnable cases  ·  green = within $${ROUNDING_TOLERANCE} legacy benchmark tolerance${RST}\n\n`,
+export async function runBenchmark(
+  casesDir: string,
+  known: KnownInvalidCases,
+  json = false,
+): Promise<number> {
+  const discovery = await discoverBenchmarkCases(casesDir, undefined, known);
+  const names = discovery.found.map((path) => path.slice(casesDir.length + 1));
+  const results = await runAll(casesDir, names);
+  const report = buildBenchmarkReport(
+    basename(dirname(casesDir)),
+    Number(basename(casesDir)),
+    discovery,
+    results,
   );
-  const publishedLineCases = results.filter((result) => result.oracleScope === BenchmarkOracleScope.PublishedLines);
-  if (publishedLineCases.length > 0) {
-    write(`  ${publishedLineCases.length} published-line cases score only their cited lines, with exact dollar equality; unscored return balances are not IRS oracles.\n\n`);
-  }
-  if (emptyCaseSet) {
-    console.error(
-      "No runnable benchmark cases found; failing instead of reporting an empty success.",
-    );
-  }
+  write(BOT + "\n\n" + formatBenchmarkSummary(report) + "\n");
+  if (json) console.log(JSON.stringify(report));
+  return benchmarkExitCode(
+    report.counts.executed,
+    report.counts.failed + report.counts.notRun,
+  );
+}
 
-  if (jsonFlag) {
-    const failures = results.filter((r) => !r.ok).map((r) => ({
-      name: r.name,
-      lineFailures: r.lineFailures,
-      unsupportedChecks: r.unsupportedChecks,
-      errors: r.errors,
-    }));
-    const failing = failures.map((failure) => failure.name);
-    console.log(
-      JSON.stringify({
-        total: results.length,
-        skipped,
-        pass,
-        fail,
-        failing,
-        failures,
-        publishedLineCases: publishedLineCases.map((result) => ({ name: result.name, scoredLines: Object.keys(result.correct) })),
-      }),
-    );
-  }
-
-  if (fail > 0 || skipped > 0 || emptyCaseSet) {
-    process.exit(1);
-  }
+if (import.meta.main) {
+  process.exitCode = await runBenchmark(CASES_DIR, {
+    casesRoot: join(SCRIPT_DIR, "cases"),
+    baseline: await readCaseBaseline(TAX_DIR),
+    today: new Date().toISOString().slice(0, 10),
+  }, jsonFlag);
 }

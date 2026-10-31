@@ -56,7 +56,7 @@ Public entrypoints are `mod.ts`, `catalog.ts`, `cli/main.ts`, and the cataloged 
 │   ├── release/                   # Compiled binary checks
 │   └── site/                      # Static site statistics
 ├── benchmark/
-│   ├── run_benchmark.ts           # Expected-output comparison against IRS ground truth
+│   ├── run_benchmark.ts           # Expected-value comparison with explicit verification limits
 │   ├── check_cases.ts             # Case contract without running the engine
 │   ├── cases/baseline.json        # Known-invalid cases, with reason and expiry
 │   ├── cases/<form>/<year>/ledger.json # Every expected-value change, with its publication
@@ -191,8 +191,12 @@ in `scripts/testing/year-pinned-baseline.json`; a count may only fall, and
 }
 ```
 
-**Required** (benchmark pass/fail): `line24_total_tax`, `line35a_refund`, `line37_amount_owed`
+**Full-return fixtures require** `line24_total_tax`, `line35a_refund`, and
+`line37_amount_owed`. Other numeric expectations, including AGI, taxable income,
+and payments, are scored when supplied; unmapped expectations fail.
 
-**Optional** (shown for debugging): `line11_agi`, `line15_taxable_income`, `line33_total_payments`
+Explicit `published_lines` fixtures score only their cited lines with exact
+dollar equality. See the [benchmark reporting contract](../../benchmark/README.md#reading-the-report)
+for corpus exclusions, issue categories, citation metadata, and verification limits.
 
 Values must come directly from an IRS publication. The `source` field must cite the specific pub, exercise, and page. Never compute values.

@@ -8,8 +8,15 @@ description: Where the engine stands — benchmark pass rate per form:year, MeF 
 Run these and summarize; change nothing.
 
 1. For each `benchmark/cases/<form>/<year>/` directory:
-   `bun run bench:cached --form <form> --year <year> --json`. Report pass/total
-   and the failing cases grouped by failing line.
+   `bun run bench:cached --form <form> --year <year> --json`. Report
+   `counts.passed` / `counts.executed`, `counts.failed`, and the separate
+   `counts.discovered`, `counts.runnable`, `counts.excludedKnownInvalid`,
+   and `counts.notRun` inventory counts. Group failures by issue and compared line.
+   Keep disjoint `failureBreakdown` groups separate from overlapping
+   `failureCauses`; do not label every failure an arithmetic defect.
+   Include `excludedCases` reasons and expiry, `provenance` citation coverage,
+   `oracleScopes`, and `validationLimits`. Citation presence is not verified
+   IRS support, and published-line checks are not full-return certification.
 2. `bun run check:mef`: sample returns ready to file, the most common
    findings, and any `NEW` or `FIXED` problem against
    `scripts/testing/mef-baseline.json`.

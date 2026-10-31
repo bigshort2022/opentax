@@ -13,9 +13,16 @@ agent. Nothing is persisted between runs: each round re-reads the scoreboards.
 ## 1. Read the failures
 
 - `{form}:{year}`: `bun run bench:cached --form {form} --year {year} --json`
-  (replays `bench` when nothing it reads changed). The last
-  line is `{ total, pass, fail, failing, failures }`; each failure has
-  `lineFailures`, `unsupportedChecks` and `errors`.
+  (replays `bench` when nothing it reads changed). The last line contains
+  `counts`, `failing`, and `failures`. Use `counts.failed` for failing cases
+  and `counts.passed` / `counts.executed` for passes; report
+  `counts.excludedKnownInvalid` and `counts.notRun` separately.
+  Each failure has `issues`, `lineFailures`, `unsupportedChecks`, and `errors`.
+  `failureBreakdown` groups are disjoint; `failureCauses` counts overlap.
+  `excludedCases` are not executed or passing. Read `provenance`,
+  `oracleScopes`, and `validationLimits` before making an accuracy claim;
+  citation presence is not source verification. The complete report contract
+  is in `benchmark/README.md`.
 - `mef`: `bun run check:mef --json` (`returns`: sample return id → findings;
   `scripts/testing/mef-baseline.json` gives the reason each known one blocks)
   and `bun run check:ats --json` (per ATS scenario: `findings`, `schemaValid`,
