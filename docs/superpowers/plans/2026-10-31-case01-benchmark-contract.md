@@ -63,7 +63,7 @@ Files: harness, runner, report and their existing tests; benchmark README and ar
 - [x] Actual isolated synthetic CLI smoke plus reviewed benchmark smoke: all 23 assertions, original expectation hash, $312 refund and no errors.
 - [x] Core/contract/integration regressions; required structure, cases, oracle and typed unit gates; lint.
 - [x] Full TY2025 benchmark: inspect all changes against the retained 109-case baseline, not just a reduced case selection. TY2021–2024 published-line benchmarks remain green.
-- [ ] Review the change, record exercised verification and remaining limits below, commit/push to PR #4, and inspect its checks. Do not merge.
+- [x] Review the change, record exercised verification and remaining limits below, commit/push to PR #4, and inspect its checks. Do not merge.
 
 ## Authority register
 
@@ -107,3 +107,11 @@ The scorer already accepted singleton numeric arrays, but the inactive-balance n
 ### Evidence limits
 
 Capture is unavailable for Form 8839, Form 8990 and Form 8621 QEF-deferral projection paths rather than returning a stale trace. Reviewed zero-activity bindings do not certify private worksheet results or disaggregate positive combined credits. IRS eligibility and taxpayer-source authenticity remain synthetic assumptions. No PDF/MeF acceptance, filing certification, or real taxpayer-store modification is claimed.
+
+### Publication
+
+Implementation commit `ae5d6d0f1bf4ad55f621ce4d786cdde40d59d07e` is pushed to `codex/historical-federal-preparation` on [draft PR #4](https://github.com/bigshort2022/opentax/pull/4). The PR description separates this repair's current evidence from the earlier implementation/reporting snapshots.
+
+The remote [`unit-and-preflight` check](https://github.com/bigshort2022/opentax/actions/runs/41175961178/job/124463460103) succeeded for that exact commit at `2026-10-31T06:29:00Z`. The PR remains open and draft; nothing was merged or filed.
+
+Two independent code reviews have no unresolved actionable findings. The optional Jev staged-diff review requested testing for the executor, return command and TY2025 wrapper; the focused regressions and 374-fixture parity smoke above cover those paths. Its completion judgment was inconclusive because its input cut the 104,500-character diff to 20,000 characters; it is not used as proof of completion.
