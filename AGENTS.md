@@ -5,23 +5,34 @@ as a graph of pure nodes. Two CLIs, kept apart:
 
 - `cli/main.ts` is the product, compiled to the `opentax` binary users run.
 - The harness is what you use while building it and is never shipped:
-  `deno task check:structure` (nodes placed, registered, reachable),
-  `deno task check:cases` (benchmark cases fit their node schemas and cite a
-  publication), `deno task bench` (engine output against IRS ground truth) and
-  `deno task test:unit` (module graph and typed tests).
+  `bun run check:structure` (nodes placed, registered, reachable),
+  `bun run check:cases` (benchmark cases fit their node schemas and cite a
+  publication), `bun run check:sandbox` (the binary reaches the network only
+  through restricted fetch), `bun run bench` (engine output against IRS ground
+  truth), `bun run test:unit` (module graph, type check and typed tests),
+  `bun run test:forms` (node, export and return-processing tests),
+  `bun run check:mef` (sample returns build MeF XML and pass the IRS rules) and
+  `bun run check:cli` (complete returns work end to end through the CLI).
 
 ## Before a pull request
 
 A change ships with proof, not a description of it:
 
-- `deno task check:structure` and `deno task test:unit` pass.
-- `deno task bench --form <form> --year <year>` passes for every form:year the
-  change touches, and `deno task check:oracle` passes: an expected value changes
+- `bun run check:structure`, `bun run check:sandbox`, `bun run test:unit`,
+  `bun run test:forms`, `bun run check:mef` and `bun run check:cli` pass.
+- `bun run bench --form <form> --year <year>` passes for every form:year the
+  change touches, and `bun run check:oracle` passes: an expected value changes
   only with a publication cited in that product's `ledger.json`.
 - The pull request says what was not verified and why.
 
+While iterating, `bun run verify:changed` runs only what the change since
+`origin/main` can reach: tests whose imports reach a changed file, the MeF and
+CLI gates when the CLI loads it, and bench compared with the merge base (both
+results cached by content). CI still runs every gate in full.
+
 The layout the checks enforce, and which check owns each rule, is in
-`docs/architecture/STRUCTURE.md`.
+`docs/architecture/STRUCTURE.md`. IRS schemas and business rules live in
+`irs/`, which is never committed; `irs/README.md` lists every file.
 
 ## Nodes
 
@@ -34,6 +45,8 @@ The layout the checks enforce, and which check owns each rule, is in
   or the test.
 - File order: imports, enums, item schema, input schema, type aliases, pure
   helpers, node class, singleton export.
+- Never pin a tax year in shared code; read it from `ctx.taxYear` and
+  `CONFIG_BY_YEAR` (`check:structure`).
 
 ## Benchmark truth
 

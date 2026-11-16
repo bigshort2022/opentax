@@ -1,3 +1,7 @@
+import {
+  priorYearAssetSchema,
+  priorYearDepreciationRowSchema,
+} from "../../../../intermediate/forms/deductions/business/form4562/prior-year.ts";
 import { sstbServiceClassificationSchema } from "./sstb-classification.ts";
 import {
   calculateCharitableNaturalResource,
@@ -11,6 +15,7 @@ import { mfsSstbFilingReviewSchema } from "./mfs-sstb-review.ts";
 import { inputSchema as patronReviewSchema } from "../../../deductions/business/qbi_patron/schema.ts";
 import { itemSchema as patrItemSchema } from "../f1099patr/schema.ts";
 import { z } from "zod";
+import { roundWholeDollars } from "../../../../../whole-dollars.ts";
 import {
   type AtRiskNet,
   calculateSimplifiedAtRiskLoss,
@@ -91,8 +96,8 @@ export const itemSchema = z.object({
   disposed_of_business: z.boolean().optional(),
   multi_form_code: z.string().optional(),
   llc_number: z.number().int().min(1).max(999).optional(),
-  // A positive interest deduction needs an affirmative section 163(j)
-  // determination. An absent flag is not evidence of an exemption.
+  // Prior-year receipts for the section 163(j) small-business exemption.
+  // Without them, line 1 receipts at or under the threshold are exempt.
   subject_to_163j: z.never().optional(),
   section163j_small_business_exemption: z.object({
     prior_three_year_gross_receipts: z.tuple([
@@ -181,7 +186,17 @@ export const itemSchema = z.object({
     // Reconciled to the retained investment portfolio, including positive dividends.
     qualified_dividends_zero_confirmed: z.boolean(),
     no_qualified_property_confirmed: z.literal(true),
-    no_adjustments_beyond_filed_half_se_tax_confirmed: z.literal(true),
+    no_adjustments_beyond_filed_half_se_tax_confirmed: z.literal(true).optional(),
+    // A qualified owner retirement deduction also reduces QBI (i8995,
+    // Determining Your Qualified Business Income). Attribute the computed
+    // deduction to this sole business rather than waiving the source review.
+    retirement_plan_deduction_review: z.object({
+      owner_ssn: z.string().regex(/^\d{9}$/),
+      business_reference: z.string().trim().min(1),
+      deduction_amount: z.number().int().positive(),
+      source_document_reference: z.string().trim().min(1),
+      no_other_qbi_adjustments_confirmed: z.literal(true),
+    }).strict().optional(),
     review_reference: z.string().trim().min(1),
     reviewed_by: z.string().trim().min(1),
     reviewed_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((date) => {
@@ -190,6 +205,16 @@ export const itemSchema = z.object({
         parsed.toISOString().slice(0, 10) === date && date >= "2025-12-31";
     }, "Expected a real post-year-end review date"),
   }).strict().superRefine((review, ctx) => {
+    if (
+      (review.no_adjustments_beyond_filed_half_se_tax_confirmed === true) ===
+        (review.retirement_plan_deduction_review !== undefined)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "Provide exactly one half-SE-only or attributable retirement deduction review",
+      });
+    }
     if (
       (review.accounting_sstb_confirmed === true) ===
         (review.service_classification_review !== undefined)
@@ -268,6 +293,11 @@ export const itemSchema = z.object({
     ).min(1),
   }).strict().optional(),
   line_13_depreciation: z.number().nonnegative().optional(),
+  // Assets placed in service before the return year (Pub. 946 tables);
+  // their deduction is added to this depreciation line.
+  prior_year_assets: z.array(priorYearAssetSchema).min(1).optional(),
+  prior_year_depreciation_rows: z.array(priorYearDepreciationRowSchema)
+    .optional(),
   donated_natural_resource_property_source:
     charitableNaturalResourceSourceSchema.optional(),
   donated_depreciable_property_source: charitableDepreciationSourceSchema
@@ -287,6 +317,9 @@ export const itemSchema = z.object({
   line_24a_travel: z.number().nonnegative().optional(),
   line_24b_meals: z.number().nonnegative().optional(),
   meals_dot_worker: z.boolean().optional(), // DOT hours-of-service → 80% meals
+  // Meals eaten during DOT hours-of-service duty, 80% deductible beside the
+  // line_24b_meals amount at its own rate (IRC 274(n)(3)).
+  line_24b_meals_dot_hours_of_service: z.number().nonnegative().optional(),
   meals_as_wages: z.boolean().optional(), // Meals treated as wages → 100%
   line_25_utilities: z.number().nonnegative().optional(),
   // Gross payroll before the Form 5884 and other employment-credit reductions.
@@ -429,7 +462,7 @@ export const inputSchema = z.object({
           refund_transaction_id: z.string().trim().min(1),
           amount: z.number().int().positive(),
           refund_record_reference: z.string().trim().min(1),
-          issued_in_2025: z.literal(true),
+          issued_in_tax_year: z.literal(true),
           same_business_sale: z.literal(true),
           not_claimed_elsewhere: z.literal(true),
         }).strict(),
@@ -581,9 +614,35 @@ export function projectSection481aScheduleCItems(
   });
 }
 
-export function projectScheduleCItems(
+/** Fold the auto_expense worksheet amount into the business's line 9.
+ * Schedule C instructions, line 9: the standard mileage rate or the
+ * business share of actual costs is the line 9 car and truck expense. */
+export function foldCarTruckWorksheet(
   input: z.infer<typeof inputSchema>,
+): z.infer<typeof inputSchema> {
+  const worksheet = input.line_9_car_truck_expenses ?? 0;
+  if (worksheet === 0) return input;
+  if (input.schedule_cs.length !== 1) {
+    throw new Error(
+      "auto_expense Schedule C car and truck expense needs exactly one Schedule C business",
+    );
+  }
+  const item = input.schedule_cs[0];
+  return {
+    ...input,
+    line_9_car_truck_expenses: undefined,
+    schedule_cs: [{
+      ...item,
+      line_9_car_truck_expenses: (item.line_9_car_truck_expenses ?? 0) +
+        worksheet,
+    }],
+  };
+}
+
+export function projectScheduleCItems(
+  rawInput: z.infer<typeof inputSchema>,
 ): ScheduleCItem[] {
+  const input = foldCarTruckWorksheet(rawInput);
   const rawItems = projectSection481aScheduleCItems(input).map((item) =>
     item.donated_natural_resource_property_source
       ? itemSchema.parse({
@@ -680,8 +739,9 @@ export function projectScheduleCItems(
 }
 
 export function projectForm8829ScheduleCItems(
-  input: z.infer<typeof inputSchema>,
+  rawInput: z.infer<typeof inputSchema>,
 ): ScheduleCItem[] {
+  const input = foldCarTruckWorksheet(rawInput);
   const claim = input.form8829_line30;
   if (!claim) return input.schedule_cs;
   if (
@@ -691,7 +751,6 @@ export function projectForm8829ScheduleCItems(
     (input.line1_gross_receipts ?? 0) > 0 ||
     (input.statutory_wages ?? 0) > 0 ||
     (input.line16a_interest_mortgage ?? 0) > 0 ||
-    (input.line_9_car_truck_expenses ?? 0) > 0 ||
     (input.line_12_depletion ?? 0) > 0
   ) {
     throw new Error(
@@ -707,12 +766,14 @@ export function projectForm8829ScheduleCItems(
     item.home_office_method === "simplified" ||
     item.home_office_sq_ft !== undefined ||
     item.home_total_sq_ft !== undefined ||
-    (item.line_15_insurance ?? 0) > 0 ||
+    // Line 15 business insurance and Part V other expenses are not expenses
+    // of the home, so they stay on Schedule C beside Form 8829 (Form 8829
+    // instructions, lines 8 and 18-22: the home's insurance and other
+    // expenses are entered there; Schedule C instructions, lines 15 and 27a).
     (item.line_20b_rent_other ?? 0) > 0 ||
     (item.line_21_repairs ?? 0) > 0 ||
     (item.line_25_utilities ?? 0) > 0 ||
     (item.line_27b_other_expenses ?? 0) > 0 ||
-    (item.part_v_other_expenses?.length ?? 0) > 0 ||
     computeGrossIncome(item) - computeTotalExpenses(item) !==
       claim.schedule_c_line29_tentative_profit
   ) {
@@ -732,10 +793,17 @@ export function assertScheduleCInterestExempt(
     (item.line_16b_interest_other ?? 0);
   if (interest === 0) return;
   const exemption = item.section163j_small_business_exemption;
+  // Form 8990 instructions, Who Must File: a taxpayer meeting the section
+  // 448(c) gross-receipts test is exempt and files no Form 8990. Without
+  // prior-year receipts, a sole proprietor's line 1 receipts stand for the
+  // average; receipts over the threshold still need the reviewed history.
   if (!exemption) {
-    throw new Error(
-      "Schedule C interest needs documented section 163(j) exemption; Form 8990 ATI is not yet reconciled",
-    );
+    if (item.line_1_gross_receipts > threshold) {
+      throw new Error(
+        "Schedule C interest needs documented section 163(j) exemption; Form 8990 ATI is not yet reconciled",
+      );
+    }
+    return;
   }
   const receipts = exemption.prior_three_year_gross_receipts;
   const average = (receipts[0] + receipts[1] + receipts[2]) / 3;
@@ -768,6 +836,13 @@ export function mealsDeductiblePct(item: ScheduleCItem): number {
   if (item.meals_as_wages === true) return MEALS_WAGES_PCT;
   if (item.meals_dot_worker === true) return MEALS_DOT_PCT;
   return MEALS_STANDARD_PCT;
+}
+
+/** Schedule C line 24b: each meals amount at its own deductible rate
+ * (Schedule C instructions, line 24b; IRC 274(n)(1) and (n)(3)). */
+export function deductibleMeals(item: ScheduleCItem): number {
+  return (item.line_24b_meals ?? 0) * mealsDeductiblePct(item) +
+    (item.line_24b_meals_dot_hours_of_service ?? 0) * MEALS_DOT_PCT;
 }
 
 export function homeOfficeDeduction(
@@ -1048,7 +1123,7 @@ export function computeTotalExpenses(
   item: ScheduleCItem,
   wotcReduction = 0,
 ): number {
-  const mealsDeductible = (item.line_24b_meals ?? 0) * mealsDeductiblePct(item);
+  const mealsDeductible = deductibleMeals(item);
   const partVTotal = item.donated_natural_resource_property_source
     ? naturalResourceCurrentCosts(item)
     : (item.part_v_other_expenses ?? []).reduce(
@@ -1095,6 +1170,16 @@ export function computeNetProfit(
   return item.professional_gambler === true
     ? Math.max(0, rawProfit)
     : rawProfit;
+}
+
+/**
+ * Schedule 1 line 3. Each attached Schedule C rounds its own line 31, so with
+ * several of them line 3 adds those whole-dollar amounts (MeF S1-F1040-195).
+ */
+export function scheduleCSchedule1Line3(netProfits: readonly number[]): number {
+  return netProfits.length > 1
+    ? netProfits.reduce((sum, profit) => sum + roundWholeDollars(profit), 0)
+    : netProfits.reduce((sum, profit) => sum + profit, 0);
 }
 
 export function isSeExempt(item: ScheduleCItem): boolean {

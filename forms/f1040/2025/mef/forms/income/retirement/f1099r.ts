@@ -11,6 +11,7 @@ import {
 import { TS } from "../../../../../nodes/types.ts";
 import type { MefBuildContext, MefFormDescriptor } from "../../../form-descriptor.ts";
 import { assert1099RRecipientOwner } from "../../../../domains/income/retirement/f1099r/f1099r-recipient-owner.ts";
+import { mefTaxYear } from "../../../support/year-config.ts";
 
 type Item = z.infer<typeof itemSchema>;
 
@@ -189,7 +190,11 @@ export const f1099r: MefFormDescriptor<"f1099r", Fields, readonly string[]> = {
   pdfUrl: "https://www.irs.gov/pub/irs-pdf/f1099r.pdf",
   build(fields, context) {
     const substitutes =
-      form4852NativeSources(context?.pending, context?.filer).f1099rs;
+      form4852NativeSources(
+        context?.pending,
+        context?.filer,
+        mefTaxYear(context),
+      ).f1099rs;
     const allSources = [...(fields.f1099rs ?? []), ...substitutes];
     if (allSources.length === 0) return [];
     if (
@@ -204,7 +209,11 @@ export const f1099r: MefFormDescriptor<"f1099r", Fields, readonly string[]> = {
       );
     }
     assertDistinct1099RCopies(allSources);
-    assert1099RRecipientOwner({ f1099rs: allSources }, context?.filer);
+    assert1099RRecipientOwner(
+      { f1099rs: allSources },
+      context?.filer,
+      mefTaxYear(context),
+    );
     return allSources.map((item, index) =>
       build1099R(item, context ?? {}, index)
     );

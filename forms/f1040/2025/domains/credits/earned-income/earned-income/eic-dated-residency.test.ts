@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import {
   assertEquals,
   assertRejects,
@@ -13,6 +16,7 @@ import { buildMefXml } from "../../../../mef/builder.ts";
 import { buildPdfBytes } from "../../../../pdf/builder.ts";
 import { eitcPdf } from "../../../../pdf/forms/credits/earned-income/eitc.ts";
 import { extractFilerIdentity } from "../../../../../mef/filer.ts";
+import { shiftDatedFacts } from "../../../../../../../scripts/testing/sample-year.ts";
 
 const period = (start: string, end: string) => ({
   start_date: start,
@@ -72,9 +76,9 @@ export function datedResidencyInputs(split = false, dependent = false) {
   };
 }
 
-Deno.test("dated EIC residence distinguishes183 from182days and prints7 while preserving6actualmonths", () => {
-  assertEquals(reviewedEicDatedResidence(child), true);
-  assertEquals(scheduleEicLine6Months(child), 7);
+test("dated EIC residence distinguishes183 from182days and prints7 while preserving6actualmonths", () => {
+  assertEquals(reviewedEicDatedResidence(child, 2025), true);
+  assertEquals(scheduleEicLine6Months(child, 2025), 7);
   for (
     const periods of [
       [period("2025-07-03", "2025-12-31")],
@@ -92,24 +96,24 @@ Deno.test("dated EIC residence distinguishes183 from182days and prints7 while pr
           ...child.eic_dated_residency_review,
           residence_periods: periods,
         },
-      })
+      }, 2025)
     );
   }
   assertThrows(() =>
-    reviewedEicDatedResidence({ ...child, months_lived_with_you_in_us: 7 })
+    reviewedEicDatedResidence({ ...child, months_lived_with_you_in_us: 7 }, 2025)
   );
   assertThrows(() =>
-    reviewedEicDatedResidence({ ...child, months_in_home: 5 })
+    reviewedEicDatedResidence({ ...child, months_in_home: 5 }, 2025)
   );
-  assertThrows(() => reviewedEicDatedResidence({ ...child, ssn: "999887777" }));
+  assertThrows(() => reviewedEicDatedResidence({ ...child, ssn: "999887777" }, 2025));
   assertThrows(() =>
-    reviewedEicDatedResidence({ ...child, dob: "2025-01-01" })
+    reviewedEicDatedResidence({ ...child, dob: "2025-01-01" }, 2025)
   );
 });
 
 for (const dependent of [false, true]) {
   for (const split of [false, true]) {
-    Deno.test(`dated EIC actual full native return ${dependent ? "dependent" : "custodial-release"}/${split ? "split" : "continuous"}`, async () => {
+    test(`dated EIC actual full native return ${dependent ? "dependent" : "custodial-release"}/${split ? "split" : "continuous"}`, async () => {
       const result = f1040_2025.executeReturn(
         datedResidencyInputs(split, dependent),
       );
@@ -131,17 +135,17 @@ for (const dependent of [false, true]) {
         xml,
         "<MonthsChildLivedWithYouCnt>07</MonthsChildLivedWithYouCnt>",
       );
-      const path = await Deno.makeTempFile({
+      const path = await sys.makeTempFile({
         prefix: "opentax-eic-dated-",
         suffix: ".xml",
       });
-      await Deno.writeTextFile(path, xml);
+      await fs.writeFile(path, xml);
       console.log(`EIC_DATED_XML ${path}`);
       const schema = new URL(
-        "../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+        "../../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
         import.meta.url,
       ).pathname;
-      const validation = await new Deno.Command("xmllint", {
+      const validation = await new sys.Command("xmllint", {
         args: ["--noout", "--schema", schema, path],
         stdout: "piped",
         stderr: "piped",
@@ -185,3 +189,12 @@ for (const dependent of [false, true]) {
     });
   }
 }
+
+// Pub. 596: the residency test counts days in the return year, so a 2026
+// return reviews 2026 home periods (183 of 365 days is more than half).
+test("dated EIC residence reads the return year's home periods", () => {
+  const in2026 = shiftDatedFacts(child, 1);
+  assertEquals(reviewedEicDatedResidence(in2026, 2026), true);
+  assertEquals(scheduleEicLine6Months(in2026, 2026), 7);
+  assertThrows(() => reviewedEicDatedResidence(child, 2026));
+});

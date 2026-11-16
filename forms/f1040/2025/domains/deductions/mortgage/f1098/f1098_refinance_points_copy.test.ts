@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { canonicalForm1098CopyDocument } from "../../../../pdf/reviews/deductions/mortgage/review-1098-copy.fixture.ts";
 import { assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { PDFDocument } from "pdf-lib";
@@ -10,7 +13,7 @@ import { pdfReviewFixtures } from "../../../../pdf/review-fixtures.ts";
 
 const base = pdfReviewFixtures.find((item) => item.id === "single-w2-refund")!;
 const xsdPath = new URL(
-  "../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+  "../../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
   import.meta.url,
 ).pathname;
 
@@ -34,7 +37,7 @@ async function issuerCopy(): Promise<Uint8Array> {
   return doc.save();
 }
 
-Deno.test("Schedule A refinance points bind lender Copy B principal and origination", async () => {
+test("Schedule A refinance points bind lender Copy B principal and origination", async () => {
   const bytes = await issuerCopy();
   const hash = Array.from(
     new Uint8Array(
@@ -95,17 +98,17 @@ Deno.test("Schedule A refinance points bind lender Copy B principal and originat
     ),
     true,
   );
-  const xmlPath = await Deno.makeTempFile({ suffix: ".xml" });
+  const xmlPath = await sys.makeTempFile({ suffix: ".xml" });
   try {
-    await Deno.writeTextFile(xmlPath, bundle.xml);
-    const checked = await new Deno.Command("xmllint", {
+    await fs.writeFile(xmlPath, bundle.xml);
+    const checked = await new sys.Command("xmllint", {
       args: ["--noout", "--schema", xsdPath, xmlPath],
       stdout: "piped",
       stderr: "piped",
     }).output();
     assertEquals(checked.code, 0, new TextDecoder().decode(checked.stderr));
   } finally {
-    await Deno.remove(xmlPath);
+    await sys.remove(xmlPath);
   }
   const filled = await buildPdfBytes(
     bundle.pending,
@@ -114,10 +117,10 @@ Deno.test("Schedule A refinance points bind lender Copy B principal and originat
     bundle,
   );
   assertEquals((await PDFDocument.load(filled)).getPageCount(), 3);
-  const pdfPath = await Deno.makeTempFile({ suffix: ".pdf" });
+  const pdfPath = await sys.makeTempFile({ suffix: ".pdf" });
   try {
-    await Deno.writeFile(pdfPath, filled);
-    const extracted = await new Deno.Command("pdftotext", {
+    await fs.writeFile(pdfPath, filled);
+    const extracted = await new sys.Command("pdftotext", {
       args: ["-layout", pdfPath, "-"],
       stdout: "piped",
       stderr: "piped",
@@ -128,7 +131,7 @@ Deno.test("Schedule A refinance points bind lender Copy B principal and originat
       true,
     );
   } finally {
-    await Deno.remove(pdfPath);
+    await sys.remove(pdfPath);
   }
 
   const withoutCopy = {

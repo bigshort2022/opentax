@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import { buildForm2210FBoxB, form2210f } from "./f2210f_box_b.ts";
 import {
@@ -48,12 +49,12 @@ function source() {
     current_line4_refundable_credits_excluding_schedule3_line11: 1_000,
     current_withholding: 1_000,
     current_excess_social_security_or_rrta_withholding: 0,
-    estimated_payments_by_2026_01_15: 1_000,
+    estimated_payments_by_january_15: 1_000,
     full_underpayment_paid_on: null,
   });
 }
 
-Deno.test("Form 2210-F box B local XML follows TY2025 element order and amounts", () => {
+test("Form 2210-F box B local XML follows TY2025 element order and amounts", () => {
   const xml = buildForm2210FBoxB(source());
   assert(xml.startsWith("<IRS2210F>"));
   assert(xml.includes("<JointReturnInd>X</JointReturnInd>"));
@@ -68,14 +69,14 @@ Deno.test("Form 2210-F box B local XML follows TY2025 element order and amounts"
   assertEquals(xml.indexOf("<JointReturnInd>"), xml.indexOf("<IRS2210F>") + 10);
 });
 
-Deno.test("Form 2210-F box B local XML omits Part III when no penalty is due", () => {
+test("Form 2210-F box B local XML omits Part III when no penalty is due", () => {
   const xml = buildForm2210FBoxB({ ...source(), current_withholding: 8_000 });
   assert(xml.includes("<UnderpaymentAmt>0</UnderpaymentAmt>"));
   assert(!xml.includes("<PenaltyAmt>"));
   assert(!xml.includes("<EarlierOfPaymentOrTaxDueDt>"));
 });
 
-Deno.test("Form 2210-F box B local XML rejects unsourced eligibility", () => {
+test("Form 2210-F box B local XML rejects unsourced eligibility", () => {
   const input = source();
   assertThrows(() =>
     buildForm2210FBoxB({
@@ -94,16 +95,16 @@ Deno.test("Form 2210-F box B local XML rejects unsourced eligibility", () => {
       ...input,
       current_return_reference:
         input.prior_separate_returns[1].filed_return_reference,
-    }), Error, "distinct filed 2024 taxpayer, spouse, and 2025 joint returns"
+    }), Error, "distinct filed prior-year taxpayer and spouse returns"
   );
 });
 
-Deno.test("registered Form 2210-F checks finalized 1040 and filed worksheet", () => {
+test("registered Form 2210-F checks finalized 1040 and filed worksheet", () => {
   const zeroTaxSource = {
     ...source(),
     current_included_schedule2_taxes: 0,
     current_line4_refundable_credits_excluding_schedule3_line11: 0,
-    estimated_payments_by_2026_01_15: 0,
+    estimated_payments_by_january_15: 0,
   };
   const lines = calculateForm2210FBoxB(zeroTaxSource);
   const fields = { source: zeroTaxSource, filed_lines: lines };

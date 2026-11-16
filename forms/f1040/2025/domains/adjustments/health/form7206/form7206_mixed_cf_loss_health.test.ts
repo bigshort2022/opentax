@@ -1,3 +1,5 @@
+import { test } from "bun:test";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { pdfReviewFixtures } from "../../../../pdf/review-fixtures.ts";
 import { mixedCfLossHealthFixtures } from "../../../../pdf/reviews/general/composed-returns/review-mixed-cf-loss-health.fixture.ts";
@@ -16,20 +18,20 @@ const fixtures = mixedCfLossHealthFixtures(
   ),
 );
 const expected = [
-  [9600, 460868.37, 21822, 2400, 111277],
-  [181669, 288799.37, 0, 2400, 74182],
-  [0, 470468.37, 20032, 2400, 114922],
-  [6000, 475386.37, 18972, 2400, 94998],
-  [192587, 288799.37, 0, 2400, 52346],
-  [0, 481386.37, 17548, 2400, 97374],
+  [9600, 460868, 21822, 2400, 111277],
+  [181669, 288799, 0, 2400, 74182],
+  [0, 470468, 20032, 2400, 114922],
+  [6000, 475386, 18972, 2400, 94998],
+  [192587, 288799, 0, 2400, 52346],
+  [0, 481386, 17548, 2400, 97374],
 ];
-Deno.test("actual mixed C/F loss-owner established plans settle source SE health QBI current credit full XSD PDF", async () => {
+test("actual mixed C/F loss-owner established plans settle source SE health QBI current credit full XSD PDF", async () => {
   assertEquals(fixtures.length, 6);
   for (const [index, f] of fixtures.entries()) {
     const r = f1040_2025.executeReturn(f.inputs),
       p = normalizeAllPending(r.pending) as any;
     assertEquals(r.diagnostics, []);
-    const h = assertIndependentOwnerHealth(p, f.filer);
+    const h = assertIndependentOwnerHealth(p, 2025, f.filer);
     assertEquals([
       h.deduction,
       p.f1040.line11_agi,
@@ -79,11 +81,11 @@ Deno.test("actual mixed C/F loss-owner established plans settle source SE health
         true,
       );
     }
-    const child = new Deno.Command("xmllint", {
+    const child = new sys.Command("xmllint", {
       args: [
         "--noout",
         "--schema",
-        ".state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+        "irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
         "-",
       ],
       stdin: "piped",
@@ -103,7 +105,7 @@ Deno.test("actual mixed C/F loss-owner established plans settle source SE health
     assertEquals((await prep.renderPdf()).length > 0, true);
   }
 });
-Deno.test("mixed C/F loss-owner source capacities and retained source records reject public native PDF conflicts", async () => {
+test("mixed C/F loss-owner source capacities and retained source records reject public native PDF conflicts", async () => {
   for (const f of [fixtures[0], fixtures[3]]) {
     for (
       const mutate of [
@@ -160,7 +162,7 @@ Deno.test("mixed C/F loss-owner source capacities and retained source records re
       const p = structuredClone(original);
       mutate(p);
       await assertRejects(() => f1040_2025.prepareReturn(p, f.filer));
-      assertThrows(() => assertIndependentOwnerHealth(p, f.filer));
+      assertThrows(() => assertIndependentOwnerHealth(p, 2025, f.filer));
       assertThrows(() =>
         form7206.build(p.form7206 as any, { pending: p, filer: f.filer })
       );

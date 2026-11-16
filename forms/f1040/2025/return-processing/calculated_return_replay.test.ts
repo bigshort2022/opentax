@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals } from "@std/assert";
 import { buildMefBundle } from "../mef/builder.ts";
 import { f1040_2025 } from "../index.ts";
@@ -8,17 +9,16 @@ import { pdfReviewFixtures } from "../pdf/review-fixtures.ts";
 // preparation. Keep exclusions explicit so a newly guarded fixture cannot
 // silently shrink the replay audit.
 const guardedFixtureIds = new Set([
-  "single-8862-ctc-reinstatement",
-  "single-withheld-w2g",
-  "single-new-markets-business-credit",
-  "single-long-name-new-markets-investment",
-  "single-two-new-markets-investments",
-  "single-six-new-markets-investments",
-  "single-seven-new-markets-investments",
-  "single-twenty-four-new-markets-investments",
-  "single-geothermal-and-new-markets-credits",
-  "single-partnership-code-k-and-w2g",
-  "single-form461-schedule-c-excess-business-loss",
+  // Frozen copies of retained packets that predate the issued health-policy
+  // and premium records the Form 7206 guard requires.
+  "tip-health-mfj-fully-phased-out",
+  "tip-health-mfj-owned-cap-phaseout",
+  "tip-health-mfj-primary-health-limited",
+  "tip-health-single-fully-phased-out",
+  "tip-health-single-health-income-limited",
+  "tip-health-single-positive-health",
+  "tip-health-single-tip-netincome-limited",
+  "tip-health-single-w2-qbi-binding",
 ]);
 const calculatedKeys = [
   "f1040",
@@ -37,7 +37,7 @@ function stableXml(xml: string): string {
   );
 }
 
-Deno.test("calculated Form 1040 and Schedule 1-3 amounts cannot change native XML without source replay", async () => {
+test("calculated Form 1040 and Schedule 1-3 amounts cannot change native XML without source replay", async () => {
   const seen = new Set<string>();
   let checkedFixtures = 0;
   let checkedAmounts = 0;

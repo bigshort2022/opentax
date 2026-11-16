@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import { FilingStatus } from "../../../../../types.ts";
 import {
@@ -18,18 +19,18 @@ const dividends: ScheduleJPreferentialLine4Facts = {
   rate28Gain: 0,
 };
 
-Deno.test("2025 Schedule J line 4 computes current-year QDCG tax on line 3", () => {
+test("2025 Schedule J line 4 computes current-year QDCG tax on line 3", () => {
   // The ordinary $35,000 uses the 2025 Tax Table. Of the $15,000 preferred
   // income, $13,350 is within the 0% ceiling and $1,650 is taxed at 15%.
-  assertEquals(calculateScheduleJPreferentialLine4(dividends), 4_213);
+  assertEquals(calculateScheduleJPreferentialLine4(dividends, 2025), 4_213);
 });
 
-Deno.test("2025 Schedule J line 4 does not silently omit Form 4952 or special-rate gains", () => {
+test("2025 Schedule J line 4 does not silently omit Form 4952 or special-rate gains", () => {
   assertThrows(
     () => calculateScheduleJPreferentialLine4({
       ...dividends,
       form4952Line4g: 1_000,
-    }),
+    }, 2025),
     Error,
     "cannot omit Form 4952",
   );
@@ -37,18 +38,18 @@ Deno.test("2025 Schedule J line 4 does not silently omit Form 4952 or special-ra
     () => calculateScheduleJPreferentialLine4({
       ...dividends,
       unrecaptured1250Gain: 100,
-    }),
+    }, 2025),
     Error,
     "cannot omit Form 4952",
   );
 });
 
-Deno.test("2025 Schedule J line 4 preserves the 0% capital-gain band", () => {
+test("2025 Schedule J line 4 preserves the 0% capital-gain band", () => {
   assertEquals(calculateScheduleJPreferentialLine4({
     ...dividends,
     scheduleJLine3: 40_000,
     netCapitalGain: 0,
-  }), 3_365);
+  }, 2025), 3_365);
 });
 
 const scheduleD: ScheduleJPreferentialLine4Facts = {
@@ -66,17 +67,17 @@ const scheduleD: ScheduleJPreferentialLine4Facts = {
   form4952Line4e: 0,
 };
 
-Deno.test("2025 Schedule J line 4 computes Schedule D special-rate tax", () => {
+test("2025 Schedule J line 4 computes Schedule D special-rate tax", () => {
   // The 2025 Tax Table gives $14,720 at $90,000, plus $1,500 at 15%.
-  assertEquals(calculateScheduleJPreferentialLine4(scheduleD), 16_220);
+  assertEquals(calculateScheduleJPreferentialLine4(scheduleD, 2025), 16_220);
 });
 
-Deno.test("2025 Schedule J line 4 closes elected capital-gain cases without a source rule", () => {
+test("2025 Schedule J line 4 closes elected capital-gain cases without a source rule", () => {
   assertThrows(
     () => calculateScheduleJPreferentialLine4({
       ...dividends,
       electedFarmNetCapitalGain: 1_000,
-    }),
+    }, 2025),
     Error,
     "explicit current-year elected-gain worksheet rule",
   );
@@ -84,7 +85,7 @@ Deno.test("2025 Schedule J line 4 closes elected capital-gain cases without a so
     () => calculateScheduleJPreferentialLine4({
       ...scheduleD,
       electedFarmNetCapitalGain: 1_000,
-    }),
+    }, 2025),
     Error,
     "explicit current-year elected-gain worksheet rule",
   );

@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { PDFDocument } from "pdf-lib";
 import { canonicalForm1098CopyDocument } from "../../../../pdf/reviews/deductions/mortgage/review-1098-copy.fixture.ts";
@@ -10,13 +13,12 @@ import { buildPdfBytes } from "../../../../pdf/builder.ts";
 import { inputSchema } from "../../../../../nodes/inputs/deductions/mortgage/f1098/index.ts";
 import { cashoutRefinanceRatio, cashoutRefinanceReviewSchema } from "../../../../../nodes/inputs/deductions/mortgage/f1098/cashout_refinance.ts";
 import {
-  inputSchema as pointsInputSchema,
   refinancePointsDeduction,
 } from "../../../../../nodes/inputs/deductions/mortgage/mortgage_refinance_points/index.ts";
 
 const base = pdfReviewFixtures.find((item) => item.id === "single-w2-refund")!;
 const xsdPath = new URL(
-  "../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+  "../../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
   import.meta.url,
 ).pathname;
 
@@ -88,7 +90,7 @@ async function source(refinanceMonth = 7) {
     0,
   );
   const qualifiedNew = newMonths.reduce(
-    (sum, row, index) =>
+    (sum, _row, index) =>
       sum + Math.min(200_000, 250_000 - 10_000 * (index + 1)),
     0,
   );
@@ -186,7 +188,7 @@ async function source(refinanceMonth = 7) {
   };
 }
 
-Deno.test("cash-out refinance uses lender secured months for old debt and annual mixed-use balances for new debt", async () => {
+test("cash-out refinance uses lender secured months for old debt and annual mixed-use balances for new debt", async () => {
   for (const month of [7, 4]) {
     const data = await source(month);
     const parsed = inputSchema.parse({
@@ -226,17 +228,17 @@ Deno.test("cash-out refinance uses lender secured months for old debt and annual
       bundle.xml.includes("<HomeMortgNotUsedInd>X</HomeMortgNotUsedInd>"),
       true,
     );
-    const xmlPath = await Deno.makeTempFile({ suffix: ".xml" });
+    const xmlPath = await sys.makeTempFile({ suffix: ".xml" });
     try {
-      await Deno.writeTextFile(xmlPath, bundle.xml);
-      const checked = await new Deno.Command("xmllint", {
+      await fs.writeFile(xmlPath, bundle.xml);
+      const checked = await new sys.Command("xmllint", {
         args: ["--noout", "--schema", xsdPath, xmlPath],
         stdout: "piped",
         stderr: "piped",
       }).output();
       assertEquals(checked.code, 0, new TextDecoder().decode(checked.stderr));
     } finally {
-      await Deno.remove(xmlPath);
+      await sys.remove(xmlPath);
     }
     const filled = await buildPdfBytes(
       bundle.pending,
@@ -246,23 +248,19 @@ Deno.test("cash-out refinance uses lender secured months for old debt and annual
     );
     assertEquals((await PDFDocument.load(filled)).getPageCount(), 3);
     let evidenceDir: string | undefined;
-    try {
-      evidenceDir = Deno.env.get("FORM1098_CASHOUT_EVIDENCE_DIR");
-    } catch (error) {
-      if (!(error instanceof Deno.errors.NotCapable)) throw error;
-    }
+    evidenceDir = process.env.FORM1098_CASHOUT_EVIDENCE_DIR;
     if (evidenceDir) {
       const packetDir = `${evidenceDir}/month-${month}`;
-      await Deno.mkdir(packetDir, { recursive: true });
-      await Deno.writeFile(`${packetDir}/return.pdf`, filled);
-      await Deno.writeTextFile(`${packetDir}/return.xml`, bundle.xml);
+      await fs.mkdir(packetDir, { recursive: true });
+      await fs.writeFile(`${packetDir}/return.pdf`, filled);
+      await fs.writeFile(`${packetDir}/return.xml`, bundle.xml);
       for (const [index, item] of data.f1098.entries()) {
-        await Deno.writeFile(
+        await fs.writeFile(
           `${packetDir}/source-1098-${index + 1}.pdf`,
           item.issuer_copy.bytes,
         );
       }
-      await Deno.writeTextFile(
+      await fs.writeFile(
         `${packetDir}/source.json`,
         JSON.stringify(
           {
@@ -328,7 +326,7 @@ Deno.test("cash-out refinance uses lender secured months for old debt and annual
   }
 });
 
-Deno.test("cash-out refinance rejects changed closing, use, payoff, months, and filed interest", async () => {
+test("cash-out refinance rejects changed closing, use, payoff, months, and filed interest", async () => {
   const data = await source();
   const raw = { f1098s: data.f1098, ...data.f1098_cashout_refinance_review };
   const changed = (mutate: (value: typeof raw) => void) => {
@@ -434,13 +432,13 @@ async function sourceWithPoints(month: 4 | 7) {
   return { mortgage, points };
 }
 
-Deno.test("cash-out refinance points use annual Table 1 ratio and actual loan-term payments", async () => {
+test("cash-out refinance points use annual Table 1 ratio and actual loan-term payments", async () => {
   for (const month of [7, 4] as const) {
     const { mortgage, points } = await sourceWithPoints(month);
     // The July fractional ratable points ($133.333...) must survive until
     // the .973 Table 1 multiplication: $129.733... rounds to $130.
     const expectedPoints = month === 7 ? 130 : 146;
-    assertEquals(refinancePointsDeduction(points), expectedPoints);
+    assertEquals(refinancePointsDeduction(points, 2025), expectedPoints);
     const result = f1040_2025.executeReturn({
       ...base.inputs,
       schedule_a: { force_itemized: true },
@@ -457,40 +455,36 @@ Deno.test("cash-out refinance points use annual Table 1 ratio and actual loan-te
     assertEquals(bundle.xml.includes(
       `<Form1098PointsNotReportedAmt>${expectedPoints}</Form1098PointsNotReportedAmt>`,
     ), true);
-    const xmlPath = await Deno.makeTempFile({ suffix: ".xml" });
+    const xmlPath = await sys.makeTempFile({ suffix: ".xml" });
     try {
-      await Deno.writeTextFile(xmlPath, bundle.xml);
-      const checked = await new Deno.Command("xmllint", {
+      await fs.writeFile(xmlPath, bundle.xml);
+      const checked = await new sys.Command("xmllint", {
         args: ["--noout", "--schema", xsdPath, xmlPath],
         stdout: "piped",
         stderr: "piped",
       }).output();
       assertEquals(checked.code, 0, new TextDecoder().decode(checked.stderr));
     } finally {
-      await Deno.remove(xmlPath);
+      await sys.remove(xmlPath);
     }
     const filled = await buildPdfBytes(bundle.pending, filer, ".pdf-cache", bundle);
     assertEquals((await PDFDocument.load(filled)).getPageCount(), 3);
     let dir: string | undefined;
-    try {
-      dir = Deno.env.get("FORM1098_CASHOUT_POINTS_EVIDENCE_DIR");
-    } catch (error) {
-      if (!(error instanceof Deno.errors.NotCapable)) throw error;
-    }
+    dir = process.env.FORM1098_CASHOUT_POINTS_EVIDENCE_DIR;
     if (dir) {
       const packetDir = `${dir}/month-${month}`;
-      await Deno.mkdir(packetDir, { recursive: true });
-      await Deno.writeTextFile(`${packetDir}/source.json`, JSON.stringify({
+      await fs.mkdir(packetDir, { recursive: true });
+      await fs.writeFile(`${packetDir}/source.json`, JSON.stringify({
         f1098: mortgage.f1098,
         f1098_cashout_refinance_review:
           mortgage.f1098_cashout_refinance_review,
         mortgage_refinance_points: points,
       }));
-      await Deno.writeTextFile(`${packetDir}/pending.json`, JSON.stringify(bundle.pending));
-      await Deno.writeTextFile(`${packetDir}/return.xml`, bundle.xml);
-      await Deno.writeFile(`${packetDir}/return.pdf`, filled);
+      await fs.writeFile(`${packetDir}/pending.json`, JSON.stringify(bundle.pending));
+      await fs.writeFile(`${packetDir}/return.xml`, bundle.xml);
+      await fs.writeFile(`${packetDir}/return.pdf`, filled);
       for (const [index, loan] of mortgage.f1098.entries()) {
-        await Deno.writeFile(
+        await fs.writeFile(
           `${packetDir}/source-1098-${index + 1}.pdf`,
           loan.issuer_copy.bytes,
         );
@@ -517,12 +511,12 @@ Deno.test("cash-out refinance points use annual Table 1 ratio and actual loan-te
   }
 });
 
-Deno.test("cash-out points reject missing and conflicting owner, settlement, note and payment records", async () => {
+test("cash-out points reject missing and conflicting owner, settlement, note and payment records", async () => {
   const { points } = await sourceWithPoints(7);
   const changed = (mutate: (value: typeof points) => void) => {
     const value = structuredClone(points);
     mutate(value);
-    assertThrows(() => pointsInputSchema.parse(value));
+    assertThrows(() => refinancePointsDeduction(value, 2025));
   };
   changed((value) => { delete (value as { cashout_source?: unknown }).cashout_source; });
   changed((value) => { value.refinances[0].cashout_points_payment.payer_tin = "999-88-7777"; });
@@ -670,14 +664,14 @@ async function sourceWithImprovement(month: 4 | 7) {
   return { mortgage, points, ratio, totalAllowed, expectedPoints };
 }
 
-Deno.test("one mixed refinance sources home improvement and personal use before interest and points limits", async () => {
+test("one mixed refinance sources home improvement and personal use before interest and points limits", async () => {
   for (const month of [7, 4] as const) {
     const { mortgage, points, ratio, totalAllowed, expectedPoints } =
       await sourceWithImprovement(month);
     assertEquals(ratio, month === 7 ? .975 : .978);
     assertEquals(totalAllowed, month === 7 ? 13_894 : 14_377);
     assertEquals(expectedPoints, month === 7 ? 948 : 968);
-    assertEquals(refinancePointsDeduction(points), expectedPoints);
+    assertEquals(refinancePointsDeduction(points, 2025), expectedPoints);
     const result = f1040_2025.executeReturn({
       ...base.inputs,
       schedule_a: { force_itemized: true },
@@ -697,42 +691,41 @@ Deno.test("one mixed refinance sources home improvement and personal use before 
     assertEquals(bundle.xml.includes(
       `<Form1098PointsNotReportedAmt>${expectedPoints}</Form1098PointsNotReportedAmt>`,
     ), true);
-    const xmlPath = await Deno.makeTempFile({ suffix: ".xml" });
+    const xmlPath = await sys.makeTempFile({ suffix: ".xml" });
     try {
-      await Deno.writeTextFile(xmlPath, bundle.xml);
-      const checked = await new Deno.Command("xmllint", {
+      await fs.writeFile(xmlPath, bundle.xml);
+      const checked = await new sys.Command("xmllint", {
         args: ["--noout", "--schema", xsdPath, xmlPath],
         stdout: "piped", stderr: "piped",
       }).output();
       assertEquals(checked.code, 0, new TextDecoder().decode(checked.stderr));
-    } finally { await Deno.remove(xmlPath); }
+    } finally { await sys.remove(xmlPath); }
     const filled = await buildPdfBytes(bundle.pending, filer, ".pdf-cache", bundle);
     assertEquals((await PDFDocument.load(filled)).getPageCount(), 3);
     let dir: string | undefined;
-    try { dir = Deno.env.get("FORM1098_IMPROVEMENT_EVIDENCE_DIR"); }
-    catch (error) { if (!(error instanceof Deno.errors.NotCapable)) throw error; }
+    dir = process.env.FORM1098_IMPROVEMENT_EVIDENCE_DIR;
     if (dir) {
       const path = `${dir}/month-${month}`;
-      await Deno.mkdir(path, { recursive: true });
-      await Deno.writeTextFile(`${path}/source.json`, JSON.stringify({
+      await fs.mkdir(path, { recursive: true });
+      await fs.writeFile(`${path}/source.json`, JSON.stringify({
         f1098: mortgage.f1098,
         f1098_cashout_refinance_review:
           mortgage.f1098_cashout_refinance_review,
         mortgage_refinance_points: points,
       }));
-      await Deno.writeTextFile(`${path}/pending.json`, JSON.stringify(bundle.pending));
-      await Deno.writeTextFile(`${path}/return.xml`, bundle.xml);
-      await Deno.writeFile(`${path}/return.pdf`, filled);
+      await fs.writeFile(`${path}/pending.json`, JSON.stringify(bundle.pending));
+      await fs.writeFile(`${path}/return.xml`, bundle.xml);
+      await fs.writeFile(`${path}/return.pdf`, filled);
       for (const [index, loan] of mortgage.f1098.entries()) {
-        await Deno.writeFile(`${path}/source-1098-${index + 1}.pdf`,
+        await fs.writeFile(`${path}/source-1098-${index + 1}.pdf`,
           loan.issuer_copy.bytes);
       }
       const invoice = (mortgage.f1098_cashout_refinance_review
         .cashout_refinance_review as Record<string, any>)
         .improvement_use_records[0];
-      await Deno.writeFile(`${path}/${invoice.contractor_invoice_document.file_name}`,
+      await fs.writeFile(`${path}/${invoice.contractor_invoice_document.file_name}`,
         invoice.contractor_invoice_document.bytes);
-      await Deno.writeFile(`${path}/${invoice.contractor_payment_document.file_name}`,
+      await fs.writeFile(`${path}/${invoice.contractor_payment_document.file_name}`,
         invoice.contractor_payment_document.bytes);
     }
     const bad = structuredClone(bundle.pending);
@@ -802,7 +795,7 @@ Deno.test("one mixed refinance sources home improvement and personal use before 
   }
 });
 
-Deno.test("mixed refinance rejects unjoined contractor, property, debt-category and immediate-points evidence", async () => {
+test("mixed refinance rejects unjoined contractor, property, debt-category and immediate-points evidence", async () => {
   const { mortgage, points } = await sourceWithImprovement(7);
   const mortgageRaw = {
     f1098s: mortgage.f1098,
@@ -848,7 +841,7 @@ Deno.test("mixed refinance rejects unjoined contractor, property, debt-category 
   const changedPoints = (mutate: (source: typeof points) => void) => {
     const source = structuredClone(points);
     mutate(source);
-    assertThrows(() => pointsInputSchema.parse(source));
+    assertThrows(() => refinancePointsDeduction(source, 2025));
   };
   changedPoints((source) => {
     ((source.refinances[0] as Record<string, any>).improvement)
@@ -1020,14 +1013,14 @@ async function marriedImprovementSource(status: "mfj" | "mfs") {
   return { mortgage, points, ratio, totalInterest, taxpayer, spouse };
 }
 
-Deno.test("married cash-out refinance uses owner-bound paid interest and separate MFS limit", async () => {
+test("married cash-out refinance uses owner-bound paid interest and separate MFS limit", async () => {
   for (const status of ["mfj", "mfs"] as const) {
     const source = await marriedImprovementSource(status);
     const { mortgage, points, ratio, totalInterest } = source;
     assertEquals(ratio, status === "mfj" ? .987 : .593);
     assertEquals(totalInterest, status === "mfj" ? 25_909 : 15_566);
     assertEquals(
-      refinancePointsDeduction(points),
+      refinancePointsDeduction(points, 2025),
       status === "mfj" ? 642 : 385,
     );
     assertEquals(
@@ -1070,17 +1063,17 @@ Deno.test("married cash-out refinance uses owner-bound paid interest and separat
       ),
       true,
     );
-    const path = await Deno.makeTempFile({ suffix: ".xml" });
+    const path = await sys.makeTempFile({ suffix: ".xml" });
     try {
-      await Deno.writeTextFile(path, bundle.xml);
-      const checked = await new Deno.Command("xmllint", {
+      await fs.writeFile(path, bundle.xml);
+      const checked = await new sys.Command("xmllint", {
         args: ["--noout", "--schema", xsdPath, path],
         stdout: "piped",
         stderr: "piped",
       }).output();
       assertEquals(checked.code, 0, new TextDecoder().decode(checked.stderr));
     } finally {
-      await Deno.remove(path);
+      await sys.remove(path);
     }
     const pdf = await buildPdfBytes(
       bundle.pending,
@@ -1090,15 +1083,11 @@ Deno.test("married cash-out refinance uses owner-bound paid interest and separat
     );
     assertEquals((await PDFDocument.load(pdf)).getPageCount(), 3);
     let evidenceDir: string | undefined;
-    try {
-      evidenceDir = Deno.env.get("FORM1098_MARRIED_EVIDENCE_DIR");
-    } catch (error) {
-      if (!(error instanceof Deno.errors.NotCapable)) throw error;
-    }
+    evidenceDir = process.env.FORM1098_MARRIED_EVIDENCE_DIR;
     if (evidenceDir) {
       const dir = `${evidenceDir}/${status}`;
-      await Deno.mkdir(dir, { recursive: true });
-      await Deno.writeTextFile(
+      await fs.mkdir(dir, { recursive: true });
+      await fs.writeFile(
         `${dir}/source.json`,
         JSON.stringify({
           ...base.inputs,
@@ -1110,14 +1099,14 @@ Deno.test("married cash-out refinance uses owner-bound paid interest and separat
           mortgage_refinance_points: points,
         }),
       );
-      await Deno.writeTextFile(
+      await fs.writeFile(
         `${dir}/pending.json`,
         JSON.stringify(bundle.pending),
       );
-      await Deno.writeTextFile(`${dir}/return.xml`, bundle.xml);
-      await Deno.writeFile(`${dir}/return.pdf`, pdf);
+      await fs.writeFile(`${dir}/return.xml`, bundle.xml);
+      await fs.writeFile(`${dir}/return.pdf`, pdf);
       for (const [index, loan] of mortgage.f1098.entries()) {
-        await Deno.writeFile(
+        await fs.writeFile(
           `${dir}/source-1098-${index + 1}.pdf`,
           loan.issuer_copy.bytes,
         );
@@ -1136,7 +1125,7 @@ Deno.test("married cash-out refinance uses owner-bound paid interest and separat
           review.improvement_use_records[0].contractor_payment_document,
         ] as Array<{ file_name: string; bytes: Uint8Array }>
       ) {
-        await Deno.writeFile(`${dir}/${document.file_name}`, document.bytes);
+        await fs.writeFile(`${dir}/${document.file_name}`, document.bytes);
       }
     }
     const bad = structuredClone(bundle.pending);
@@ -1337,13 +1326,13 @@ async function marriedCrossLoanSource(status: "mfj" | "mfs") {
   return { mortgage, points, ratio, allAllowed, owner, spouse: data.spouse };
 }
 
-Deno.test("mixed cash-out and separate second-home debt share one sourced Table 1 for MFJ and MFS", async () => {
+test("mixed cash-out and separate second-home debt share one sourced Table 1 for MFJ and MFS", async () => {
   for (const status of ["mfj", "mfs"] as const) {
     const { mortgage, points, ratio, allAllowed, spouse } =
       await marriedCrossLoanSource(status);
     assertEquals(ratio, status === "mfj" ? .804 : .402);
     assertEquals(allAllowed, status === "mfj" ? 35_577 : 17_789);
-    assertEquals(refinancePointsDeduction(points), status === "mfj" ? 523 : 261);
+    assertEquals(refinancePointsDeduction(points, 2025), status === "mfj" ? 523 : 261);
     const general = {
       ...(base.inputs.general as Record<string, unknown>),
       filing_status: status,
@@ -1366,29 +1355,28 @@ Deno.test("mixed cash-out and separate second-home debt share one sourced Table 
     const bundle = await buildMefBundle(pending, { filer, attachments: [] });
     assertEquals(bundle.xml.includes(
       `<RptHomeMortgIntAndPointsAmt>${allAllowed}</RptHomeMortgIntAndPointsAmt>`), true);
-    const xmlPath = await Deno.makeTempFile({ suffix: ".xml" });
+    const xmlPath = await sys.makeTempFile({ suffix: ".xml" });
     try {
-      await Deno.writeTextFile(xmlPath, bundle.xml);
-      const checked = await new Deno.Command("xmllint", {
+      await fs.writeFile(xmlPath, bundle.xml);
+      const checked = await new sys.Command("xmllint", {
         args: ["--noout", "--schema", xsdPath, xmlPath],
         stdout: "piped", stderr: "piped",
       }).output();
       assertEquals(checked.code, 0, new TextDecoder().decode(checked.stderr));
-    } finally { await Deno.remove(xmlPath); }
+    } finally { await sys.remove(xmlPath); }
     const pdf = await buildPdfBytes(bundle.pending, filer, ".pdf-cache", bundle);
     assertEquals((await PDFDocument.load(pdf)).getPageCount(), 3);
     let dir: string | undefined;
-    try { dir = Deno.env.get("FORM1098_CROSS_LOAN_EVIDENCE_DIR"); }
-    catch (error) { if (!(error instanceof Deno.errors.NotCapable)) throw error; }
+    dir = process.env.FORM1098_CROSS_LOAN_EVIDENCE_DIR;
     if (dir) {
       const packet = `${dir}/${status}`;
-      await Deno.mkdir(packet, { recursive: true });
-      await Deno.writeTextFile(`${packet}/source.json`, JSON.stringify(inputs));
-      await Deno.writeTextFile(`${packet}/pending.json`, JSON.stringify(bundle.pending));
-      await Deno.writeTextFile(`${packet}/return.xml`, bundle.xml);
-      await Deno.writeFile(`${packet}/return.pdf`, pdf);
+      await fs.mkdir(packet, { recursive: true });
+      await fs.writeFile(`${packet}/source.json`, JSON.stringify(inputs));
+      await fs.writeFile(`${packet}/pending.json`, JSON.stringify(bundle.pending));
+      await fs.writeFile(`${packet}/return.xml`, bundle.xml);
+      await fs.writeFile(`${packet}/return.pdf`, pdf);
       for (const [index, loan] of mortgage.f1098.entries()) {
-        await Deno.writeFile(`${packet}/source-1098-${index + 1}.pdf`, loan.issuer_copy.bytes);
+        await fs.writeFile(`${packet}/source-1098-${index + 1}.pdf`, loan.issuer_copy.bytes);
       }
       const review = mortgage.f1098_cashout_refinance_review
         .cashout_refinance_review as Record<string, any>;
@@ -1400,7 +1388,7 @@ Deno.test("mixed cash-out and separate second-home debt share one sourced Table 
         review.improvement_use_records[0].contractor_invoice_document,
         review.improvement_use_records[0].contractor_payment_document];
       for (const document of documents as Array<{file_name:string;bytes:Uint8Array}>) {
-        await Deno.writeFile(`${packet}/${document.file_name}`, document.bytes);
+        await fs.writeFile(`${packet}/${document.file_name}`, document.bytes);
       }
     }
     const wrongInventory = structuredClone(mortgage);
@@ -1535,13 +1523,13 @@ async function pre2017SecondHomeSource(status: "mfj" | "mfs") {
   return { mortgage, points, ratio, total, spouse: data.spouse };
 }
 
-Deno.test("pre-2017 second-home acquisition debt keeps its separate Table 1 ceiling beside mixed refinance", async () => {
+test("pre-2017 second-home acquisition debt keeps its separate Table 1 ceiling beside mixed refinance", async () => {
   for (const status of ["mfj", "mfs"] as const) {
     const { mortgage, points, ratio, total, spouse } =
       await pre2017SecondHomeSource(status);
     assertEquals(ratio, status === "mfj" ? .558 : .349);
     assertEquals(total, status === "mfj" ? 41_432 : 25_913);
-    assertEquals(refinancePointsDeduction(points), status === "mfj" ? 363 : 227);
+    assertEquals(refinancePointsDeduction(points, 2025), status === "mfj" ? 363 : 227);
     const general = {
       ...(base.inputs.general as Record<string, unknown>),
       filing_status: status,
@@ -1566,29 +1554,28 @@ Deno.test("pre-2017 second-home acquisition debt keeps its separate Table 1 ceil
     const bundle = await buildMefBundle(pending, { filer, attachments: [] });
     assertEquals(bundle.xml.includes(
       `<RptHomeMortgIntAndPointsAmt>${total}</RptHomeMortgIntAndPointsAmt>`), true);
-    const xmlPath = await Deno.makeTempFile({ suffix: ".xml" });
+    const xmlPath = await sys.makeTempFile({ suffix: ".xml" });
     try {
-      await Deno.writeTextFile(xmlPath, bundle.xml);
-      const checked = await new Deno.Command("xmllint", {
+      await fs.writeFile(xmlPath, bundle.xml);
+      const checked = await new sys.Command("xmllint", {
         args: ["--noout", "--schema", xsdPath, xmlPath],
         stdout: "piped", stderr: "piped",
       }).output();
       assertEquals(checked.code, 0, new TextDecoder().decode(checked.stderr));
-    } finally { await Deno.remove(xmlPath); }
+    } finally { await sys.remove(xmlPath); }
     const pdf = await buildPdfBytes(bundle.pending, filer, ".pdf-cache", bundle);
     assertEquals((await PDFDocument.load(pdf)).getPageCount(), 3);
     let dir: string | undefined;
-    try { dir = Deno.env.get("FORM1098_PRE2017_EVIDENCE_DIR"); }
-    catch (error) { if (!(error instanceof Deno.errors.NotCapable)) throw error; }
+    dir = process.env.FORM1098_PRE2017_EVIDENCE_DIR;
     if (dir) {
       const packet = `${dir}/${status}`;
-      await Deno.mkdir(packet, { recursive: true });
-      await Deno.writeTextFile(`${packet}/source.json`, JSON.stringify(inputs));
-      await Deno.writeTextFile(`${packet}/pending.json`, JSON.stringify(bundle.pending));
-      await Deno.writeTextFile(`${packet}/return.xml`, bundle.xml);
-      await Deno.writeFile(`${packet}/return.pdf`, pdf);
+      await fs.mkdir(packet, { recursive: true });
+      await fs.writeFile(`${packet}/source.json`, JSON.stringify(inputs));
+      await fs.writeFile(`${packet}/pending.json`, JSON.stringify(bundle.pending));
+      await fs.writeFile(`${packet}/return.xml`, bundle.xml);
+      await fs.writeFile(`${packet}/return.pdf`, pdf);
       for (const [index, loan] of mortgage.f1098.entries()) {
-        await Deno.writeFile(`${packet}/source-1098-${index + 1}.pdf`, loan.issuer_copy.bytes);
+        await fs.writeFile(`${packet}/source-1098-${index + 1}.pdf`, loan.issuer_copy.bytes);
       }
       const review = mortgage.f1098_cashout_refinance_review
         .cashout_refinance_review as Record<string, any>;
@@ -1600,7 +1587,7 @@ Deno.test("pre-2017 second-home acquisition debt keeps its separate Table 1 ceil
         review.improvement_use_records[0].contractor_invoice_document,
         review.improvement_use_records[0].contractor_payment_document];
       for (const document of documents as Array<{file_name:string;bytes:Uint8Array}>) {
-        await Deno.writeFile(`${packet}/${document.file_name}`, document.bytes);
+        await fs.writeFile(`${packet}/${document.file_name}`, document.bytes);
       }
     }
     const wrongPeriod = structuredClone(mortgage);
@@ -1826,7 +1813,7 @@ async function historicalMultiLienSource(
     packetName: `${postOnMain ? "main-post-" : ""}${status}` };
 }
 
-Deno.test("historical and improvement liens share one five-mortgage Table 1", async () => {
+test("historical and improvement liens share one five-mortgage Table 1", async () => {
   for (const [status, postOnMain] of [
     ["mfj", false], ["mfs", false], ["mfj", true], ["mfs", true],
   ] as const) {
@@ -1851,29 +1838,28 @@ Deno.test("historical and improvement liens share one five-mortgage Table 1", as
     const pending = buildPending(result.pending);
     const filer = extractFilerIdentity(result.pending.f1040)!;
     const bundle = await buildMefBundle(pending, { filer, attachments: [] });
-    const xmlPath = await Deno.makeTempFile({ suffix: ".xml" });
+    const xmlPath = await sys.makeTempFile({ suffix: ".xml" });
     try {
-      await Deno.writeTextFile(xmlPath, bundle.xml);
-      const checked = await new Deno.Command("xmllint", {
+      await fs.writeFile(xmlPath, bundle.xml);
+      const checked = await new sys.Command("xmllint", {
         args: ["--noout", "--schema", xsdPath, xmlPath],
         stdout: "piped", stderr: "piped",
       }).output();
       assertEquals(checked.code, 0, new TextDecoder().decode(checked.stderr));
-    } finally { await Deno.remove(xmlPath); }
+    } finally { await sys.remove(xmlPath); }
     const pdf = await buildPdfBytes(bundle.pending, filer, ".pdf-cache", bundle);
     assertEquals((await PDFDocument.load(pdf)).getPageCount(), 3);
     let dir: string | undefined;
-    try { dir = Deno.env.get("FORM1098_GENERAL_EVIDENCE_DIR"); }
-    catch (error) { if (!(error instanceof Deno.errors.NotCapable)) throw error; }
+    dir = process.env.FORM1098_GENERAL_EVIDENCE_DIR;
     if (dir) {
       const packet = `${dir}/${packetName}`;
-      await Deno.mkdir(packet, { recursive: true });
-      await Deno.writeTextFile(`${packet}/source.json`, JSON.stringify(inputs));
-      await Deno.writeTextFile(`${packet}/pending.json`, JSON.stringify(bundle.pending));
-      await Deno.writeTextFile(`${packet}/return.xml`, bundle.xml);
-      await Deno.writeFile(`${packet}/return.pdf`, pdf);
+      await fs.mkdir(packet, { recursive: true });
+      await fs.writeFile(`${packet}/source.json`, JSON.stringify(inputs));
+      await fs.writeFile(`${packet}/pending.json`, JSON.stringify(bundle.pending));
+      await fs.writeFile(`${packet}/return.xml`, bundle.xml);
+      await fs.writeFile(`${packet}/return.pdf`, pdf);
       for (const [index, loan] of mortgage.f1098.entries()) {
-        await Deno.writeFile(`${packet}/source-1098-${index + 1}.pdf`,
+        await fs.writeFile(`${packet}/source-1098-${index + 1}.pdf`,
           loan.issuer_copy.bytes);
       }
       const review = mortgage.f1098_cashout_refinance_review
@@ -1887,7 +1873,7 @@ Deno.test("historical and improvement liens share one five-mortgage Table 1", as
         review.improvement_use_records[0].contractor_invoice_document,
         review.improvement_use_records[0].contractor_payment_document];
       for (const document of documents) {
-        await Deno.writeFile(`${packet}/${document.file_name}`, document.bytes);
+        await fs.writeFile(`${packet}/${document.file_name}`, document.bytes);
       }
     }
     for (const mutate of [
@@ -2040,7 +2026,7 @@ Deno.test("historical and improvement liens share one five-mortgage Table 1", as
   }
 });
 
-Deno.test("additional lien payoff and dated advances use sourced Table 1 averages", async () => {
+test("additional lien payoff and dated advances use sourced Table 1 averages", async () => {
   const retainedJson = async (name: string, value: unknown) => {
     const bytes = new TextEncoder().encode(JSON.stringify(value));
     const sha256 = Array.from(new Uint8Array(await crypto.subtle.digest(
@@ -2256,29 +2242,28 @@ Deno.test("additional lien payoff and dated advances use sourced Table 1 average
     const pending = buildPending(result.pending);
     const filer = extractFilerIdentity(result.pending.f1040)!;
     const bundle = await buildMefBundle(pending, { filer, attachments: [] });
-    const xmlPath = await Deno.makeTempFile({ suffix: ".xml" });
+    const xmlPath = await sys.makeTempFile({ suffix: ".xml" });
     try {
-      await Deno.writeTextFile(xmlPath, bundle.xml);
-      const checked = await new Deno.Command("xmllint", {
+      await fs.writeFile(xmlPath, bundle.xml);
+      const checked = await new sys.Command("xmllint", {
         args: ["--noout", "--schema", xsdPath, xmlPath],
         stdout: "piped", stderr: "piped",
       }).output();
       assertEquals(checked.code, 0, new TextDecoder().decode(checked.stderr));
-    } finally { await Deno.remove(xmlPath); }
+    } finally { await sys.remove(xmlPath); }
     const pdf = await buildPdfBytes(bundle.pending, filer, ".pdf-cache", bundle);
     assertEquals((await PDFDocument.load(pdf)).getPageCount(), 3);
     let dir: string | undefined;
-    try { dir = Deno.env.get("FORM1098_PAYOFF_ADVANCE_EVIDENCE_DIR"); }
-    catch (error) { if (!(error instanceof Deno.errors.NotCapable)) throw error; }
+    dir = process.env.FORM1098_PAYOFF_ADVANCE_EVIDENCE_DIR;
     if (dir) {
       const packet = `${dir}/${scenario}`;
-      await Deno.mkdir(packet, { recursive: true });
-      await Deno.writeTextFile(`${packet}/source.json`, JSON.stringify(inputs));
-      await Deno.writeTextFile(`${packet}/pending.json`, JSON.stringify(bundle.pending));
-      await Deno.writeTextFile(`${packet}/return.xml`, bundle.xml);
-      await Deno.writeFile(`${packet}/return.pdf`, pdf);
+      await fs.mkdir(packet, { recursive: true });
+      await fs.writeFile(`${packet}/source.json`, JSON.stringify(inputs));
+      await fs.writeFile(`${packet}/pending.json`, JSON.stringify(bundle.pending));
+      await fs.writeFile(`${packet}/return.xml`, bundle.xml);
+      await fs.writeFile(`${packet}/return.pdf`, pdf);
       for (const [index, source] of mortgage.f1098.entries()) {
-        await Deno.writeFile(`${packet}/source-1098-${index + 1}.pdf`,
+        await fs.writeFile(`${packet}/source-1098-${index + 1}.pdf`,
           source.issuer_copy.bytes);
       }
       const records = [review.qualified_home_inventory_document,
@@ -2294,7 +2279,7 @@ Deno.test("additional lien payoff and dated advances use sourced Table 1 average
         review.improvement_use_records[0].contractor_invoice_document,
         review.improvement_use_records[0].contractor_payment_document];
       for (const record of records as Array<{file_name: string; bytes: Uint8Array}>) {
-        await Deno.writeFile(`${packet}/${record.file_name}`, record.bytes);
+        await fs.writeFile(`${packet}/${record.file_name}`, record.bytes);
       }
     }
     if (scenario === "before") continue;
@@ -2334,7 +2319,7 @@ Deno.test("additional lien payoff and dated advances use sourced Table 1 average
   }
 });
 
-Deno.test("July 15 refinance retains both lender periods and five paid points installments", async () => {
+test("July 15 refinance retains both lender periods and five paid points installments", async () => {
   const { mortgage, points } = await sourceWithPoints(7);
   const old = mortgage.f1098[0];
   const fresh = mortgage.f1098[1];
@@ -2469,7 +2454,7 @@ Deno.test("July 15 refinance retains both lender periods and five paid points in
     mortgage_refinance_points: points };
   assertEquals(inputSchema.parse({ f1098s: mortgage.f1098,
     ...mortgage.f1098_cashout_refinance_review }).f1098s.length, 2);
-  assertEquals(refinancePointsDeduction(points), 106);
+  assertEquals(refinancePointsDeduction(points, 2025), 106);
   const result = f1040_2025.executeReturn(inputs);
   assertEquals(result.diagnostics, []);
   assertEquals(result.pending.schedule_a?.line_8a_mortgage_interest_1098,
@@ -2478,35 +2463,34 @@ Deno.test("July 15 refinance retains both lender periods and five paid points in
   const filer = extractFilerIdentity(result.pending.f1040)!;
   const bundle = await buildMefBundle(buildPending(result.pending),
     { filer, attachments: [] });
-  const xmlPath = await Deno.makeTempFile({ suffix: ".xml" });
+  const xmlPath = await sys.makeTempFile({ suffix: ".xml" });
   try {
-    await Deno.writeTextFile(xmlPath, bundle.xml);
-    const checked = await new Deno.Command("xmllint", {
+    await fs.writeFile(xmlPath, bundle.xml);
+    const checked = await new sys.Command("xmllint", {
       args: ["--noout", "--schema", xsdPath, xmlPath],
       stdout: "piped", stderr: "piped",
     }).output();
     assertEquals(checked.code, 0, new TextDecoder().decode(checked.stderr));
-  } finally { await Deno.remove(xmlPath); }
+  } finally { await sys.remove(xmlPath); }
   const pdf = await buildPdfBytes(bundle.pending, filer, ".pdf-cache", bundle);
   assertEquals((await PDFDocument.load(pdf)).getPageCount(), 3);
   let dir: string | undefined;
-  try { dir = Deno.env.get("FORM1098_MIDMONTH_EVIDENCE_DIR"); }
-  catch (error) { if (!(error instanceof Deno.errors.NotCapable)) throw error; }
+  dir = process.env.FORM1098_MIDMONTH_EVIDENCE_DIR;
   if (dir) {
-    await Deno.mkdir(dir, { recursive: true });
-    await Deno.writeTextFile(`${dir}/source.json`, JSON.stringify(inputs));
-    await Deno.writeTextFile(`${dir}/pending.json`, JSON.stringify(bundle.pending));
-    await Deno.writeTextFile(`${dir}/return.xml`, bundle.xml);
-    await Deno.writeFile(`${dir}/return.pdf`, pdf);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(`${dir}/source.json`, JSON.stringify(inputs));
+    await fs.writeFile(`${dir}/pending.json`, JSON.stringify(bundle.pending));
+    await fs.writeFile(`${dir}/return.xml`, bundle.xml);
+    await fs.writeFile(`${dir}/return.pdf`, pdf);
     for (const [index, loan] of mortgage.f1098.entries()) {
-      await Deno.writeFile(`${dir}/source-1098-${index + 1}.pdf`,
+      await fs.writeFile(`${dir}/source-1098-${index + 1}.pdf`,
         loan.issuer_copy.bytes);
     }
     for (const doc of [review.midmonth_lender_ledger_document,
       review.midmonth_closing_document, review.midmonth_old_payoff_document,
       review.midmonth_old_points_document,
       item.cashout_points_payment.payment_schedule_document]) {
-      await Deno.writeFile(`${dir}/${doc.file_name}`, doc.bytes);
+      await fs.writeFile(`${dir}/${doc.file_name}`, doc.bytes);
     }
   }
   for (const mutate of [
@@ -2526,7 +2510,7 @@ Deno.test("July 15 refinance retains both lender periods and five paid points in
     month: 7, document_reference: "unsourced July payment",
     paid_on: "2025-07-31",
   });
-  assertThrows(() => pointsInputSchema.parse(unsourcedPayment));
+  assertThrows(() => refinancePointsDeduction(unsourcedPayment, 2025));
   for (const mutate of [
     (pending: any) => { pending.f1098.cashout_refinance_review
       .midmonth_lender_ledger_document.bytes[0] ^= 1; },
@@ -2579,14 +2563,14 @@ Deno.test("July 15 refinance retains both lender periods and five paid points in
   schedule.sha256 = Array.from(new Uint8Array(await crypto.subtle.digest(
     "SHA-256", schedule.bytes,
   )), (byte) => byte.toString(16).padStart(2, "0")).join("");
-  assertThrows(() => pointsInputSchema.parse(
-    wrongSchedule.mortgage_refinance_points));
+  assertThrows(() => refinancePointsDeduction(
+    wrongSchedule.mortgage_refinance_points, 2025));
   await assertRejects(() => buildMefBundle(wrongSchedule,
     { filer, attachments: [] }));
   await assertRejects(() => buildPdfBytes(wrongSchedule, filer, ".pdf-cache"));
 });
 
-Deno.test("separate qualified liens retain July 15 origination and September 15 payoff periods", async () => {
+test("separate qualified liens retain July 15 origination and September 15 payoff periods", async () => {
   const retained = async (name: string, value: unknown) => {
     const bytes = new TextEncoder().encode(JSON.stringify(value));
     const sha256 = Array.from(new Uint8Array(await crypto.subtle.digest(
@@ -2718,29 +2702,28 @@ Deno.test("separate qualified liens retain July 15 origination and September 15 
     const filer = extractFilerIdentity(result.pending.f1040)!;
     const bundle = await buildMefBundle(buildPending(result.pending),
       { filer, attachments: [] });
-    const xmlPath = await Deno.makeTempFile({ suffix: ".xml" });
+    const xmlPath = await sys.makeTempFile({ suffix: ".xml" });
     try {
-      await Deno.writeTextFile(xmlPath, bundle.xml);
-      const checked = await new Deno.Command("xmllint", {
+      await fs.writeFile(xmlPath, bundle.xml);
+      const checked = await new sys.Command("xmllint", {
         args: ["--noout", "--schema", xsdPath, xmlPath],
         stdout: "piped", stderr: "piped",
       }).output();
       assertEquals(checked.code, 0, new TextDecoder().decode(checked.stderr));
-    } finally { await Deno.remove(xmlPath); }
+    } finally { await sys.remove(xmlPath); }
     const pdf = await buildPdfBytes(bundle.pending, filer, ".pdf-cache", bundle);
     assertEquals((await PDFDocument.load(pdf)).getPageCount(), 3);
     let dir: string | undefined;
-    try { dir = Deno.env.get("FORM1098_MIDMONTH_ADDITIONAL_EVIDENCE_DIR"); }
-    catch (error) { if (!(error instanceof Deno.errors.NotCapable)) throw error; }
+    dir = process.env.FORM1098_MIDMONTH_ADDITIONAL_EVIDENCE_DIR;
     if (dir) {
       const packet = `${dir}/${caseName}`;
-      await Deno.mkdir(packet, { recursive: true });
-      await Deno.writeTextFile(`${packet}/source.json`, JSON.stringify(inputs));
-      await Deno.writeTextFile(`${packet}/pending.json`, JSON.stringify(bundle.pending));
-      await Deno.writeTextFile(`${packet}/return.xml`, bundle.xml);
-      await Deno.writeFile(`${packet}/return.pdf`, pdf);
+      await fs.mkdir(packet, { recursive: true });
+      await fs.writeFile(`${packet}/source.json`, JSON.stringify(inputs));
+      await fs.writeFile(`${packet}/pending.json`, JSON.stringify(bundle.pending));
+      await fs.writeFile(`${packet}/return.xml`, bundle.xml);
+      await fs.writeFile(`${packet}/return.pdf`, pdf);
       for (const [index, item] of mortgage.f1098.entries()) {
-        await Deno.writeFile(`${packet}/source-1098-${index + 1}.pdf`,
+        await fs.writeFile(`${packet}/source-1098-${index + 1}.pdf`,
           item.issuer_copy.bytes);
       }
       const documents = [review.qualified_home_inventory_document,
@@ -2752,7 +2735,7 @@ Deno.test("separate qualified liens retain July 15 origination and September 15 
         review.improvement_use_records[0].contractor_invoice_document,
         review.improvement_use_records[0].contractor_payment_document];
       for (const doc of documents) {
-        await Deno.writeFile(`${packet}/${doc.file_name}`, doc.bytes);
+        await fs.writeFile(`${packet}/${doc.file_name}`, doc.bytes);
       }
     }
     const wrong = structuredClone(bundle.pending) as Record<string, any>;

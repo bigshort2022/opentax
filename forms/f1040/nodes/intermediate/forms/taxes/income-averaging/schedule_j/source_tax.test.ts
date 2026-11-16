@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import { FilingStatus } from "../../../../../types.ts";
 import {
@@ -30,8 +31,8 @@ function input(): ScheduleJOrdinaryIncomeInput {
     section1_tax_workpaper_reference: `retained ${year} tax worksheet`,
   });
   return {
-    taxable_income_2025: 171111,
-    filing_status_2025: FilingStatus.Single,
+    current_year_taxable_income: 171111,
+    current_year_filing_status: FilingStatus.Single,
     elected_farm_income: 15000,
     elected_farm_income_net_capital_gain: 0,
     current_year_tax_source: source,
@@ -51,8 +52,8 @@ function input(): ScheduleJOrdinaryIncomeInput {
     },
   };
 }
-Deno.test("ScheduleJ current qualified source uses its worksheet and preserves distinct base rates", () => {
-  const p = calculateScheduleJOrdinaryIncome(input());
+test("ScheduleJ current qualified source uses its worksheet and preserves distinct base rates", () => {
+  const p = calculateScheduleJOrdinaryIncome(input(), 2025);
   // Current ordinary126111:1192.50+4386+12072.50+5462.64;
   // qualified30000 at15%=4500; rounded27614. Base rates1595/1580/1568.
   assertEquals([p.line4, p.line8, p.line12, p.line16, p.line22, p.line23], [
@@ -64,7 +65,7 @@ Deno.test("ScheduleJ current qualified source uses its worksheet and preserves d
     29357,
   ]);
 });
-Deno.test("ScheduleJ all three base qualified worksheets use actual filed treatment and source amounts", () => {
+test("ScheduleJ all three base qualified worksheets use actual filed treatment and source amounts", () => {
   const s = input();
   for (const year of ["year2022", "year2023", "year2024"] as const) {
     s.base_year_source.base_returns[year].preferential_tax_source = {
@@ -75,19 +76,19 @@ Deno.test("ScheduleJ all three base qualified worksheets use actual filed treatm
     s.base_year_source.base_returns[year].taxable_income_line15 = 50000;
     s.tax_treatment[year].has_qualified_dividends = true;
   }
-  const p = calculateScheduleJOrdinaryIncome(s);
+  const p = calculateScheduleJOrdinaryIncome(s, 2025);
   // Base ordinary45000:2022=5517;2023=5207.50;2024=5168.
   // Firsttwo qualified10000 all15%;2024 qualified2025 at0%,7975 at15%.
   assertEquals([p.line8, p.line12, p.line16], [7017, 6708, 6364]);
 });
-Deno.test("ScheduleJ rejects omitted or contradictory prior/current worksheet source", () => {
+test("ScheduleJ rejects omitted or contradictory prior/current worksheet source", () => {
   const s = input();
   delete s.current_year_tax_source;
-  assertThrows(() => calculateScheduleJOrdinaryIncome(s));
+  assertThrows(() => calculateScheduleJOrdinaryIncome(s, 2025));
   const t = input();
   t.tax_treatment.year2025.has_qualified_dividends = false;
-  assertThrows(() => calculateScheduleJOrdinaryIncome(t));
+  assertThrows(() => calculateScheduleJOrdinaryIncome(t, 2025));
   const u = input();
   u.tax_treatment.year2022.has_net_capital_gain = true;
-  assertThrows(() => calculateScheduleJOrdinaryIncome(u));
+  assertThrows(() => calculateScheduleJOrdinaryIncome(u, 2025));
 });

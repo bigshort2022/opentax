@@ -9,10 +9,11 @@ import { schedule3 } from "../../../../intermediate/aggregation/general/return-a
 import type { NodeContext } from "../../../../../../../core/types/node-context.ts";
 
 export const extensionPaymentEvidenceSchema = z.object({
-  tax_year: z.literal(2025),
+  tax_year: z.number().int().min(2025),
   primary_ssn: z.string().regex(/^\d{3}-?\d{2}-?\d{4}$/),
   spouse_ssn: z.string().regex(/^\d{3}-?\d{2}-?\d{4}$/).optional(),
-  payment_date: z.string().regex(/^2026-(0[1-3]-\d{2}|04-(0[1-9]|1[0-5]))$/),
+  // January 1 through the April 15 due date of the following year.
+  payment_date: z.string().regex(/^\d{4}-(0[1-3]-\d{2}|04-(0[1-9]|1[0-5]))$/),
   amount: z.number().positive().int(),
   payment_confirmation_reference: z.string().trim().min(1),
   extension_request_reference: z.string().trim().min(1),
@@ -22,6 +23,7 @@ export const extensionPaymentEvidenceSchema = z.object({
   if (
     Number.isNaN(date.getTime()) ||
     date.toISOString().slice(0, 10) !== source.payment_date ||
+    date.getUTCFullYear() !== source.tax_year + 1 ||
     source.payment_confirmation_reference === source.extension_request_reference
   ) {
     context.addIssue({
@@ -33,7 +35,8 @@ export const extensionPaymentEvidenceSchema = z.object({
 });
 
 export const inputSchema = z.object({
-  // Master switch — "X" = generate Form 4868; any other value or absent = do not generate
+  // Drake print flag: "X" = generate Form 4868. It has no tax effect; a
+  // line 7 payment reaches Schedule 3 line 10 either way.
   produce_4868: z.string().optional(),
   // Line 4: estimate of total tax liability (must be ≥ 0)
   line_4_total_tax: z.number().nonnegative().optional(),
@@ -56,11 +59,6 @@ export const inputSchema = z.object({
 
 type EXTInput = z.infer<typeof inputSchema>;
 
-// line_6_balance_due = MAX(0, line_4 - line_5) — display-only computed field
-function balanceDue(line4: number, line5: number): number {
-  return Math.max(0, line4 - line5);
-}
-
 // Route the extension payment to Schedule 3 Line 10 — this is the only tax output
 function extensionPaymentOutput(amountPaying: number): NodeOutput[] {
   if (amountPaying <= 0) return [];
@@ -72,21 +70,16 @@ class EXTNode extends TaxNode<typeof inputSchema> {
   readonly inputSchema = inputSchema;
   readonly outputNodes = new OutputNodes([schedule3]);
 
-  compute(_ctx: NodeContext, input: EXTInput): NodeResult {
+  compute(ctx: NodeContext, input: EXTInput): NodeResult {
     const parsed = inputSchema.parse(input);
-
-    // Master switch: without produce_4868 = "X", nothing is generated
-    if (parsed.produce_4868 !== "X") {
-      return { outputs: [] };
-    }
-
-    const line4 = parsed.line_4_total_tax ?? 0;
-    const line5 = parsed.line_5_total_payments ?? 0;
     const line7 = parsed.line_7_amount_paying ?? 0;
 
-    if (line7 > 0 && parsed.payment_evidence?.amount !== line7) {
+    if (
+      line7 > 0 && (parsed.payment_evidence?.amount !== line7 ||
+        parsed.payment_evidence.tax_year !== ctx.taxYear)
+    ) {
       throw new Error(
-        "Extension payment needs matching reviewed 2025 payment evidence",
+        `Extension payment needs matching reviewed ${ctx.taxYear} payment evidence`,
       );
     }
     if (line7 === 0 && parsed.payment_evidence !== undefined) {
@@ -95,11 +88,9 @@ class EXTNode extends TaxNode<typeof inputSchema> {
       );
     }
 
-    // line_6 is computed for display purposes; not emitted as a tax output
-    const _line6 = balanceDue(line4, line5);
-
     // Only routing output: line_7 amount flows to Schedule 3 Line 10
-    // when the final return is filed (line_8, line_9, and Drake flags are informational)
+    // when the final return is filed (line_8, line_9, and Drake flags,
+    // produce_4868 among them, are informational)
     const outputs = extensionPaymentOutput(line7);
 
     return { outputs };

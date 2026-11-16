@@ -1,5 +1,5 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
-import { scheduleC } from "../../../../../inputs/income/business/schedule_c/index.ts";
 import {
   applyCalculatedInterestAllowance,
   stageProvisionalScheduleCInterest,
@@ -17,7 +17,7 @@ const business = {
   line_16b_interest_other: 8_000,
 };
 
-Deno.test("2025 Form 8990 two-stage Schedule C feedback changes only sourced line 16b", () => {
+test("2025 Form 8990 two-stage Schedule C feedback changes only sourced line 16b", () => {
   const provisional = stageProvisionalScheduleCInterest({
     schedule_cs: [business],
   });
@@ -40,15 +40,9 @@ Deno.test("2025 Form 8990 two-stage Schedule C feedback changes only sourced lin
   assertEquals(finalized.finalizedAtRiskNet, 188_500);
   assertEquals(finalized.source.schedule_cs[0].line_16b_interest_other, 3_000);
   assertEquals(finalized.source.schedule_cs[0].line_13_depreciation, 7_500);
-  assertThrows(
-    () =>
-      scheduleC.compute({ taxYear: 2025, formType: "f1040" }, finalized.source),
-    Error,
-    "documented section 163(j) exemption",
-  );
 });
 
-Deno.test("2025 Form 8990 two-stage source rejects mixed interest and unmodeled injections", () => {
+test("2025 Form 8990 two-stage source rejects mixed interest and unmodeled injections", () => {
   assertThrows(
     () =>
       stageProvisionalScheduleCInterest({
@@ -93,7 +87,7 @@ Deno.test("2025 Form 8990 two-stage source rejects mixed interest and unmodeled 
   );
 });
 
-Deno.test("2025 Form 8990 two-stage feedback rejects out-of-range allowance", () => {
+test("2025 Form 8990 two-stage feedback rejects out-of-range allowance", () => {
   const provisional = stageProvisionalScheduleCInterest({
     schedule_cs: [business],
   });

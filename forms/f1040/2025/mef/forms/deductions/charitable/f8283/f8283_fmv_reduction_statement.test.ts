@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import { z } from "zod";
 import {
@@ -35,7 +36,7 @@ const electedCapitalGift = {
   capital_gain_reduction_election_confirmed: true as const,
 };
 
-Deno.test("Form 8283 capital-gain election needs complete return-wide source", () => {
+test("Form 8283 capital-gain election needs complete return-wide source", () => {
   const pending = { f8283: { section_a_items: [electedCapitalGift] } };
   const statement = buildFmvReductionStatement(electedCapitalGift, 0);
   assertStringIncludes(statement, "unreduced FMV $4500.00");
@@ -62,7 +63,7 @@ Deno.test("Form 8283 capital-gain election needs complete return-wide source", (
   );
 });
 
-Deno.test("Form 8283 election cannot file with an unsourced prior-year carryover", () => {
+test("Form 8283 election cannot file with an unsourced prior-year carryover", () => {
   assertThrows(
     () =>
       form8283.build({ section_a_items: [electedCapitalGift] }, {
@@ -185,7 +186,7 @@ function electedSectionBReturn() {
   return { form, schedule, pending, context };
 }
 
-Deno.test("Form 8283 Section B election keeps appraised FMV and reduced deduction separate", () => {
+test("Form 8283 Section B election keeps appraised FMV and reduced deduction separate", () => {
   const { form, schedule, context } = electedSectionBReturn();
   const [xml] = form8283.build(form, context);
   assertStringIncludes(
@@ -203,7 +204,7 @@ Deno.test("Form 8283 Section B election keeps appraised FMV and reduced deductio
   );
 });
 
-Deno.test("Form 8283 Section B election rejects missing reduction PDF and divergent source", () => {
+test("Form 8283 Section B election rejects missing reduction PDF and divergent source", () => {
   const { form, context } = electedSectionBReturn();
   assertThrows(
     () =>
@@ -276,15 +277,27 @@ Deno.test("Form 8283 Section B election rejects missing reduction PDF and diverg
   );
 });
 
-Deno.test("Form 8283 Section B election needs an actual 2025 contribution date", () => {
-  for (const date_contributed of ["2024-06-01", "2025-02-30"]) {
-    assertEquals(
-      inputSchema.safeParse({
-        section_b_items: [{ ...electedSectionBLand, date_contributed }],
-      }).success,
-      false,
-    );
-  }
+test("Form 8283 Section B election needs an actual 2025 contribution date", () => {
+  assertEquals(
+    inputSchema.safeParse({
+      section_b_items: [{
+        ...electedSectionBLand,
+        date_contributed: "2025-02-30",
+      }],
+    }).success,
+    false,
+  );
+  assertThrows(
+    () =>
+      f8283.compute({ taxYear: 2025, formType: "f1040" }, {
+        section_b_items: [{
+          ...electedSectionBLand,
+          date_contributed: "2024-06-01",
+        }],
+      } as Parameters<typeof f8283.compute>[1]),
+    Error,
+    "value reduction needs a contribution made in 2025",
+  );
 });
 
 function electedReturn() {
@@ -456,7 +469,7 @@ const privateFoundationGift = {
   },
 };
 
-Deno.test("Form 8283 private-foundation gift reduces long-term appreciation and reconciles the return", () => {
+test("Form 8283 private-foundation gift reduces long-term appreciation and reconciles the return", () => {
   const form = { section_a_items: [privateFoundationGift] };
   const pending = nonElectionReturn(form);
   const [statement] = form8283FmvReductionStatement.build([], { pending });
@@ -497,7 +510,7 @@ Deno.test("Form 8283 private-foundation gift reduces long-term appreciation and 
   );
 });
 
-Deno.test("Form 8283 private-foundation reduction rejects wrong status, category, holding period and value", () => {
+test("Form 8283 private-foundation reduction rejects wrong status, category, holding period and value", () => {
   const reason =
     privateFoundationGift.private_foundation_capital_gain_reduction;
   for (
@@ -562,7 +575,7 @@ Deno.test("Form 8283 private-foundation reduction rejects wrong status, category
   );
 });
 
-Deno.test("Form 8283 unrelated-use tangible property links reduced FMV to Schedule A", () => {
+test("Form 8283 unrelated-use tangible property links reduced FMV to Schedule A", () => {
   const form = { section_a_items: [unrelatedUseGift] };
   const pending = nonElectionReturn(form);
   const [statement] = form8283FmvReductionStatement.build([], { pending });
@@ -623,7 +636,7 @@ Deno.test("Form 8283 unrelated-use tangible property links reduced FMV to Schedu
   );
 });
 
-Deno.test("Form 8283 donor-created art links ordinary-gain statement and basis claim", () => {
+test("Form 8283 donor-created art links ordinary-gain statement and basis claim", () => {
   const form = { section_a_items: [creatorGift] };
   const pending = nonElectionReturn(form);
   const [statement] = form8283FmvReductionStatement.build([], { pending });
@@ -655,7 +668,7 @@ Deno.test("Form 8283 donor-created art links ordinary-gain statement and basis c
   );
 });
 
-Deno.test("Form 8283 donor-prepared manuscript links ordinary-gain statement and Schedule A claim", () => {
+test("Form 8283 donor-prepared manuscript links ordinary-gain statement and Schedule A claim", () => {
   const form = { section_a_items: [manuscriptGift] };
   const pending = nonElectionReturn(form);
   const [statement] = form8283FmvReductionStatement.build([], { pending });
@@ -699,7 +712,7 @@ Deno.test("Form 8283 donor-prepared manuscript links ordinary-gain statement and
   );
 });
 
-Deno.test("Form 8283 purchased inventory reduction links ordinary-gain statement and reconciles claim", () => {
+test("Form 8283 purchased inventory reduction links ordinary-gain statement and reconciles claim", () => {
   const form = { section_a_items: [inventoryGift] };
   const pending = nonElectionReturn(form);
   const [statement] = form8283FmvReductionStatement.build([], { pending });
@@ -742,7 +755,7 @@ Deno.test("Form 8283 purchased inventory reduction links ordinary-gain statement
   );
 });
 
-Deno.test("elected Section A links native statement and reconciles Schedule A line 12", () => {
+test("elected Section A links native statement and reconciles Schedule A line 12", () => {
   const { form, schedule, pending } = electedReturn();
   const statements = form8283FmvReductionStatement.build([], {
     pending,
@@ -785,7 +798,7 @@ Deno.test("elected Section A links native statement and reconciles Schedule A li
   );
 });
 
-Deno.test("elected Section A needs its printed donee and valuation facts", () => {
+test("elected Section A needs its printed donee and valuation facts", () => {
   const { pending } = electedReturn();
   for (
     const incomplete of [
@@ -812,7 +825,7 @@ Deno.test("elected Section A needs its printed donee and valuation facts", () =>
   }
 });
 
-Deno.test("Form 8283 non-election reductions require distinct statement IDs", () => {
+test("Form 8283 non-election reductions require distinct statement IDs", () => {
   const shortTerm = {
     property_description: "Purchased art print",
     donee_organization_name: "Community Arts Center",
@@ -909,7 +922,7 @@ Deno.test("Form 8283 non-election reductions require distinct statement IDs", ()
   );
 });
 
-Deno.test("Form 8283 purchased short-term reduction needs complete Section A source", () => {
+test("Form 8283 purchased short-term reduction needs complete Section A source", () => {
   const item = {
     property_description: "Purchased print",
     donee_organization_name: "Community Arts Center",
@@ -949,15 +962,17 @@ Deno.test("Form 8283 purchased short-term reduction needs complete Section A sou
     Error,
     "reduction differs from the pending source used by its statement",
   );
-  assertEquals(
-    inputSchema.safeParse({
-      section_a_items: [{
-        ...item,
-        date_acquired: "2024-01-01",
-        date_contributed: "2024-06-01",
-      }],
-    }).success,
-    false,
+  assertThrows(
+    () =>
+      f8283.compute({ taxYear: 2025, formType: "f1040" }, {
+        section_a_items: [{
+          ...item,
+          date_acquired: "2024-01-01",
+          date_contributed: "2024-06-01",
+        }],
+      } as Parameters<typeof f8283.compute>[1]),
+    Error,
+    "value reduction needs a contribution made in 2025",
   );
   for (
     const incomplete of [
@@ -983,7 +998,7 @@ Deno.test("Form 8283 purchased short-term reduction needs complete Section A sou
   }
 });
 
-Deno.test("Form 8283 vehicle-sale reduction statement needs complete, matching donee facts", () => {
+test("Form 8283 vehicle-sale reduction statement needs complete, matching donee facts", () => {
   const item = {
     property_description: "2020 Honda Civic",
     donee_organization_name: "City Charity",
@@ -1061,7 +1076,7 @@ Deno.test("Form 8283 vehicle-sale reduction statement needs complete, matching d
   );
 });
 
-Deno.test("elected Section A rejects missing statement IDs and mismatched inventory", () => {
+test("elected Section A rejects missing statement IDs and mismatched inventory", () => {
   const { form, pending } = electedReturn();
   assertThrows(
     () =>
@@ -1101,12 +1116,11 @@ Deno.test("elected Section A rejects missing statement IDs and mismatched invent
   );
 });
 
-Deno.test("Form 8283 capital-gain election rejects short holding, unmatched basis, and other AGI category", () => {
+test("Form 8283 capital-gain election rejects short holding, unmatched basis, and other AGI category", () => {
   for (
     const item of [
       { ...electedCapitalGift, date_acquired: "2025-01-01" },
       { ...electedCapitalGift, date_acquired: "2024-06-01" },
-      { ...electedCapitalGift, date_contributed: "2026-06-01" },
       { ...electedCapitalGift, cost_or_adjusted_basis: 2_900 },
       { ...electedCapitalGift, charitable_limit_category: "capital_gain_30" },
       { ...electedCapitalGift, is_vehicle: true },
@@ -1118,9 +1132,20 @@ Deno.test("Form 8283 capital-gain election rejects short holding, unmatched basi
       "capital-gain election reduction needs nonvehicle purchased capital property held more than one year",
     );
   }
+  assertThrows(
+    () =>
+      f8283.compute({ taxYear: 2025, formType: "f1040" }, {
+        section_a_items: [{
+          ...electedCapitalGift,
+          date_contributed: "2026-06-01",
+        }],
+      } as Parameters<typeof f8283.compute>[1]),
+    Error,
+    "value reduction needs a contribution made in 2025",
+  );
 });
 
-Deno.test("Form 8283 capital-gain election cannot claim an unchanged or missing reduction", () => {
+test("Form 8283 capital-gain election cannot claim an unchanged or missing reduction", () => {
   for (
     const item of [
       { ...electedCapitalGift, deduction_claimed: 4_500 },
@@ -1136,7 +1161,7 @@ Deno.test("Form 8283 capital-gain election cannot claim an unchanged or missing 
   }
 });
 
-Deno.test("Form 8283 capital-gain election does not mix a 30% capital-gain gift in the same form", () => {
+test("Form 8283 capital-gain election does not mix a 30% capital-gain gift in the same form", () => {
   assertThrows(
     () =>
       inputSchema.parse({
@@ -1159,7 +1184,7 @@ Deno.test("Form 8283 capital-gain election does not mix a 30% capital-gain gift 
   );
 });
 
-Deno.test("Form 8283 statement builder rejects a reduced gift without a validated reduction route", () => {
+test("Form 8283 statement builder rejects a reduced gift without a validated reduction route", () => {
   assertThrows(
     () =>
       buildFmvReductionStatement({

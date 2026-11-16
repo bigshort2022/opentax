@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import {
   currentYearDistributionLines,
@@ -36,12 +37,12 @@ function compute(input: Parameters<typeof f8915f.compute>[1]) {
   return f8915f.compute({ taxYear: 2025, formType: "f1040" }, input);
 }
 
-Deno.test("Form 8915-F absent and empty source make no claim", () => {
+test("Form 8915-F absent and empty source make no claim", () => {
   assertEquals(compute({}).outputs, []);
   assertEquals(compute({ f8915fs: [] }).outputs, []);
 });
 
-Deno.test("Form 8915-F calculates one current-year fully taxable plan distribution", () => {
+test("Form 8915-F calculates one current-year fully taxable plan distribution", () => {
   const lines = currentYearDistributionLines(
     itemSchema.parse(reviewed2025Plan),
     { planGross: 0, iraGross: 0 },
@@ -53,7 +54,7 @@ Deno.test("Form 8915-F calculates one current-year fully taxable plan distributi
   assertEquals(lines.line15_form1040_line5b, 20_000);
 });
 
-Deno.test("Form 8915-F spreads a new 2025 plan distribution over three years", () => {
+test("Form 8915-F spreads a new 2025 plan distribution over three years", () => {
   const lines = currentYearDistributionLines(
     itemSchema.parse({
       ...reviewed2025Plan,
@@ -66,7 +67,7 @@ Deno.test("Form 8915-F spreads a new 2025 plan distribution over three years", (
   assertEquals(lines.line15_form1040_line5b, 6_667);
 });
 
-Deno.test("Form 8915-F bounds repayment to income and the reviewed filing deadline", () => {
+test("Form 8915-F bounds repayment to income and the reviewed filing deadline", () => {
   const repayment = {
     kind: "timely",
     amount: 1_000,
@@ -94,6 +95,21 @@ Deno.test("Form 8915-F bounds repayment to income and the reviewed filing deadli
       repayment: { ...repayment, date: "2025-05-31" },
     }).success,
     false,
+  );
+  // i8915f: a repayment can be made beginning the day after the distribution.
+  assertEquals(
+    itemSchema.safeParse({
+      ...source,
+      repayment: { ...repayment, date: "2025-06-01" },
+    }).success,
+    false,
+  );
+  assertEquals(
+    itemSchema.safeParse({
+      ...source,
+      repayment: { ...repayment, date: "2025-06-02" },
+    }).success,
+    true,
   );
   assertEquals(
     itemSchema.safeParse({
@@ -188,7 +204,7 @@ Deno.test("Form 8915-F bounds repayment to income and the reviewed filing deadli
   );
 });
 
-Deno.test("Form 8915-F traditional IRA path needs reviewed no-basis history", () => {
+test("Form 8915-F traditional IRA path needs reviewed no-basis history", () => {
   assertEquals(
     itemSchema.safeParse({
       ...reviewed2025Plan,
@@ -211,11 +227,11 @@ Deno.test("Form 8915-F traditional IRA path needs reviewed no-basis history", ()
   assertEquals(lines.line26_form1040_line4b, 6_667);
 });
 
-Deno.test("Form 8915-F retains the reviewed source for native and PDF export", () => {
+test("Form 8915-F retains the reviewed source for native and PDF export", () => {
   assertEquals(compute({ f8915fs: [reviewed2025Plan] }).outputs, []);
 });
 
-Deno.test("Form 8915-F rejects the old amount-only source", () => {
+test("Form 8915-F rejects the old amount-only source", () => {
   assertEquals(
     itemSchema.safeParse({
       distribution_year: 2025,
@@ -234,7 +250,7 @@ Deno.test("Form 8915-F rejects the old amount-only source", () => {
   assertEquals(itemSchema.safeParse(oldPlan).success, false);
 });
 
-Deno.test("Form 8915-F enforces the disaster limit and distribution window", () => {
+test("Form 8915-F enforces the disaster limit and distribution window", () => {
   assertEquals(
     itemSchema.safeParse({ ...reviewed2025Plan, gross_distribution: 22_001 })
       .success,
@@ -270,7 +286,7 @@ Deno.test("Form 8915-F enforces the disaster limit and distribution window", () 
   );
 });
 
-Deno.test("Form 8915-F matches one issued 1099-R and recipient", () => {
+test("Form 8915-F matches one issued 1099-R and recipient", () => {
   const filer = {
     primarySSN: "111223333",
     nameLine1: "EXAMPLE ALEX",
@@ -451,5 +467,37 @@ Deno.test("Form 8915-F matches one issued 1099-R and recipient", () => {
       ),
     Error,
     "recipient must match",
+  );
+});
+
+// IRC §72(t)(11) qualified disaster recovery distributions have no end year:
+// the 180-day window and $22,000 limit apply to a 2026 disaster on the 2026
+// return; MeF 2026v1.0 IRS8915F enumerates TaxYearFilingFormCd and
+// CalendarYrDisasterCd 2026.
+test("Form 8915-F current-year path follows the return year", () => {
+  const plan2026 = {
+    ...reviewed2025Plan,
+    disaster_begin_date: "2026-03-26",
+    disaster_declaration_date: "2026-05-21",
+    distribution_date: "2026-06-01",
+  };
+  assertEquals(
+    f8915f.compute({ taxYear: 2026, formType: "f1040" }, {
+      f8915fs: [plan2026],
+    }).outputs,
+    [],
+  );
+  assertThrows(
+    () => compute({ f8915fs: [plan2026] }),
+    Error,
+    "needs a 2025 distribution",
+  );
+  assertEquals(
+    itemSchema.safeParse({
+      ...plan2026,
+      disaster_begin_date: "2025-12-20",
+      disaster_declaration_date: "2025-12-28",
+    }).success,
+    false,
   );
 });

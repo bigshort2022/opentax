@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import { SCENARIO_1040_01_FACTS } from "../../../../../e2e/ats/ty2025_cases.ts";
 import { type FilerIdentity, FilingStatus } from "../../../../mef/types.ts";
@@ -66,7 +67,7 @@ const sourcedStudentMinor = {
         birth_date: "2008-05-10",
         birth_date_source_reference: "student-age-record",
         student_enrollment_source_reference: "2025-school-enrollment",
-        student_during_2025_verified: true,
+        student_during_tax_year_verified: true,
       },
       ordinary_cash_only: true,
       annual_cash_wages: 4_000,
@@ -85,7 +86,7 @@ const filer: FilerIdentity = {
   address: facts.taxpayer.address,
 };
 
-Deno.test("synthetic student minor Schedule H PDF reconciles FUTA without FICA", () => {
+test("synthetic student minor Schedule H PDF reconciles FUTA without FICA", () => {
   const projected = scheduleHPdf.projectFields!(sourcedStudentMinor, {});
   assertEquals(projected.cash_wages_over_2025_limit, false);
   assertEquals(projected.box_b_federal_withheld, false);
@@ -116,7 +117,7 @@ Deno.test("synthetic student minor Schedule H PDF reconciles FUTA without FICA",
   );
 });
 
-Deno.test("ATS Scenario 1 Schedule H PDF prints sourced Part I on the 2025 widgets", () => {
+test("ATS Scenario 1 Schedule H PDF prints sourced Part I on the 2025 widgets", () => {
   const projected = scheduleHPdf.projectFields?.(source, {}) ?? {};
   assertEquals(projected.line2_social_security_tax, 384);
   assertEquals(projected.line4_medicare_tax, 90);
@@ -163,10 +164,10 @@ Deno.test("ATS Scenario 1 Schedule H PDF prints sourced Part I on the 2025 widge
     schedule_h: source,
     schedule2: { line9_household_employment: 474 },
   };
-  assertThrows(
-    () => scheduleHPdf.instances?.(projected, filer, pending),
-    Error,
-    "needs employee payroll source",
+  // Part I is filed from employer totals; employee rows are not required.
+  assertEquals(
+    scheduleHPdf.instances?.(projected, filer, pending)?.length,
+    1,
   );
   assertThrows(
     () =>
@@ -183,7 +184,7 @@ Deno.test("ATS Scenario 1 Schedule H PDF prints sourced Part I on the 2025 widge
   );
 });
 
-Deno.test("synthetic sourced FICA-only Schedule H PDF reconciles its worker and Schedule 2", () => {
+test("synthetic sourced FICA-only Schedule H PDF reconciles its worker and Schedule 2", () => {
   const projected = scheduleHPdf.projectFields!(sourcedFicaOnly, {});
   assertEquals(projected.line8_fica_and_withholding, 474);
   assertEquals(projected.cash_wages_over_quarter_limit, false);
@@ -215,7 +216,7 @@ Deno.test("synthetic sourced FICA-only Schedule H PDF reconciles its worker and 
   );
 });
 
-Deno.test("Schedule H PDF requires W-4 review for unrelated-worker withholding", () => {
+test("Schedule H PDF requires W-4 review for unrelated-worker withholding", () => {
   const worker = sourcedFicaOnly.fica_only_payroll.employee_wages[0];
   const withheld = {
     ...sourcedFicaOnly,
@@ -260,7 +261,7 @@ Deno.test("Schedule H PDF requires W-4 review for unrelated-worker withholding",
   );
 });
 
-Deno.test("Schedule H PDF maps Section A FUTA and Part III to the 2025 widgets", () => {
+test("Schedule H PDF maps Section A FUTA and Part III to the 2025 widgets", () => {
   const sectionA = {
     ...source,
     cash_wages_over_quarter_limit: true,
@@ -329,7 +330,7 @@ Deno.test("Schedule H PDF maps Section A FUTA and Part III to the 2025 widgets",
   );
 });
 
-Deno.test("Schedule H PDF maps two Section B rows, totals, and worksheet indicator", () => {
+test("Schedule H PDF maps two Section B rows, totals, and worksheet indicator", () => {
   const sectionB = {
     ...source,
     ss_wages: 3_000,
@@ -417,7 +418,7 @@ Deno.test("Schedule H PDF maps two Section B rows, totals, and worksheet indicat
   );
 });
 
-Deno.test("Schedule H PDF retains additional Section B rows for line 17 continuation", () => {
+test("Schedule H PDF retains additional Section B rows for line 17 continuation", () => {
   const projected = scheduleHPdf.projectFields?.({
     ...source,
     cash_wages_over_quarter_limit: true,

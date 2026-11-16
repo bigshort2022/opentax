@@ -1,4 +1,9 @@
 import {
+  priorYearAssetSchema,
+  priorYearDepreciationRowSchema,
+  priorYearDepreciationTotal,
+} from "../../../../intermediate/forms/deductions/business/form4562/prior-year.ts";
+import {
   allocateCurrentPassiveForms,
   currentPassiveFormsSchema,
 } from "../../../../intermediate/forms/income/business/form8582/current-form-allocation.ts";
@@ -215,9 +220,17 @@ export const itemSchema = z.object({
   expense_taxes: z.number().nonnegative().optional(),
   expense_utilities: z.number().nonnegative().optional(),
   expense_depreciation: z.number().nonnegative().optional(),
+  // Assets placed in service before the return year (Pub. 946 tables);
+  // their deduction is added to this depreciation line.
+  prior_year_assets: z.array(priorYearAssetSchema).min(1).optional(),
+  prior_year_depreciation_rows: z.array(priorYearDepreciationRowSchema)
+    .optional(),
   expense_depreciation_amt: z.number().nonnegative().optional(),
   expense_depletion: z.number().nonnegative().optional(),
   expense_other_lines: z.array(otherExpenseLineSchema).max(6).optional(),
+  // The expense lines above are already the rental-use share of a unit with
+  // personal use, so they are not divided again by days (Pub. 527, ch. 5).
+  expenses_are_rental_portion: z.boolean().optional(),
 }).superRefine((item, ctx) => {
   if (item.qbi_aggregation_number !== undefined) {
     ctx.addIssue({
@@ -231,6 +244,9 @@ export const itemSchema = z.object({
 
 export const inputSchema = z.object({
   schedule_es: z.array(itemSchema).optional().default([]),
+  // Part I lines A and B when no property row carries them (e.g. only Form 4835).
+  form_1099_payments_made: z.boolean().optional(),
+  form_1099_filed: z.boolean().optional(),
   // Reviewed filed-year record, joined to every positive 2025 prior PAL by
   // durable activity ID and reporting character. Acceptance is verified by
   // the export boundary, not inferred from this entered reference.
@@ -528,6 +544,33 @@ export function reviewPre2025PartIEntireGainCandidate(item: EItem): {
 
 // ─── Validation ──────────────────────────────────────────────────────────────
 
+// Prior-year passive losses, dispositions and first-year sources are keyed to
+// TY2025 (filed 2024 Form 8582 records, 2025 acquisition and sale dates).
+function assertTy2025OnlyFacts(
+  taxYear: number,
+  input: z.infer<typeof inputSchema>,
+): void {
+  if (taxYear === 2025) return;
+  const dated = input.filed_2024_form8582_record !== undefined ||
+    input.schedule_es.some((item) =>
+      item.current_property_source !== undefined ||
+      item.passive_property_sales !== undefined ||
+      item.section_1231_lookback_source !== undefined ||
+      item.first_year_activity_source !== undefined ||
+      item.pre2025_part1_entire_disposition_source !== undefined ||
+      item.prior_year_8582_source !== undefined ||
+      (item.prior_unallowed_passive_operating ?? 0) > 0 ||
+      (item.prior_unallowed_passive_4797_part1 ?? 0) > 0 ||
+      (item.prior_unallowed_passive_4797_part2 ?? 0) > 0 ||
+      (item.prior_unallowed_at_risk ?? 0) > 0
+    );
+  if (dated) {
+    throw new Error(
+      `Schedule E prior-year passive losses and property dispositions are not yet supported for TY${taxYear}`,
+    );
+  }
+}
+
 function validateItem(item: EItem): void {
   reconcileCurrentPropertySource(item);
   if (reviewPre2025PartIEntireGainCandidate(item)) {
@@ -579,6 +622,17 @@ function validateItem(item: EItem): void {
   ) {
     throw new Error(
       "Schedule E K-1 royalty row must match box 7 and code I sources",
+    );
+  }
+  if (
+    isRecharacterizedSelfRental(item) &&
+    ((item.prior_unallowed_passive_operating ?? 0) > 0 ||
+      (item.prior_unallowed_passive_4797_part1 ?? 0) > 0 ||
+      (item.prior_unallowed_passive_4797_part2 ?? 0) > 0 ||
+      (item.passive_property_sales?.length ?? 0) > 0)
+  ) {
+    throw new Error(
+      "Schedule E self-rental net income with prior passive losses or a property sale needs Regulations section 1.469-2(f)(6) review",
     );
   }
   if (item.property_type === 8 && !item.property_type_other_desc) {
@@ -742,8 +796,27 @@ export function computePropertyNet(item: EItem): number {
   return grossIncome - expenses;
 }
 
-function isPassive(item: EItem): boolean {
-  return item.activity_type === "A" || item.activity_type === "B";
+/** The property's whole-dollar net as filed on Schedule E line 21 or 22.
+ * Form 8582, Schedule 1 line 5 and Form 8995 take the filed amount, so
+ * cents or a fractional ownership share do not leave unreconciled totals. */
+export function filedPropertyNet(item: EItem): number {
+  return Math.round(computePropertyNet(item));
+}
+
+/** Self-rental (Schedule E line 1b code 7) net income is nonpassive and is
+ * kept off Form 8582; a net loss stays passive. Pub. 925 (2025),
+ * Recharacterization of Passive Income and Rental of Property to a
+ * Nonpassive Activity; Regulations section 1.469-2(f)(6). */
+export function isRecharacterizedSelfRental(item: EItem): boolean {
+  return item.property_type === 7 &&
+    (item.activity_type === "A" || item.activity_type === "B") &&
+    item.current_property_source === undefined &&
+    computePropertyNet(item) > 0;
+}
+
+export function isPassiveProperty(item: EItem): boolean {
+  return (item.activity_type === "A" || item.activity_type === "B") &&
+    !isRecharacterizedSelfRental(item);
 }
 
 // ─── Routing helpers ─────────────────────────────────────────────────────────
@@ -806,7 +879,7 @@ function currentLossForms(items: EItems, farms: readonly FarmActivity[]) {
 }
 
 function passiveItems(items: EItems): EItems {
-  return items.filter(isPassive);
+  return items.filter(isPassiveProperty);
 }
 
 // Current-year net loss from passive activities (positive amount).
@@ -816,7 +889,7 @@ function passiveCurrentLoss(items: EItems): number {
       item.current_property_source
         ? currentPropertyPassiveAmounts(item.current_property_source)
           .passiveOperating
-        : computePropertyNet(item)
+        : filedPropertyNet(item)
     )
     .filter((n) => n < 0)
     .reduce((sum, n) => sum + Math.abs(n), 0);
@@ -829,7 +902,7 @@ function passiveCurrentIncome(items: EItems): number {
       item.current_property_source
         ? currentPropertyPassiveAmounts(item.current_property_source)
           .passiveOperating
-        : computePropertyNet(item)
+        : filedPropertyNet(item)
     )
     .filter((n) => n > 0)
     .reduce((sum, n) => sum + n, 0);
@@ -844,20 +917,20 @@ function activeRentalCurrentLoss(items: EItems): number {
       item.current_property_source
         ? currentPropertyPassiveAmounts(item.current_property_source)
           .passiveOperating
-        : computePropertyNet(item)
+        : filedPropertyNet(item)
     )
     .filter((n) => n < 0)
     .reduce((sum, n) => sum + Math.abs(n), 0);
 }
 
 function activeRentalCurrentIncome(items: EItems): number {
-  return items
+  return passiveItems(items)
     .filter((item) => item.activity_type === "A")
     .map((item) =>
       item.current_property_source
         ? currentPropertyPassiveAmounts(item.current_property_source)
           .passiveOperating
-        : computePropertyNet(item)
+        : filedPropertyNet(item)
     )
     .filter((net) => net > 0)
     .reduce((sum, net) => sum + net, 0);
@@ -902,12 +975,12 @@ function farmCurrentIncome(farms: readonly FarmActivity[]): number {
  * Royalty rows are handled on lines 8–10, so their net is excluded here. */
 export function scheduleEPassiveEicIncome(rawInput: unknown): number {
   const input = inputSchema.parse(rawInput);
-  const rentalIncome = input.schedule_es.filter(isPassive).reduce(
+  const rentalIncome = input.schedule_es.filter(isPassiveProperty).reduce(
     (sum, item) => {
       const net = item.current_property_source
         ? currentPropertyPassiveAmounts(item.current_property_source)
           .passiveOperating
-        : computePropertyNet(item);
+        : filedPropertyNet(item);
       if ((item.royalties_income ?? 0) === 0) return sum + Math.max(0, net);
       const fraction = (item.ownership_percent ?? 100) / 100;
       const royaltyGross = Math.round(item.royalties_income! * fraction);
@@ -948,7 +1021,7 @@ function form8582Outputs(
             .passiveOperating !== 0 ||
         currentPropertyPassiveAmounts(item.current_property_source)
             .passiveGain < 0
-      : computePropertyNet(item) !== 0 ||
+      : filedPropertyNet(item) !== 0 ||
         (item.passive_property_sales?.length ?? 0) > 0 ||
         (item.prior_unallowed_passive_operating ?? 0) > 0 ||
         (item.prior_unallowed_passive_4797_part1 ?? 0) > 0 ||
@@ -991,7 +1064,7 @@ function form8582Outputs(
       current_net: item.current_property_source
         ? currentPropertyPassiveAmounts(item.current_property_source)
           .passiveOperating
-        : computePropertyNet(item),
+        : filedPropertyNet(item),
       prior_unallowed_operating: item.prior_unallowed_passive_operating ?? 0,
       prior_year_8582_source: item.prior_year_8582_source,
       first_year_activity_source: item.first_year_activity_source,
@@ -999,6 +1072,12 @@ function form8582Outputs(
         item.prior_passive_losses_active_when_incurred,
       prior_unallowed_4797_part1: item.prior_unallowed_passive_4797_part1 ?? 0,
       prior_unallowed_4797_part2: item.prior_unallowed_passive_4797_part2 ?? 0,
+      ...(item.qbi_trade_or_business === "Y" &&
+          item.qbi_specified_service !== true &&
+          item.qbi_override === undefined &&
+          item.current_property_source === undefined
+        ? { qbi_trade_or_business: true }
+        : {}),
     })),
     ...reportedFarms.map((farm) => ({
       activity_id: farm.activity_id!,
@@ -1122,7 +1201,7 @@ function form8960Outputs(items: EItems): NodeOutput[] {
   if (niitItems.length === 0) return [];
 
   const totalNet = niitItems.reduce(
-    (sum, item) => sum + computePropertyNet(item),
+    (sum, item) => sum + filedPropertyNet(item),
     0,
   );
   return [output(form8960, { line4b_rental_net: totalNet })];
@@ -1187,7 +1266,7 @@ function form8995Outputs(items: EItems): NodeOutput[] {
   const f8995Input: Partial<z.infer<typeof form8995["inputSchema"]>> = {};
 
   const qbiAmount = (item: EItem) =>
-    item.qbi_override ?? computePropertyNet(item);
+    item.qbi_override ?? filedPropertyNet(item);
   const nonSstbItems = qbiItems.filter((item) =>
     item.qbi_specified_service !== true
   );
@@ -1336,6 +1415,119 @@ function form8990Outputs(items: EItems): NodeOutput[] {
   );
 }
 
+// ─── Row finalization ─────────────────────────────────────────────────────────
+
+// Prior-year assets become this activity's depreciation (Pub. 946, Appendix A).
+function withPriorYearDepreciation(item: EItem, taxYear: number): EItem {
+  if (!item.prior_year_assets) return item;
+  const { prior_year_assets: assets, ...rest } = item;
+  const { rows, total } = priorYearDepreciationTotal(assets, taxYear);
+  return {
+    ...rest,
+    expense_depreciation: (item.expense_depreciation ?? 0) + total,
+    prior_year_depreciation_rows: rows,
+  };
+}
+
+const dividedExpenseKeys = [
+  "expense_advertising",
+  "expense_auto_travel",
+  "expense_cleaning",
+  "expense_commissions",
+  "expense_insurance",
+  "expense_legal_professional",
+  "expense_management",
+  "expense_mortgage_interest",
+  "expense_other_interest",
+  "expense_repairs",
+  "expense_supplies",
+  "expense_taxes",
+  "expense_utilities",
+  "expense_depreciation",
+  "expense_depreciation_amt",
+  "expense_depletion",
+] as const satisfies ReadonlyArray<keyof EItem>;
+
+const cents = (amount: number) => Math.round(amount * 100) / 100;
+
+// IRC 280A(e)(1); Pub. 527, ch. 5, Dividing Expenses: a unit used for both
+// rental and personal purposes deducts only rental days / total days used of
+// each expense. A unit rented under 15 days deducts nothing (280A(g)), and a
+// row with an occupancy_percent split keeps that reviewed split instead.
+function withRentalShareOfExpenses(item: EItem): EItem {
+  if (
+    item.personal_use_days === 0 || item.fair_rental_days === 0 ||
+    item.expenses_are_rental_portion === true ||
+    item.occupancy_percent !== undefined ||
+    isVacationHomeExcluded(item)
+  ) return item;
+  const share = item.fair_rental_days /
+    (item.fair_rental_days + item.personal_use_days);
+  const divided: Partial<EItem> = {};
+  for (const key of dividedExpenseKeys) {
+    const amount = item[key];
+    if (amount !== undefined) divided[key] = cents(amount * share);
+  }
+  return {
+    ...item,
+    ...divided,
+    ...(item.expense_other_lines
+      ? {
+        expense_other_lines: item.expense_other_lines.map((line) => ({
+          ...line,
+          amount: cents(line.amount * share),
+        })),
+      }
+      : {}),
+    expenses_are_rental_portion: true,
+  };
+}
+
+// The auto_expense worksheet's rental car expense goes on line 6 of the
+// rental it was driven for (Schedule E instructions, line 6; Rev. Proc.
+// 2019-46 standard mileage). Royalty rows are not rentals.
+function withAutoTravel(
+  input: z.infer<typeof inputSchema>,
+): z.infer<typeof inputSchema> {
+  const travel = input.expense_auto_travel ?? 0;
+  if (travel === 0) return input;
+  const rentals = (input.schedule_es ?? []).filter((item) =>
+    item.property_type !== 6
+  );
+  if (rentals.length !== 1) {
+    throw new Error(
+      "auto_expense Schedule E car expense needs exactly one rental property",
+    );
+  }
+  return {
+    ...input,
+    expense_auto_travel: undefined,
+    schedule_es: input.schedule_es.map((item) =>
+      item === rentals[0]
+        ? {
+          ...item,
+          expense_auto_travel: (item.expense_auto_travel ?? 0) + travel,
+        }
+        : item
+    ),
+  };
+}
+
+export function finalizeScheduleEInput(
+  input: z.infer<typeof inputSchema>,
+  taxYear: number,
+): z.infer<typeof inputSchema> {
+  const rows = input.schedule_es ?? [];
+  const finalizedRows = rows.map((item) =>
+    withRentalShareOfExpenses(withPriorYearDepreciation(item, taxYear))
+  );
+  const withRows = finalizedRows.some((item, index) => item !== rows[index])
+    ? { ...input, schedule_es: finalizedRows }
+    : input;
+  // Worksheet miles are rental miles only, so they are added after dividing.
+  return withAutoTravel(withRows);
+}
+
 // ─── Node class ───────────────────────────────────────────────────────────────
 
 class ScheduleENode extends TaxNode<typeof inputSchema> {
@@ -1354,8 +1546,31 @@ class ScheduleENode extends TaxNode<typeof inputSchema> {
     form4562,
   ]);
 
-  compute(_ctx: NodeContext, input: z.infer<typeof inputSchema>): NodeResult {
+  compute(ctx: NodeContext, input: z.infer<typeof inputSchema>): NodeResult {
+    const finalized = finalizeScheduleEInput(input, ctx.taxYear);
+    if (finalized === input) return this.computeRows(ctx, input);
+    // The finalized rows carry the projected expenses to every reader.
+    const result = this.computeRows(ctx, finalized);
+    return {
+      ...result,
+      outputs: [
+        ...result.outputs,
+        {
+          nodeType: this.nodeType,
+          fields: {
+            schedule_es: finalized.schedule_es,
+            ...(finalized.expense_auto_travel !== input.expense_auto_travel
+              ? { expense_auto_travel: undefined }
+              : {}),
+          },
+        },
+      ],
+    };
+  }
+
+  private computeRows(ctx: NodeContext, input: z.infer<typeof inputSchema>): NodeResult {
     const parsed = inputSchema.parse(input);
+    assertTy2025OnlyFacts(ctx.taxYear, parsed);
     const {
       schedule_es,
       rental_income,
@@ -1421,7 +1636,7 @@ class ScheduleENode extends TaxNode<typeof inputSchema> {
     }
 
     const propertyNet = schedule_es.reduce(
-      (sum, item) => sum + computePropertyNet(item),
+      (sum, item) => sum + filedPropertyNet(item),
       0,
     );
     const eicRoyalty = scheduleERoyaltyEicAmounts(parsed);

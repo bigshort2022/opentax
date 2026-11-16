@@ -14,6 +14,7 @@ import {
 } from "../../../../../nodes/inputs/income/rental-passthrough/schedule_e/index.ts";
 import {
   scheduleE,
+  scheduleEReturn1099Answer,
   validatePassiveActivityLink,
 } from "../../../../mef/forms/income/rental-passthrough/schedule_e.ts";
 import { verifyMiscRoyaltySource } from "../../../../mef/forms/income/rental-passthrough/schedule_e.ts";
@@ -234,7 +235,8 @@ function retainedScheduleEPages(projected: Record<string, unknown>): number[] {
   return partI && partII ? [0, 1] : partII ? [1] : [0];
 }
 
-export const scheduleEPdf: PdfFormDescriptor = {
+export function scheduleEPdfFor(taxYear: number): PdfFormDescriptor {
+  return {
   pendingKey: "schedule_e",
   pdfUrl: "https://www.irs.gov/pub/irs-prior/f1040se--2025.pdf",
   pageIndices: retainedScheduleEPages,
@@ -258,7 +260,10 @@ export const scheduleEPdf: PdfFormDescriptor = {
     },
   ],
   projectFields(raw, allPending) {
-    const k1Rows = scheduleEK1Part2Rows(allPending);
+    const k1Rows = scheduleEK1Part2Rows(allPending, {
+      taxYear,
+      formType: "f1040",
+    });
     if (Object.keys(raw).length === 0 && k1Rows.length === 0) return {};
     const input = inputSchema.parse(raw);
     const trustRows = input.estate_trust_rows ?? [];
@@ -292,7 +297,7 @@ export const scheduleEPdf: PdfFormDescriptor = {
         input.rental_income !== undefined ||
         input.royalty_income !== undefined ||
         trustRows.length > 2 ||
-        !scheduleE.build(input, { pending: allPending })
+        !scheduleE.build(input, { pending: allPending, taxYear })
       ) {
         throw new Error(
           "Schedule E PDF Part II needs up to four sourced K-1 rows on a supported page 2",
@@ -358,7 +363,7 @@ export const scheduleEPdf: PdfFormDescriptor = {
         input.rental_income !== undefined ||
         input.royalty_income !== undefined ||
         trustRows.length > 2 ||
-        !scheduleE.build(input, { pending: allPending })
+        !scheduleE.build(input, { pending: allPending, taxYear })
       ) {
         throw new Error(
           "Schedule E PDF trust rows need a sourced Part III return",
@@ -390,12 +395,16 @@ export const scheduleEPdf: PdfFormDescriptor = {
       if (input.schedule_es.length === 0) return partIIFields!;
     }
     if (input.schedule_es.length === 0 && input.farm_rental_net !== undefined) {
-      if (!scheduleE.build(input, { pending: allPending })) {
+      if (!scheduleE.build(input, { pending: allPending, taxYear })) {
         throw new Error(
           "Schedule E PDF farm rental needs a native Form 4835 join",
         );
       }
+      const answer = scheduleEReturn1099Answer(input, 0);
       return {
+        ...(answer
+          ? { payments_made: answer.payments, forms_1099_filed: answer.filed }
+          : {}),
         ...farmFields,
         trust_line41: farmNet,
       };
@@ -440,6 +449,7 @@ export const scheduleEPdf: PdfFormDescriptor = {
       ).some(Boolean);
     const allowedByActivity = validatePassiveActivityLink(items, {
       pending: allPending,
+      taxYear,
     });
     // Native Schedule E checks every source row, limitation, and finalized total.
     if (items[0].f1099m_royalty_source) {
@@ -449,7 +459,7 @@ export const scheduleEPdf: PdfFormDescriptor = {
         undefined,
         allPending,
       );
-    } else if (!scheduleE.build(input, { pending: allPending })) {
+    } else if (!scheduleE.build(input, { pending: allPending, taxYear })) {
       throw new Error("Schedule E PDF needs native Part I properties");
     }
     const rows = items.map((item, index) => {
@@ -657,7 +667,7 @@ export const scheduleEPdf: PdfFormDescriptor = {
     if (input?.schedule_es[0]?.f1099m_royalty_source) {
       if (
         !filer || !allPending ||
-        !scheduleE.build(input, { pending: allPending, filer })
+        !scheduleE.build(input, { pending: allPending, filer, taxYear })
       ) {
         throw new Error(
           "Schedule E PDF linked 1099-MISC royalty needs its primary filer and native property",
@@ -683,4 +693,7 @@ export const scheduleEPdf: PdfFormDescriptor = {
       filer,
     );
   },
-};
+  };
+}
+
+export const scheduleEPdf: PdfFormDescriptor = scheduleEPdfFor(2025);

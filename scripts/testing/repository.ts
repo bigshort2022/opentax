@@ -1,4 +1,7 @@
-import { join, toFileUrl } from "@std/path";
+import * as sys from "../support/sys.ts";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { pathToFileURL as toFileUrl } from "node:url";
 import {
   assertGraphCoverage,
   assertHealthyModuleGraph,
@@ -6,7 +9,7 @@ import {
 } from "./contracts.ts";
 
 export async function repositoryFiles(root: string): Promise<string[]> {
-  const result = await new Deno.Command("git", {
+  const result = await new sys.Command("git", {
     args: ["ls-files", "--cached", "--others", "--exclude-standard", "-z"],
     cwd: root,
     stdout: "piped",
@@ -26,14 +29,16 @@ export async function repositoryFiles(root: string): Promise<string[]> {
 
 export function verificationInputPaths(paths: string[]): string[] {
   return paths.filter((path) =>
-    path.endsWith(".ts") || path === "deno.json" || path === "deno.lock" ||
+    path.endsWith(".ts") ||
+    ["package.json", "bun.lock", "bunfig.toml", "tsconfig.json"].includes(
+      path,
+    ) ||
     (path.endsWith(".json") &&
       [
         "forms/",
         "benchmark/",
         "core/",
         "cli/",
-        ".state/field-dumps/",
         "scripts/testing/",
       ].some((
         prefix,
@@ -48,7 +53,7 @@ export async function runtimeSnapshot(
   const entries = await Promise.all(paths.map(async (path) => {
     const hash = await crypto.subtle.digest(
       "SHA-256",
-      await Deno.readFile(join(root, path)),
+      await sys.readBytes(join(root, path)),
     );
     return [
       path,
@@ -61,53 +66,95 @@ export async function runtimeSnapshot(
   return Object.fromEntries(entries);
 }
 
+type GraphModule = {
+  readonly specifier: string;
+  readonly error?: string;
+  readonly dependencies: { specifier: string; code: { error?: string } }[];
+};
+
+/** Every runtime import of every module, resolved the way Bun will load it. */
+export function moduleGraph(root: string, paths: string[]): GraphModule[] {
+  const transpiler = new Bun.Transpiler({ loader: "ts" });
+  return paths.map((path) => {
+    const file = join(root, path);
+    const specifier = toFileUrl(file).href;
+    let imports: { path: string }[];
+    try {
+      // The transpiler API rejects a leading #! line that `bun` itself skips.
+      imports = transpiler.scanImports(
+        readFileSync(file, "utf8").replace(/^#!.*/, ""),
+      );
+    } catch (error) {
+      return {
+        specifier,
+        error: `${path}: ${(error as Error).message}`,
+        dependencies: [],
+      };
+    }
+    const dependencies = imports
+      .filter((entry) => !/^(node|bun):/.test(entry.path))
+      .map((entry) => {
+        try {
+          Bun.resolveSync(entry.path, dirname(file));
+          return { specifier: entry.path, code: {} };
+        } catch (error) {
+          return {
+            specifier: entry.path,
+            code: { error: `${path}: ${(error as Error).message}` },
+          };
+        }
+      });
+    return { specifier, dependencies };
+  });
+}
+
+/** Resolves every runtime import and type-checks every module with tsconfig.json. */
 export async function graphPreflight(
   root: string,
   evidenceDirectory: string,
+  typecheck = true,
 ): Promise<number> {
   const paths = (await repositoryFiles(root)).filter((path) =>
     path.endsWith(".ts")
   );
-  const entry = join(evidenceDirectory, "all-modules.ts");
-  await Deno.writeTextFile(
-    entry,
-    paths.map((path) =>
-      `import ${JSON.stringify(toFileUrl(join(root, path)).href)};`
-    ).join("\n"),
-    { createNew: true, mode: 0o600 },
-  );
-  const result = await new Deno.Command("deno", {
-    args: [
-      "info",
-      "--frozen",
-      "--json",
-      "--config",
-      join(root, "deno.json"),
-      entry,
-    ],
-    cwd: root,
-    stdout: "piped",
-    stderr: "piped",
-  }).output();
-  await Deno.writeFile(
+  const graph = { modules: moduleGraph(root, paths) };
+  await sys.writeText(
     join(evidenceDirectory, "module-graph.json"),
-    result.stdout,
+    JSON.stringify(graph, null, 2),
     { createNew: true, mode: 0o600 },
   );
-  await Deno.writeFile(
-    join(evidenceDirectory, "module-graph.stderr.log"),
-    result.stderr,
-    { createNew: true, mode: 0o600 },
-  );
-  if (!result.success) {
-    throw new Error(`Module graph command exited ${result.code}`);
-  }
-  const graph: unknown = JSON.parse(new TextDecoder().decode(result.stdout));
   const count = assertHealthyModuleGraph(graph);
   assertGraphCoverage(
     paths.map((path) => toFileUrl(join(root, path)).href),
     graph,
   );
+  if (!typecheck) return count;
+  const checked = await new sys.Command(process.execPath, {
+    args: [
+      join(root, "node_modules/typescript/bin/tsc"),
+      "--project",
+      join(root, "tsconfig.json"),
+      "--pretty",
+      "false",
+    ],
+    cwd: root,
+    stdout: "piped",
+    stderr: "piped",
+  }).output();
+  await sys.writeBytes(
+    join(evidenceDirectory, "typecheck.log"),
+    new Uint8Array([...checked.stdout, ...checked.stderr]),
+    { createNew: true, mode: 0o600 },
+  );
+  if (!checked.success) {
+    const errors = new TextDecoder().decode(checked.stdout)
+      .split("\n").filter((line) => line.includes("error TS"));
+    throw new Error(
+      `Type check failed with ${errors.length} error(s): ${
+        errors.slice(0, 20).join("; ")
+      }`,
+    );
+  }
   return count;
 }
 

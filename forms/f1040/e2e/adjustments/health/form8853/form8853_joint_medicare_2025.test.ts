@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../scripts/support/sys.ts";
 import {
   assertEquals,
   assertExists,
@@ -52,7 +55,7 @@ function holder(
       }],
     },
     prior_year: {
-      had_account_at_end_2024: false,
+      had_account_at_prior_year_end: false,
       year_end_account_review_source_reference: `${owner} 2024 account review`,
     },
   };
@@ -62,11 +65,11 @@ export const mixedPrior: MedicareHolderLedger[] = [
   holder("spouse", 2000.4, 500.6),
 ];
 mixedPrior[0].prior_year = {
-  had_account_at_end_2024: true,
-  balance_on_2024_12_31: 10000,
+  had_account_at_prior_year_end: true,
+  balance_at_prior_year_end: 10000,
   balance_source_reference: "taxpayer 2024 year-end balance",
   balance_includes_all_holder_medicare_msas_confirmed: true,
-  annual_hdhp_deductible_on_2025_01_01: 8000,
+  annual_hdhp_deductible_at_year_start: 8000,
   deductible_policy_source_reference: "taxpayer Jan1 2025 deductible",
 };
 export const partialException: MedicareHolderLedger[] = structuredClone(
@@ -92,10 +95,10 @@ partialException[0].source.distributions = ["14", "15", "16"].map((day) => ({
   unreimbursed_holder_qualified_expenses: 1000,
   qualified_expense_source_references: [`taxpayer bill${day}`],
 }));
-if (!partialException[0].prior_year?.had_account_at_end_2024) {
+if (!partialException[0].prior_year?.had_account_at_prior_year_end) {
   throw new Error("fixture prior year");
 }
-partialException[0].prior_year.annual_hdhp_deductible_on_2025_01_01 = 12000;
+partialException[0].prior_year.annual_hdhp_deductible_at_year_start = 12000;
 partialException[1] = holder("spouse");
 export const bothCents: MedicareHolderLedger[] = [
   holder("taxpayer", 1000.49, 100.51),
@@ -150,7 +153,7 @@ for (
     ["both qualified zero", bothQualified, 0, 0],
   ] as const
 ) {
-  Deno.test(`Joint Medicare ${name}: public source→1040→controlling form/statements→full XSD/PDF`, async () => {
+  test(`Joint Medicare ${name}: public source→1040→controlling form/statements→full XSD/PDF`, async () => {
     const result = run(ledgers);
     assertEquals(result.diagnostics, []);
     assertEquals(
@@ -166,7 +169,7 @@ for (
     assertEquals(result.pending.f1040?.line23_other_taxes ?? 0, tax);
     const filer = extractFilerIdentity(result.pending.f1040);
     assertExists(filer);
-    const computed = calculateMedicareJointLedgers(ledgers);
+    const computed = calculateMedicareJointLedgers(ledgers, 2025);
     const xml = buildMefXml(buildPending(result.pending), filer);
     assertEquals((xml.match(/<IRS8853\b/g) ?? []).length, 1);
     assertEquals(
@@ -211,20 +214,20 @@ for (
       if (i > 0) assertEquals(body.includes("MSAHolderSSN"), false);
     }
     const xsd = new URL(
-      "../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+      "../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
       import.meta.url,
     ).pathname;
-    const xmlPath = await Deno.makeTempFile({ suffix: ".xml" }),
-      pdfPath = await Deno.makeTempFile({ suffix: ".pdf" });
+    const xmlPath = await sys.makeTempFile({ suffix: ".xml" }),
+      pdfPath = await sys.makeTempFile({ suffix: ".pdf" });
     try {
-      await Deno.writeTextFile(xmlPath, xml);
-      const valid = await new Deno.Command("xmllint", {
+      await fs.writeFile(xmlPath, xml);
+      const valid = await new sys.Command("xmllint", {
         args: ["--noout", "--schema", xsd, xmlPath],
         stderr: "piped",
       }).output();
       assertEquals(valid.code, 0, new TextDecoder().decode(valid.stderr));
-      await Deno.writeFile(pdfPath, await buildPdfBytes(result.pending, filer));
-      const extracted = await new Deno.Command("pdftotext", {
+      await fs.writeFile(pdfPath, await buildPdfBytes(result.pending, filer));
+      const extracted = await new sys.Command("pdftotext", {
         args: ["-layout", pdfPath, "-"],
         stdout: "piped",
       }).output();
@@ -266,12 +269,12 @@ for (
         lines.map((l) => l.line13a),
       );
     } finally {
-      await Deno.remove(xmlPath);
-      await Deno.remove(pdfPath);
+      await sys.remove(xmlPath);
+      await sys.remove(pdfPath);
     }
   });
 }
-Deno.test("Joint Medicare rejects duplicate ownership/distributions/medical sources, wrong owner and tampered totals at actual XML/PDF export", async () => {
+test("Joint Medicare rejects duplicate ownership/distributions/medical sources, wrong owner and tampered totals at actual XML/PDF export", async () => {
   const result = run(mixedPrior);
   const filer = extractFilerIdentity(result.pending.f1040)!;
   const invalids: MedicareHolderLedger[][] = [];

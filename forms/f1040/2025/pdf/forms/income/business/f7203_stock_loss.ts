@@ -1,3 +1,4 @@
+import { mefTaxYear } from "../../../../mef/support/year-config.ts";
 import { notePrincipalRepaid } from "../../../../../nodes/intermediate/forms/income/business/form7203/repayment-inventory.ts";
 import { projectPassiveSCorp7203Copy } from "../../../../domains/income/business/passive-s-corp-loss-copies.ts";
 import { PDFName, StandardFonts } from "pdf-lib";
@@ -171,7 +172,10 @@ export const form7203StockLossPdf: PdfFormDescriptor = {
   instances(raw, filer, allPending) {
     if (Object.keys(raw).length === 0) return [];
     if (raw.current_passive_s_corp_loss !== undefined) {
-      return [projectPassiveSCorp7203Copy(raw, allPending, filer).pdfFields];
+      return [projectPassiveSCorp7203Copy(raw, allPending, filer, {
+        taxYear: mefTaxYear(),
+        formType: "f1040",
+      }).pdfFields];
     }
     if (
       Array.isArray(raw.owned_debt_loss_sources) &&
@@ -202,14 +206,19 @@ export const form7203StockLossPdf: PdfFormDescriptor = {
       allowedDebt2,
       allowedDebt3,
       carryover,
-    } = projectReviewedStockLoss7203(raw, allPending ?? {}, filer);
+    } = projectReviewedStockLoss7203(
+      raw,
+      allPending ?? {},
+      filer,
+      mefTaxYear(),
+    );
     const repayment = sumPrincipalRepayments(note?.principal_repayments);
     const debtAfterRepayment = (note?.cash_advance_amount ?? 0) - repayment;
     const secondAdvance = note?.second_formal_note?.cash_advance_amount ??
       note?.open_account_net_advance_amount ?? 0;
     const secondRepayment = notePrincipalRepaid(note?.second_formal_note);
     const secondDebtAfterRepayment = secondAdvance - secondRepayment;
-    const thirdAdvance = note?.kind === "owned_2025_formal_and_open_account" &&
+    const thirdAdvance = note?.kind === "owned_current_year_formal_and_open_account" &&
         note.second_formal_note
       ? note.open_account_net_advance_amount
       : undefined;
@@ -240,7 +249,7 @@ export const form7203StockLossPdf: PdfFormDescriptor = {
       line15_ending_basis: availableBasis - allowedStock,
       ...(note
         ? {
-          ...(note.kind === "owned_2025_open_account"
+          ...(note.kind === "owned_current_year_open_account"
             ? { open_account_debt1: true }
             : { formal_note_debt1: true }),
           line16_debt1: 0,
@@ -271,9 +280,9 @@ export const form7203StockLossPdf: PdfFormDescriptor = {
           line31_debt1: debtAfterRepayment - allowedDebt1,
           line31_total: totalDebtAfterRepayment - allowedDebt,
           ...(secondAdvance > 0 ||
-              note.kind === "owned_2025_formal_and_open_account"
+              note.kind === "owned_current_year_formal_and_open_account"
             ? {
-              ...(note.kind === "owned_2025_formal_and_open_account" &&
+              ...(note.kind === "owned_current_year_formal_and_open_account" &&
                   !note.second_formal_note
                 ? { open_account_debt2: true }
                 : { formal_note_debt2: true }),

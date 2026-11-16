@@ -1,5 +1,8 @@
+import * as fs from "node:fs/promises";
+import * as sys from "../support/sys.ts";
 /** Oracle contract: expected benchmark values change only with a cited publication. */
-import { dirname, fromFileUrl, join } from "@std/path";
+import { dirname, join } from "node:path";
+import { fileURLToPath as fromFileUrl } from "node:url";
 import { z } from "zod";
 import {
   benchmarkExpectedSchema,
@@ -172,7 +175,7 @@ export function ledgerProblems(
 }
 
 async function git(root: string, args: string[]): Promise<string> {
-  const result = await new Deno.Command("git", {
+  const result = await new sys.Command("git", {
     args,
     cwd: root,
     stdout: "piped",
@@ -213,7 +216,10 @@ async function baseCases(
 async function currentCases(root: string): Promise<Map<string, unknown>> {
   const entries: [string, unknown][] = [];
   for (const path of (await repositoryFiles(root)).filter((p) => caseKey(p))) {
-    entries.push([path, JSON.parse(await Deno.readTextFile(join(root, path)))]);
+    entries.push([
+      path,
+      JSON.parse(await fs.readFile(join(root, path), "utf8")),
+    ]);
   }
   return new Map(entries);
 }
@@ -228,11 +234,13 @@ async function currentLedgers(
       entries.push([
         product,
         ledgerSchema.parse(
-          JSON.parse(await Deno.readTextFile(join(root, ledgerPath(product)))),
+          JSON.parse(
+            await fs.readFile(join(root, ledgerPath(product)), "utf8"),
+          ),
         ),
       ]);
     } catch (error) {
-      if (!(error instanceof Deno.errors.NotFound)) throw error;
+      if (!(sys.isNotFound(error))) throw error;
     }
   }
   return new Map(entries);
@@ -285,8 +293,10 @@ export function formatReport(report: OracleReport): string {
 
 if (import.meta.main) {
   const root = dirname(dirname(dirname(fromFileUrl(import.meta.url))));
-  const baseIndex = Deno.args.indexOf("--base");
-  const base = baseIndex === -1 ? "origin/main" : Deno.args[baseIndex + 1];
+  const baseIndex = process.argv.slice(2).indexOf("--base");
+  const base = baseIndex === -1
+    ? "origin/main"
+    : process.argv.slice(2)[baseIndex + 1];
   let report: OracleReport;
   try {
     report = await oracleReport(root, base);
@@ -296,12 +306,12 @@ if (import.meta.main) {
         base.replace(/^origin\//, "")
       }`,
     );
-    Deno.exit(2);
+    process.exit(2);
   }
   console.log(
-    Deno.args.includes("--json")
+    process.argv.slice(2).includes("--json")
       ? JSON.stringify(report)
       : formatReport(report),
   );
-  Deno.exit(report.problems.length === 0 ? 0 : 1);
+  process.exit(report.problems.length === 0 ? 0 : 1);
 }

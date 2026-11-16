@@ -1,3 +1,4 @@
+import type { NodeContext } from "../../../../../../../core/types/node-context.ts";
 import type { SourceDocumentBytes } from "../../../../../../../core/runtime/source-documents.ts";
 import { execute } from "../../../../../../../core/runtime/executor.ts";
 import { buildExecutionPlan } from "../../../../../../../core/runtime/planner.ts";
@@ -20,14 +21,16 @@ export async function stageForm172ProjectedReturn(
   rawInputs: Readonly<Record<string, unknown>>,
   rawBinding: unknown,
   rawDocuments: readonly SourceDocumentBytes[],
+  nolContext: NodeContext,
 ) {
   const inputs = structuredClone(rawInputs);
   const staged = await stageForm172ReviewedReturnCalculation(
     inputs,
     rawBinding,
     rawDocuments,
+    nolContext,
     inputs.form8990 !== undefined
-      ? (source) => executeForm172Form8990Return(source).execution
+      ? (source) => executeForm172Form8990Return(source, nolContext).execution
       : undefined,
   );
   // These routes need their source-dependent staging composed with the NOL
@@ -78,10 +81,7 @@ export async function stageForm172ProjectedReturn(
   const projectedRegistry = { ...registry, start: new RetainedNolStart() };
   const executeNolGraph = (
     source: Record<string, unknown>,
-    context: Parameters<typeof execute>[3] = {
-      taxYear: 2025,
-      formType: "f1040",
-    },
+    context: Parameters<typeof execute>[3] = nolContext,
   ) =>
     execute(
       buildExecutionPlan(projectedRegistry),
@@ -92,9 +92,9 @@ export async function stageForm172ProjectedReturn(
   // Recompute return-derived adoption/education operands on every NOL pass.
   const interestComposition = inputs.form8990 === undefined
     ? undefined
-    : executeForm172Form8990Return(inputs, executeNolGraph, deduction);
+    : executeForm172Form8990Return(inputs, nolContext, executeNolGraph, deduction);
   const execution = interestComposition?.execution ??
-    executePreQefSourceReturn(inputs, true, executeNolGraph);
+    executePreQefSourceReturn(inputs, nolContext, true, executeNolGraph);
   if (execution.diagnostics.length > 0) {
     throw new Error("NOL projection needs successful graph rerun");
   }
@@ -121,10 +121,7 @@ export async function stageForm172ProjectedReturn(
     throw new Error("NOL projection needs the actual retained finalizer");
   }
   const replayInput = f1040.inputSchema.parse(finalizer);
-  const replay = f1040.compute(
-    { taxYear: 2025, formType: "f1040" },
-    replayInput,
-  )
+  const replay = f1040.compute(nolContext, replayInput)
     .outputs.find((o) => o.nodeType === "f1040")?.fields;
   if (!replay) throw new Error("NOL projected finalizer replay is missing");
   for (const key of Object.keys(replay).filter((k) => /^line\d/.test(k))) {

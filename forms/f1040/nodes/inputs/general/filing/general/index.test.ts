@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 // Black-box tests for the General node (Drake Screen 1/2).
 // Written from context.md only — implementation does NOT exist yet.
 //
@@ -42,19 +43,54 @@ function findOutput(result: ReturnType<typeof compute>, nodeType: string) {
   return result.outputs.find((o) => o.nodeType === nodeType);
 }
 
-Deno.test("general rejects an explicitly dual-status 2025 e-file", () => {
+test("general rejects an explicitly dual-status e-file", () => {
   assertThrows(
     () =>
       compute({
         filing_status: FilingStatus.Single,
-        dual_status_return_2025: true,
+        dual_status_return: true,
       }),
     Error,
     "dual-status return cannot use Form 1040 e-file",
   );
 });
 
-Deno.test("general gives Form 8880 filing status and both return SSNs", () => {
+test("general names the return year when rejecting a dual-status e-file", () => {
+  assertThrows(
+    () =>
+      general.compute(
+        { taxYear: 2026, formType: "f1040" },
+        general.inputSchema.parse({
+          filing_status: FilingStatus.Single,
+          dual_status_return: true,
+        }),
+      ),
+    Error,
+    "TY2026 dual-status return cannot use Form 1040 e-file",
+  );
+});
+
+test("general rejects retired year-named inputs", () => {
+  for (
+    const key of [
+      "dual_status_return_2025",
+      "ptc_residence_states_2025",
+      "ptc_residence_months_2025",
+      "apply_overpayment_to_2026_estimated_tax_amount",
+    ]
+  ) {
+    assertEquals(
+      general.inputSchema.safeParse({
+        filing_status: FilingStatus.Single,
+        [key]: key.startsWith("ptc") ? ["CA"] : true,
+      }).success,
+      false,
+      key,
+    );
+  }
+});
+
+test("general gives Form 8880 filing status and both return SSNs", () => {
   const result = compute({ filing_status: FilingStatus.MFJ });
   assertEquals(findOutput(result, "form8880")?.fields, {
     filing_status: FilingStatus.MFJ,
@@ -63,7 +99,7 @@ Deno.test("general gives Form 8880 filing status and both return SSNs", () => {
   });
 });
 
-Deno.test("general sends each Form 8880 contributor's eligibility facts", () => {
+test("general sends each Form 8880 contributor's eligibility facts", () => {
   const result = compute({
     filing_status: FilingStatus.MFJ,
     taxpayer_dob: "1980-01-01",
@@ -86,7 +122,7 @@ Deno.test("general sends each Form 8880 contributor's eligibility facts", () => 
   });
 });
 
-Deno.test("general forwards one complete Form 8880 joint distribution review", () => {
+test("general forwards one complete Form 8880 joint distribution review", () => {
   const review = {
     filing_due_date: "2026-04-15" as const,
     reviewed_distribution_sources_ref: "2023-2026 IRA and plan review",
@@ -118,7 +154,7 @@ Deno.test("general forwards one complete Form 8880 joint distribution review", (
   );
 });
 
-Deno.test("general rejects the removed partial Form 8880 distribution input", () => {
+test("general rejects the removed partial Form 8880 distribution input", () => {
   assertThrows(() =>
     compute({
       filing_status: FilingStatus.MFJ,
@@ -130,7 +166,7 @@ Deno.test("general rejects the removed partial Form 8880 distribution input", ()
   );
 });
 
-Deno.test("general passes Form 461 filing status and documented C/F scope review", () => {
+test("general passes Form 461 filing status and documented C/F scope review", () => {
   const review = {
     only_schedule_c_and_f_business_items: true,
     other_part_i_lines_zero: true,
@@ -150,7 +186,7 @@ Deno.test("general passes Form 461 filing status and documented C/F scope review
   });
 });
 
-Deno.test("general passes MFS lived-apart proof to Form 8582", () => {
+test("general passes MFS lived-apart proof to Form 8582", () => {
   const residenceSource = {
     months: Array.from({ length: 12 }, (_, index) => ({
       month: index + 1,
@@ -206,7 +242,7 @@ function qualifyingChildDep(overrides: Record<string, unknown> = {}) {
   };
 }
 
-Deno.test("general routes required-filing dependent modified AGI to Form 8962", () => {
+test("general routes required-filing dependent modified AGI to Form 8962", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     dependents: [qualifyingChildDep({
@@ -242,7 +278,7 @@ Deno.test("general routes required-filing dependent modified AGI to Form 8962", 
   assertEquals(fields?.dependents_modified_agi, 12_500);
 });
 
-Deno.test("general routes below-100%-FPL Marketplace eligibility to Form 8962", () => {
+test("general routes below-100%-FPL Marketplace eligibility to Form 8962", () => {
   const eligibility = {
     basis: "marketplace_estimate",
     no_one_can_claim_taxpayer: true,
@@ -261,7 +297,7 @@ Deno.test("general routes below-100%-FPL Marketplace eligibility to Form 8962", 
   );
 });
 
-Deno.test("general routes reviewed MFS Marketplace status to Form 8962", () => {
+test("general routes reviewed MFS Marketplace status to Form 8962", () => {
   const status = {
     basis: "no_exception",
     exception_reviewed: true,
@@ -277,7 +313,7 @@ Deno.test("general routes reviewed MFS Marketplace status to Form 8962", () => {
   assertEquals(findOutput(result, "form8962")?.fields.mfs_ptc_status, status);
 });
 
-Deno.test("general excludes refund-only dependents and flags missing filing facts", () => {
+test("general excludes refund-only dependents and flags missing filing facts", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     dependents: [
@@ -334,7 +370,7 @@ function nonCtcDep(overrides: Record<string, unknown> = {}) {
   };
 }
 
-Deno.test("filer ID facts are required before claiming CTC, ODC, or EITC", () => {
+test("filer ID facts are required before claiming CTC, ODC, or EITC", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     taxpayer_ssn_valid_for_employment: undefined,
@@ -350,7 +386,7 @@ Deno.test("filer ID facts are required before claiming CTC, ODC, or EITC", () =>
   assertEquals(findOutput(result, "eitc")?.fields.filer_has_valid_ssns, false);
 });
 
-Deno.test("MFJ CTC needs one valid SSN and the other filer's timely TIN", () => {
+test("MFJ CTC needs one valid SSN and the other filer's timely TIN", () => {
   const result = compute({
     filing_status: FilingStatus.MFJ,
     spouse_ssn: "900-70-0001",
@@ -364,7 +400,7 @@ Deno.test("MFJ CTC needs one valid SSN and the other filer's timely TIN", () => 
   assertEquals(findOutput(result, "eitc")?.fields.filer_has_valid_ssns, false);
 });
 
-Deno.test("a timely TIN without a valid filer SSN supports ODC, not CTC", () => {
+test("a timely TIN without a valid filer SSN supports ODC, not CTC", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     taxpayer_ssn_valid_for_employment: false,
@@ -378,7 +414,7 @@ Deno.test("a timely TIN without a valid filer SSN supports ODC, not CTC", () => 
   assertEquals(findOutput(result, "eitc")?.fields.filer_has_valid_ssns, false);
 });
 
-Deno.test("a late second MFJ TIN blocks both dependent credits", () => {
+test("a late second MFJ TIN blocks both dependent credits", () => {
   const result = compute({
     filing_status: FilingStatus.MFJ,
     spouse_tin_issued_by_due_date: false,
@@ -391,7 +427,7 @@ Deno.test("a late second MFJ TIN blocks both dependent credits", () => {
   assertEquals(findOutput(result, "f1040")?.fields.other_dependent_count, 0);
 });
 
-Deno.test("a filer SSN issued on the due date can qualify for EITC but not CTC", () => {
+test("a filer SSN issued on the due date can qualify for EITC but not CTC", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     taxpayer_ssn_issued_before_due_date: false,
@@ -409,7 +445,7 @@ Deno.test("a filer SSN issued on the due date can qualify for EITC but not CTC",
   );
 });
 
-Deno.test("Schedule 1-A receives each spouse's verified SSN eligibility", () => {
+test("Schedule 1-A receives each spouse's verified SSN eligibility", () => {
   const result = compute({
     filing_status: FilingStatus.MFJ,
     taxpayer_ssn_valid_for_employment: false,
@@ -419,19 +455,44 @@ Deno.test("Schedule 1-A receives each spouse's verified SSN eligibility", () => 
   assertEquals(fields?.spouse_has_valid_ssn, true);
 });
 
+// 2025 Schedule 1-A instructions, Part V, Valid SSN: valid for employment and
+// issued by SSA before the return's due date. That SSN is also a TIN issued
+// by the due date, so it needs no separate tin_issued_by_due_date answer.
+test("Schedule 1-A senior SSN needs only employment validity and issue before the due date", () => {
+  const result = compute({
+    filing_status: FilingStatus.MFJ,
+    spouse_dob: "1960-07-07",
+    spouse_tin_issued_by_due_date: undefined,
+  });
+  const fields = findOutput(result, "schedule1a")?.fields;
+  assertEquals(fields?.spouse_age_65_or_older, true);
+  assertEquals(fields?.spouse_has_valid_ssn, true);
+});
+
+test("an explicit late TIN still governs over the SSN issue date", () => {
+  const result = compute({
+    filing_status: FilingStatus.MFJ,
+    spouse_tin_issued_by_due_date: false,
+  });
+  assertEquals(
+    findOutput(result, "schedule1a")?.fields.spouse_has_valid_ssn,
+    false,
+  );
+});
+
 // ============================================================
 // 1. Input Schema Validation
 // ============================================================
 
-Deno.test("schema: invalid filing_status throws", () => {
+test("schema: invalid filing_status throws", () => {
   assertThrows(() => compute({ filing_status: "invalid_status" }));
 });
 
-Deno.test("schema: missing filing_status throws", () => {
+test("schema: missing filing_status throws", () => {
   assertThrows(() => compute({}));
 });
 
-Deno.test("schema: invalid dependent relationship throws", () => {
+test("schema: invalid dependent relationship throws", () => {
   assertThrows(() =>
     compute({
       filing_status: FilingStatus.Single,
@@ -448,7 +509,7 @@ Deno.test("schema: invalid dependent relationship throws", () => {
   );
 });
 
-Deno.test("schema: months_in_home out of range (>12) throws", () => {
+test("schema: months_in_home out of range (>12) throws", () => {
   assertThrows(() =>
     compute({
       filing_status: FilingStatus.Single,
@@ -457,7 +518,7 @@ Deno.test("schema: months_in_home out of range (>12) throws", () => {
   );
 });
 
-Deno.test("schema: months_in_home negative throws", () => {
+test("schema: months_in_home negative throws", () => {
   assertThrows(() =>
     compute({
       filing_status: FilingStatus.Single,
@@ -470,7 +531,7 @@ Deno.test("schema: months_in_home negative throws", () => {
 // 2. Filing Status Routing — one test per status
 // ============================================================
 
-Deno.test("routing: Single filing_status routes to f1040", () => {
+test("routing: Single filing_status routes to f1040", () => {
   const result = compute({ filing_status: FilingStatus.Single });
   const out = findOutput(result, "f1040");
   assertEquals(
@@ -479,7 +540,7 @@ Deno.test("routing: Single filing_status routes to f1040", () => {
   );
 });
 
-Deno.test("routing: MFJ filing_status routes to f1040", () => {
+test("routing: MFJ filing_status routes to f1040", () => {
   const result = compute({ filing_status: FilingStatus.MFJ });
   const out = findOutput(result, "f1040");
   assertEquals(
@@ -488,7 +549,7 @@ Deno.test("routing: MFJ filing_status routes to f1040", () => {
   );
 });
 
-Deno.test("routing: MFS filing_status routes to f1040", () => {
+test("routing: MFS filing_status routes to f1040", () => {
   const result = compute({ filing_status: FilingStatus.MFS });
   const out = findOutput(result, "f1040");
   assertEquals(
@@ -497,7 +558,7 @@ Deno.test("routing: MFS filing_status routes to f1040", () => {
   );
 });
 
-Deno.test("routing: HOH filing_status routes to f1040", () => {
+test("routing: HOH filing_status routes to f1040", () => {
   const result = compute({ filing_status: FilingStatus.HOH });
   const out = findOutput(result, "f1040");
   assertEquals(
@@ -506,7 +567,7 @@ Deno.test("routing: HOH filing_status routes to f1040", () => {
   );
 });
 
-Deno.test("routing: QSS filing_status routes to f1040", () => {
+test("routing: QSS filing_status routes to f1040", () => {
   const result = compute({ filing_status: FilingStatus.QSS });
   const out = findOutput(result, "f1040");
   assertEquals(
@@ -515,7 +576,7 @@ Deno.test("routing: QSS filing_status routes to f1040", () => {
   );
 });
 
-Deno.test("QSS qualifying child SSN cannot be silently dropped from Form 1040", () => {
+test("QSS qualifying child SSN cannot be silently dropped from Form 1040", () => {
   assertThrows(
     () =>
       compute({
@@ -532,7 +593,7 @@ Deno.test("QSS qualifying child SSN cannot be silently dropped from Form 1040", 
 // 3. No Dependents
 // ============================================================
 
-Deno.test("dependents: empty array → qualifying_child_tax_credit_count is 0", () => {
+test("dependents: empty array → qualifying_child_tax_credit_count is 0", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     dependents: [],
@@ -542,21 +603,21 @@ Deno.test("dependents: empty array → qualifying_child_tax_credit_count is 0", 
   assertEquals(input?.qualifying_child_tax_credit_count ?? 0, 0);
 });
 
-Deno.test("dependents: absent dependents field → other_dependent_count is 0", () => {
+test("dependents: absent dependents field → other_dependent_count is 0", () => {
   const result = compute({ filing_status: FilingStatus.Single });
   const out = findOutput(result, "f1040");
   const input = out?.fields as Record<string, unknown>;
   assertEquals(input?.other_dependent_count ?? 0, 0);
 });
 
-Deno.test("dependents: absent dependents field → dependent_count is 0", () => {
+test("dependents: absent dependents field → dependent_count is 0", () => {
   const result = compute({ filing_status: FilingStatus.Single });
   const out = findOutput(result, "f1040");
   const input = out?.fields as Record<string, unknown>;
   assertEquals(input?.dependent_count ?? 0, 0);
 });
 
-Deno.test("no dependents sends verified zero credit counts to Schedule 8812", () => {
+test("no dependents sends verified zero credit counts to Schedule 8812", () => {
   const result = compute({ filing_status: FilingStatus.Single });
   const fields = findOutput(result, "f8812")?.fields;
   assertEquals(fields?.auto_qualifying_children, 0);
@@ -567,7 +628,7 @@ Deno.test("no dependents sends verified zero credit counts to Schedule 8812", ()
 // 4. Qualifying Child for CTC
 // ============================================================
 
-Deno.test("ctc: child with SSN, under 17, >6 months → qualifying_child_tax_credit_count = 1", () => {
+test("ctc: child with SSN, under 17, >6 months → qualifying_child_tax_credit_count = 1", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     dependents: [qualifyingChildDep()],
@@ -578,7 +639,7 @@ Deno.test("ctc: child with SSN, under 17, >6 months → qualifying_child_tax_cre
   assertEquals(input?.other_dependent_count ?? 0, 0);
 });
 
-Deno.test("ctc: child exactly age 16 at Dec 31 2025 qualifies (under 17)", () => {
+test("ctc: child exactly age 16 at Dec 31 2025 qualifies (under 17)", () => {
   // DOB: Jan 1 2009 → turns 16 in 2025, still under 17
   const result = compute({
     filing_status: FilingStatus.Single,
@@ -589,7 +650,7 @@ Deno.test("ctc: child exactly age 16 at Dec 31 2025 qualifies (under 17)", () =>
   assertEquals(input?.qualifying_child_tax_credit_count, 1);
 });
 
-Deno.test("ctc: child who turns 17 on Dec 31 2025 does NOT qualify (not under 17)", () => {
+test("ctc: child who turns 17 on Dec 31 2025 does NOT qualify (not under 17)", () => {
   // DOB: Dec 31 2008 → turns exactly 17 on Dec 31 2025 → age is 17, not under 17
   const result = compute({
     filing_status: FilingStatus.Single,
@@ -601,7 +662,7 @@ Deno.test("ctc: child who turns 17 on Dec 31 2025 does NOT qualify (not under 17
   assertEquals(input?.other_dependent_count, 1);
 });
 
-Deno.test("ctc: child with ITIN (no SSN) does not qualify for CTC → other_dependent_count = 1", () => {
+test("ctc: child with ITIN (no SSN) does not qualify for CTC → other_dependent_count = 1", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     dependents: [qualifyingChildDep({ ssn: undefined, itin: "900-70-1234" })],
@@ -612,7 +673,7 @@ Deno.test("ctc: child with ITIN (no SSN) does not qualify for CTC → other_depe
   assertEquals(input?.other_dependent_count, 1);
 });
 
-Deno.test("six months of residency cannot claim CTC or an unverified relative ODC", () => {
+test("six months of residency cannot claim CTC or an unverified relative ODC", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     dependents: [qualifyingChildDep({ months_in_home: 6 })],
@@ -623,7 +684,7 @@ Deno.test("six months of residency cannot claim CTC or an unverified relative OD
   assertEquals(input?.other_dependent_count, 0);
 });
 
-Deno.test("ctc: child with months_in_home = 7 qualifies (> 6)", () => {
+test("ctc: child with months_in_home = 7 qualifies (> 6)", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     dependents: [qualifyingChildDep({
@@ -640,7 +701,7 @@ Deno.test("ctc: child with months_in_home = 7 qualifies (> 6)", () => {
 // 5. Non-Qualifying Dependent (over 17 or ITIN)
 // ============================================================
 
-Deno.test("odc: adult child (age 20) with SSN → other_dependent_count = 1, ctc = 0", () => {
+test("odc: adult child (age 20) with SSN → other_dependent_count = 1, ctc = 0", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     dependents: [
@@ -657,7 +718,7 @@ Deno.test("odc: adult child (age 20) with SSN → other_dependent_count = 1, ctc
   assertEquals(input?.other_dependent_count, 1);
 });
 
-Deno.test("odc: parent as dependent → other_dependent_count = 1, ctc = 0", () => {
+test("odc: parent as dependent → other_dependent_count = 1, ctc = 0", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     dependents: [
@@ -682,7 +743,7 @@ Deno.test("odc: parent as dependent → other_dependent_count = 1, ctc = 0", () 
   assertEquals(input?.other_dependent_count, 1);
 });
 
-Deno.test("qualifying relative ODC requires support and income facts, with the 2025 $5,200 limit", () => {
+test("qualifying relative ODC requires support and income facts, with the 2025 $5,200 limit", () => {
   const parent = {
     first_name: "Mom",
     last_name: "Doe",
@@ -718,7 +779,7 @@ Deno.test("qualifying relative ODC requires support and income facts, with the 2
   );
 });
 
-Deno.test("qualifying-relative ODC requires family relationship or full-year household membership", () => {
+test("qualifying-relative ODC requires family relationship or full-year household membership", () => {
   const other = {
     first_name: "Pat",
     last_name: "Doe",
@@ -756,7 +817,7 @@ Deno.test("qualifying-relative ODC requires family relationship or full-year hou
 // 6. Multiple Dependents — mixed
 // ============================================================
 
-Deno.test("multiple: 2 qualifying children + 1 other → ctc=2, odc=1, total=3", () => {
+test("multiple: 2 qualifying children + 1 other → ctc=2, odc=1, total=3", () => {
   const result = compute({
     filing_status: FilingStatus.MFJ,
     dependents: [
@@ -776,7 +837,7 @@ Deno.test("multiple: 2 qualifying children + 1 other → ctc=2, odc=1, total=3",
   assertEquals(input?.dependent_count, 3);
 });
 
-Deno.test("multiple: 3 qualifying children → ctc=3, odc=0, total=3", () => {
+test("multiple: 3 qualifying children → ctc=3, odc=0, total=3", () => {
   const result = compute({
     filing_status: FilingStatus.MFJ,
     dependents: [
@@ -804,7 +865,7 @@ Deno.test("multiple: 3 qualifying children → ctc=3, odc=0, total=3", () => {
 // 7. Informational Fields — do NOT affect computed counts
 // ============================================================
 
-Deno.test("informational: taxpayer name fields do not change ctc count", () => {
+test("informational: taxpayer name fields do not change ctc count", () => {
   const withName = compute({
     filing_status: FilingStatus.Single,
     taxpayer_first_name: "Jane",
@@ -827,7 +888,7 @@ Deno.test("informational: taxpayer name fields do not change ctc count", () => {
   assertEquals(outWithout?.qualifying_child_tax_credit_count, 1);
 });
 
-Deno.test("informational: address fields do not change ctc count", () => {
+test("informational: address fields do not change ctc count", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     address_line1: "123 Main St",
@@ -844,7 +905,7 @@ Deno.test("informational: address fields do not change ctc count", () => {
 // 8. HOH requires qualifying person (but node accepts it without validation)
 // ============================================================
 
-Deno.test("hoh: HOH with no dependents is still valid (node does not block)", () => {
+test("hoh: HOH with no dependents is still valid (node does not block)", () => {
   const result = compute({ filing_status: FilingStatus.HOH });
   const out = findOutput(result, "f1040");
   assertEquals(
@@ -857,7 +918,7 @@ Deno.test("hoh: HOH with no dependents is still valid (node does not block)", ()
 // 9. Disability does not waive the CTC age limit
 // ============================================================
 
-Deno.test("disabled adult child qualifies for ODC, not CTC", () => {
+test("disabled adult child qualifies for ODC, not CTC", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     dependents: [
@@ -873,7 +934,24 @@ Deno.test("disabled adult child qualifies for ODC, not CTC", () => {
   assertEquals(input?.other_dependent_count, 1);
 });
 
-Deno.test("dependent without qualifying U.S. status receives neither CTC nor ODC", () => {
+// Pub. 596 (2025) Rule 8, Age Test: a child of any age who is permanently and
+// totally disabled meets the age test, with no younger-than-you requirement.
+test("permanently and totally disabled son of 37 is an EIC qualifying child", () => {
+  const result = compute({
+    filing_status: FilingStatus.QSS,
+    taxpayer_dob: "1975-10-06",
+    dependents: [qualifyingChildDep({ dob: "1988-09-14", disabled: true })],
+  });
+  assertEquals(findOutput(result, "eitc")?.fields.qualifying_children, 1);
+  const notDisabled = compute({
+    filing_status: FilingStatus.QSS,
+    taxpayer_dob: "1975-10-06",
+    dependents: [qualifyingChildDep({ dob: "1988-09-14", disabled: false })],
+  });
+  assertEquals(findOutput(notDisabled, "eitc")?.fields.qualifying_children, 0);
+});
+
+test("dependent without qualifying U.S. status receives neither CTC nor ODC", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     dependents: [
@@ -887,7 +965,7 @@ Deno.test("dependent without qualifying U.S. status receives neither CTC nor ODC
   assertEquals(fields?.dependent_count, 2);
 });
 
-Deno.test("child support answer is required for CTC and ODC, but not the EITC child test", () => {
+test("child support answer is required for CTC and ODC, but not the EITC child test", () => {
   for (const answer of [undefined, true]) {
     const result = compute({
       filing_status: FilingStatus.Single,
@@ -904,7 +982,7 @@ Deno.test("child support answer is required for CTC and ODC, but not the EITC ch
   }
 });
 
-Deno.test("a disqualifying joint return prevents dependent credits and EITC", () => {
+test("a disqualifying joint return prevents dependent credits and EITC", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     dependents: [
@@ -919,7 +997,7 @@ Deno.test("a disqualifying joint return prevents dependent credits and EITC", ()
   assertEquals(findOutput(result, "eitc")?.fields.qualifying_children, 0);
 });
 
-Deno.test("EITC child needs an SSN and more than half-year U.S. residence", () => {
+test("EITC child needs an SSN and more than half-year U.S. residence", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     dependents: [
@@ -939,7 +1017,7 @@ Deno.test("EITC child needs an SSN and more than half-year U.S. residence", () =
   assertEquals(findOutput(result, "f1040")?.fields.other_dependent_count, 1);
 });
 
-Deno.test("employment-invalid child SSN can qualify for ODC but not CTC or EITC", () => {
+test("employment-invalid child SSN can qualify for ODC but not CTC or EITC", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     dependents: [qualifyingChildDep({ ssn_valid_for_employment: false })],
@@ -952,7 +1030,7 @@ Deno.test("employment-invalid child SSN can qualify for ODC but not CTC or EITC"
   assertEquals(findOutput(result, "eitc")?.fields.qualifying_children, 0);
 });
 
-Deno.test("an unanswered SSN employment-validity question cannot claim CTC or EITC", () => {
+test("an unanswered SSN employment-validity question cannot claim CTC or EITC", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     dependents: [qualifyingChildDep({ ssn_valid_for_employment: undefined })],
@@ -965,7 +1043,7 @@ Deno.test("an unanswered SSN employment-validity question cannot claim CTC or EI
   assertEquals(findOutput(result, "eitc")?.fields.qualifying_children, 0);
 });
 
-Deno.test("SSN issued on the due date fails CTC but can meet EITC and ODC timing", () => {
+test("SSN issued on the due date fails CTC but can meet EITC and ODC timing", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     dependents: [qualifyingChildDep({ ssn_issued_before_due_date: false })],
@@ -978,7 +1056,7 @@ Deno.test("SSN issued on the due date fails CTC but can meet EITC and ODC timing
   assertEquals(findOutput(result, "eitc")?.fields.qualifying_children, 1);
 });
 
-Deno.test("late dependent TIN cannot support ODC or EITC", () => {
+test("late dependent TIN cannot support ODC or EITC", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     dependents: [qualifyingChildDep({
@@ -994,7 +1072,7 @@ Deno.test("late dependent TIN cannot support ODC or EITC", () => {
   assertEquals(findOutput(result, "eitc")?.fields.qualifying_children, 0);
 });
 
-Deno.test("qualifying EITC child identity reaches the Schedule EIC input", () => {
+test("qualifying EITC child identity reaches the Schedule EIC input", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     dependents: [qualifyingChildDep({
@@ -1023,7 +1101,7 @@ Deno.test("qualifying EITC child identity reaches the Schedule EIC input", () =>
   }]);
 });
 
-Deno.test("EITC child needs exact U.S. months; a U.S. residency Boolean alone is insufficient", () => {
+test("EITC child needs exact U.S. months; a U.S. residency Boolean alone is insufficient", () => {
   assertThrows(
     () =>
       compute({
@@ -1041,7 +1119,7 @@ Deno.test("EITC child needs exact U.S. months; a U.S. residency Boolean alone is
 // 10. qualifying_child_for_ctc override flag
 // ============================================================
 
-Deno.test("override: qualifying_child_for_ctc=true forces CTC even if residency fails", () => {
+test("override: qualifying_child_for_ctc=true forces CTC even if residency fails", () => {
   // months_in_home = 3 would normally disqualify, but override says yes
   const result = compute({
     filing_status: FilingStatus.Single,
@@ -1057,7 +1135,7 @@ Deno.test("override: qualifying_child_for_ctc=true forces CTC even if residency 
   assertEquals(input?.qualifying_child_tax_credit_count, 1);
 });
 
-Deno.test("override: qualifying_child_for_ctc=false forces ODC even if child would normally qualify", () => {
+test("override: qualifying_child_for_ctc=false forces ODC even if child would normally qualify", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     dependents: [
@@ -1076,7 +1154,7 @@ Deno.test("override: qualifying_child_for_ctc=false forces ODC even if child wou
 // 11. Smoke Test — MFJ return, 2 qualifying children, 1 qualifying relative
 // ============================================================
 
-Deno.test("date of birth derives age-65 eligibility for standard and senior deductions", () => {
+test("date of birth derives age-65 eligibility for standard and senior deductions", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     taxpayer_ssn: "111-22-3333",
@@ -1101,7 +1179,7 @@ Deno.test("date of birth derives age-65 eligibility for standard and senior dedu
   );
 });
 
-Deno.test("age-65 answers must agree with taxpayer and spouse dates of birth", () => {
+test("age-65 answers must agree with taxpayer and spouse dates of birth", () => {
   assertThrows(
     () =>
       compute({
@@ -1147,7 +1225,7 @@ Deno.test("age-65 answers must agree with taxpayer and spouse dates of birth", (
   );
 });
 
-Deno.test("malformed or future dates of birth cannot drive Form 1040 age boxes", () => {
+test("malformed or future dates of birth cannot drive Form 1040 age boxes", () => {
   for (const dob of ["1960-02-30", "1960/02/01", "2026-01-01"]) {
     assertThrows(
       () => compute({ filing_status: FilingStatus.Single, taxpayer_dob: dob }),
@@ -1157,7 +1235,7 @@ Deno.test("malformed or future dates of birth cannot drive Form 1040 age boxes",
   }
 });
 
-Deno.test("smoke: MFJ + 2 qualifying children + 1 qualifying relative → all outputs correct", () => {
+test("smoke: MFJ + 2 qualifying children + 1 qualifying relative → all outputs correct", () => {
   const result = compute({
     filing_status: FilingStatus.MFJ,
     taxpayer_first_name: "John",
@@ -1228,8 +1306,8 @@ Deno.test("smoke: MFJ + 2 qualifying children + 1 qualifying relative → all ou
 
   assertEquals(
     result.outputs.length,
-    16,
-    "sixteen outputs including Forms 4137 and 8919 identity and Form 8962 family context",
+    17,
+    "seventeen outputs including Forms 4137 and 8919 identity, Form 8962 family context and Form 8863 filing status",
   );
   assertEquals(findOutput(result, "form4137")?.fields, {
     taxpayer_ssn: "111-22-3333",
@@ -1266,7 +1344,7 @@ Deno.test("smoke: MFJ + 2 qualifying children + 1 qualifying relative → all ou
 // 12. New fields — digital_assets
 // ============================================================
 
-Deno.test("digital_assets: true → routes to f1040 with digital_assets: true", () => {
+test("digital_assets: true → routes to f1040 with digital_assets: true", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     digital_assets: true,
@@ -1275,7 +1353,7 @@ Deno.test("digital_assets: true → routes to f1040 with digital_assets: true", 
   assertEquals(input?.digital_assets, true);
 });
 
-Deno.test("digital_assets: false → routes to f1040 with digital_assets: false", () => {
+test("digital_assets: false → routes to f1040 with digital_assets: false", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     digital_assets: false,
@@ -1288,7 +1366,7 @@ Deno.test("digital_assets: false → routes to f1040 with digital_assets: false"
 // 13. dependent_on_another_return — excluded from counts
 // ============================================================
 
-Deno.test("dependent_on_another_return: true → excluded from dependent_count", () => {
+test("dependent_on_another_return: true → excluded from dependent_count", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     dependents: [
@@ -1302,12 +1380,12 @@ Deno.test("dependent_on_another_return: true → excluded from dependent_count",
   assertEquals(input?.qualifying_child_tax_credit_count, 1);
 });
 
-Deno.test("custodial Form 8332 release keeps child in EIC but off Form 1040 dependent rows", () => {
+test("custodial Form 8332 release keeps child in EIC but off Form 1040 dependent rows", () => {
   const release = {
     form8332_source_reference: "signed 2025 Form 8332",
     custody_record_reference: "2025 nights ledger",
-    custodial_parent_for_2025: true,
-    valid_2025_release_to_noncustodial_parent: true,
+    custodial_parent_for_tax_year: true,
+    valid_tax_year_release_to_noncustodial_parent: true,
     no_competing_eitc_claim_verified: true,
   };
   const result = compute({
@@ -1350,7 +1428,7 @@ Deno.test("custodial Form 8332 release keeps child in EIC but off Form 1040 depe
 // Separated-spouse EIC special rule
 // ============================================================
 
-Deno.test("reviewed MFS separation reaches EIC and Form 1040 special-rule mark", () => {
+test("reviewed MFS separation reaches EIC and Form 1040 special-rule mark", () => {
   const review = {
     basis: "last_six_months_apart",
     separate_residence_record_reference: "2025 residence ledger",
@@ -1396,7 +1474,7 @@ Deno.test("reviewed MFS separation reaches EIC and Form 1040 special-rule mark",
 // 14. ATIN disqualifies CTC
 // ============================================================
 
-Deno.test("atin: dependent with atin set → NOT counted as CTC qualifying child", () => {
+test("atin: dependent with atin set → NOT counted as CTC qualifying child", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     dependents: [
@@ -1412,7 +1490,7 @@ Deno.test("atin: dependent with atin set → NOT counted as CTC qualifying child
 // 15. full_time_student — qualifying child for ODC but NOT CTC
 // ============================================================
 
-Deno.test("full_time_student: age 21 full-time student → qualifying child (ODC), NOT CTC", () => {
+test("full_time_student: age 21 full-time student → qualifying child (ODC), NOT CTC", () => {
   // Age 21 at Dec 31 2025 → dob 2004
   const result = compute({
     filing_status: FilingStatus.Single,
@@ -1434,7 +1512,7 @@ Deno.test("full_time_student: age 21 full-time student → qualifying child (ODC
 // 16. mfs_spouse_itemizing routed to f1040
 // ============================================================
 
-Deno.test("mfs: mfs_spouse_itemizing: true → routed to f1040", () => {
+test("mfs: mfs_spouse_itemizing: true → routed to f1040", () => {
   const result = compute({
     filing_status: FilingStatus.MFS,
     mfs_spouse_itemizing: true,
@@ -1447,7 +1525,7 @@ Deno.test("mfs: mfs_spouse_itemizing: true → routed to f1040", () => {
 // 17. taxpayer deceased fields routed to f1040
 // ============================================================
 
-Deno.test("deceased: taxpayer_deceased + taxpayer_death_date → routed to f1040", () => {
+test("deceased: taxpayer_deceased + taxpayer_death_date → routed to f1040", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     taxpayer_deceased: true,
@@ -1462,7 +1540,7 @@ Deno.test("deceased: taxpayer_deceased + taxpayer_death_date → routed to f1040
 // 18. Dependent IP PIN accepted
 // ============================================================
 
-Deno.test("dependent ip_pin: '123456' → accepted (valid 6-digit IP PIN)", () => {
+test("dependent ip_pin: '123456' → accepted (valid 6-digit IP PIN)", () => {
   // Should not throw — confirms schema accepts 6-digit ip_pin
   const result = compute({
     filing_status: FilingStatus.Single,
@@ -1478,7 +1556,7 @@ Deno.test("dependent ip_pin: '123456' → accepted (valid 6-digit IP PIN)", () =
 // 19. Smoke test — all new major fields populated
 // ============================================================
 
-Deno.test("smoke: all new major fields populated → routes correctly to f1040", () => {
+test("smoke: all new major fields populated → routes correctly to f1040", () => {
   const result = compute({
     filing_status: FilingStatus.MFJ,
     taxpayer_first_name: "Jane",
@@ -1518,7 +1596,7 @@ Deno.test("smoke: all new major fields populated → routes correctly to f1040",
     ],
   });
 
-  assertEquals(result.outputs.length, 16);
+  assertEquals(result.outputs.length, 17); // includes Form 8863 filing status
   assertEquals(findOutput(result, "form8962")?.fields.household_size, 4);
   const input = findOutput(result, "f1040")?.fields as Record<string, unknown>;
   assertEquals(input?.filing_status, FilingStatus.MFJ);
@@ -1535,4 +1613,29 @@ Deno.test("smoke: all new major fields populated → routes correctly to f1040",
   assertEquals(input?.hoh_paid_more_than_half_home_costs, true);
   assertEquals(input?.taxpayer_ip_pin, "123456");
   assertEquals(input?.spouse_ip_pin, "654321");
+});
+
+test("reviewed HOH lived-apart spouse marks the Form 1040 separated-spouse box only for HOH", () => {
+  const review = {
+    lived_apart_last_six_months_of_tax_year_verified: true,
+    separate_residence_record_reference: "2025 residence ledger",
+  };
+  const result = compute({
+    filing_status: FilingStatus.HOH,
+    hoh_spouse_lived_apart_review: review,
+    dependents: [qualifyingChildDep()],
+  });
+  assertEquals(
+    findOutput(result, "f1040")?.fields.hoh_spouse_lived_apart,
+    true,
+  );
+  assertThrows(
+    () =>
+      compute({
+        filing_status: FilingStatus.Single,
+        hoh_spouse_lived_apart_review: review,
+      }),
+    Error,
+    "needs head-of-household status",
+  );
 });

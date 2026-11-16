@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import { FilingStatus } from "../../../../../types.ts";
 import { schedule_j_calculation } from "./index.ts";
@@ -40,8 +41,8 @@ function source() {
     farm_only_income_verified: true,
     se_tax_deduction: 5_000,
     agi: 70_000,
-    taxable_income_2025: 50_000,
-    filing_status_2025: FilingStatus.Single,
+    current_year_taxable_income: 50_000,
+    current_year_filing_status: FilingStatus.Single,
     taking_standard_deduction: true,
     qbi_deduction: 10_000,
     additional_deductions: 0,
@@ -49,7 +50,7 @@ function source() {
   });
 }
 
-Deno.test("Schedule J sends calculated line 23 to tax and finalizes the attachment", () => {
+test("Schedule J sends calculated line 23 to tax and finalizes the attachment", () => {
   const result = schedule_j_calculation.compute(
     { taxYear: 2025, formType: "f1040" },
     source(),
@@ -62,7 +63,7 @@ Deno.test("Schedule J sends calculated line 23 to tax and finalizes the attachme
   assertEquals(result.finalizations?.[0].fields.line23, 5_708);
 });
 
-Deno.test("Schedule J source deposits without an election are a normal no-op", () => {
+test("Schedule J source deposits without an election are a normal no-op", () => {
   const result = schedule_j_calculation.compute(
     { taxYear: 2025, formType: "f1040" },
     {
@@ -70,8 +71,8 @@ Deno.test("Schedule J source deposits without an election are a normal no-op", (
       farm_only_income_verified: true,
       se_tax_deduction: 5_000,
       agi: 70_000.25,
-      taxable_income_2025: 50_000.25,
-      filing_status_2025: FilingStatus.Single,
+      current_year_taxable_income: 50_000.25,
+      current_year_filing_status: FilingStatus.Single,
       taking_standard_deduction: true,
       qbi_deduction: 10_000,
       additional_deductions: 0,
@@ -82,7 +83,7 @@ Deno.test("Schedule J source deposits without an election are a normal no-op", (
   assertEquals(result.finalizations, undefined);
 });
 
-Deno.test("Schedule J rejects unverified farm attribution and excess election", () => {
+test("Schedule J rejects unverified farm attribution and excess election", () => {
   const unverified = { ...source(), farm_only_income_verified: false };
   assertThrows(() => schedule_j_calculation.compute(
     { taxYear: 2025, formType: "f1040" },
@@ -95,7 +96,7 @@ Deno.test("Schedule J rejects unverified farm attribution and excess election", 
   ));
 });
 
-Deno.test("Schedule J reports the unsupported source when fishing income lacks attribution", () => {
+test("Schedule J reports the unsupported source when fishing income lacks attribution", () => {
   assertThrows(
     () => schedule_j_calculation.compute(
       { taxYear: 2025, formType: "f1040" },
@@ -110,7 +111,7 @@ Deno.test("Schedule J reports the unsupported source when fishing income lacks a
   );
 });
 
-Deno.test("Schedule J rejects other deduction methods and unreconciled AGI", () => {
+test("Schedule J rejects other deduction methods and unreconciled AGI", () => {
   for (const changed of [
     { ...source(), taking_standard_deduction: false },
     { ...source(), additional_deductions: 1 },

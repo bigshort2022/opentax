@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import { PDFDocument } from "pdf-lib";
 import {
@@ -53,10 +54,10 @@ const reviewed = (item: F8814Item): F8814Item => ({
   },
 });
 
-Deno.test("Form 8814 PDF expands one copy for each elected child", () => {
-  const first = calculateForm8814(reviewed(election));
+test("Form 8814 PDF expands one copy for each elected child", () => {
+  const first = calculateForm8814(reviewed(election), 2025);
   const second = calculateForm8814(
-    reviewed({ ...election, child_ssn: "111223333" }),
+    reviewed({ ...election, child_ssn: "111223333" }), 2025,
   );
   const instances =
     form8814Pdf.instances?.({ items: [first, second] }, filer) ?? [];
@@ -66,24 +67,24 @@ Deno.test("Form 8814 PDF expands one copy for each elected child", () => {
   assertEquals(instances[0].multiple_forms, true);
 });
 
-Deno.test("Form 8814 PDF rejects an unreviewed or wrong-owner child source", () => {
+test("Form 8814 PDF rejects an unreviewed or wrong-owner child source", () => {
   assertThrows(
     () =>
-      form8814Pdf.instances?.({ items: [calculateForm8814(election)] }, filer),
+      form8814Pdf.instances?.({ items: [calculateForm8814(election, 2025)] }, filer),
     Error,
     "reviewed child-income source",
   );
   assertThrows(
     () =>
       form8814Pdf.instances?.({
-        items: [calculateForm8814(reviewed(election))],
+        items: [calculateForm8814(reviewed(election), 2025)],
       }, { ...filer, primarySSN: "111223333" }),
     Error,
     "child/parent owner differs",
   );
 });
 
-Deno.test("Schedule 1 PDF prints Form 8814 on line 8z amount field", () => {
+test("Schedule 1 PDF prints Form 8814 on line 8z amount field", () => {
   const instances = schedule1Pdf.instances?.({ line8z_form8814: 1000 }) ?? [];
   assertEquals(instances[0].line8z_description, "SEE STATEMENT");
   assertEquals(instances[0].line8z_other, 1000);
@@ -93,13 +94,13 @@ Deno.test("Schedule 1 PDF prints Form 8814 on line 8z amount field", () => {
   assertEquals(amount?.pdfField, "topmostSubform[0].Page1[0].f1_36[0]");
 });
 
-Deno.test("Form 8814 PDF prints child nominee amounts beside lines 1a, 2a, and 3", () => {
+test("Form 8814 PDF prints child nominee amounts beside lines 1a, 2a, and 3", () => {
   const line = calculateForm8814(reviewed({
     ...election,
     interest_adjustments: { nominee_distribution: 120 },
     dividend_nominee_distribution: 90,
     capital_gain_nominee_distribution: 75,
-  }));
+  }), 2025);
   const instance = form8814Pdf.instances?.({ items: [line] }, filer)[0] ?? {};
   assertEquals(form8814DottedNotes(instance), {
     interest: "ND $120",
@@ -109,7 +110,7 @@ Deno.test("Form 8814 PDF prints child nominee amounts beside lines 1a, 2a, and 3
   });
 });
 
-Deno.test("Form 8814 PDF adds a child-specific line 1a continuation when adjustments do not fit", async () => {
+test("Form 8814 PDF adds a child-specific line 1a continuation when adjustments do not fit", async () => {
   const line = calculateForm8814(reviewed({
     ...election,
     interest_adjustments: {
@@ -118,7 +119,7 @@ Deno.test("Form 8814 PDF adds a child-specific line 1a continuation when adjustm
       abp_adjustment: 15,
       oid_adjustment: 5,
     },
-  }));
+  }), 2025);
   const instance = form8814Pdf.instances?.({ items: [line] }, filer)[0] ?? {};
   assertEquals(form8814DottedNotes(instance), {
     interest: "See attached interest adjustments",
@@ -137,9 +138,9 @@ Deno.test("Form 8814 PDF adds a child-specific line 1a continuation when adjustm
   assertEquals(document.getPageCount(), 2);
 });
 
-Deno.test("Form 8814 PDF follows the 2025 skip rule for lines 7 through 10", () => {
+test("Form 8814 PDF follows the 2025 skip rule for lines 7 through 10", () => {
   const noPreferred = form8814Pdf.instances?.({
-    items: [calculateForm8814(reviewed(election))],
+    items: [calculateForm8814(reviewed(election), 2025)],
   }, filer)[0] ?? {};
   assertEquals(noPreferred.line7_fraction, undefined);
   assertEquals(noPreferred.line8_fraction, undefined);
@@ -152,7 +153,7 @@ Deno.test("Form 8814 PDF follows the 2025 skip rule for lines 7 through 10", () 
       ...election,
       dividend_income: 300,
       qualified_dividends: 300,
-    }))],
+    }), 2025)],
   }, filer)[0] ?? {};
   assertEquals(onePreferred.line8_fraction, "00000");
   assertEquals(onePreferred.line10, 0);
@@ -167,13 +168,13 @@ Deno.test("Form 8814 PDF follows the 2025 skip rule for lines 7 through 10", () 
   );
 });
 
-Deno.test("2025 parent PDF marks Form 8814 dividends and direct child gain", () => {
+test("2025 parent PDF marks Form 8814 dividends and direct child gain", () => {
   const child = calculateForm8814({
     ...election,
     dividend_income: 300,
     qualified_dividends: 300,
     capital_gain_distributions: 500,
-  });
+  }, 2025);
   const pending = { form8814: { items: [child] } };
   assertEquals(form8814ParentPrintAmounts(pending), {
     dividends: 120,
@@ -292,7 +293,7 @@ Deno.test("2025 parent PDF marks Form 8814 dividends and direct child gain", () 
   );
 });
 
-Deno.test("Schedule B marks only the child foreign-account and trust lines", () => {
+test("Schedule B marks only the child foreign-account and trust lines", () => {
   assertEquals(scheduleBForm8814DottedLines({}), []);
   assertEquals(
     scheduleBForm8814DottedLines({ form8814_foreign_account: true }),

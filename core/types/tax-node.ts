@@ -19,6 +19,8 @@ export type NodeResult = {
   readonly finalizations?: readonly NodeOutput[];
   // Carryforward amounts to next tax year (key = descriptive label, value = positive amount)
   readonly carryforwards?: Readonly<Record<string, number>>;
+  /** Review notes for an incomplete source that did not stop the return. */
+  readonly warnings?: readonly string[];
 };
 
 // Requires at least one key from T to be present
@@ -40,6 +42,8 @@ export abstract class TaxNode<TSchema extends z.ZodTypeAny = z.ZodTypeAny> {
   abstract readonly nodeType: NodeType;
   abstract readonly inputSchema: TSchema;
   abstract readonly outputNodes: OutputNodes<readonly TaxNode<z.ZodTypeAny>[]>;
+  /** Return-wide facts this node reads, such as filing status; they alone do not put the form on the return. */
+  readonly contextFields: readonly string[] = [];
   abstract compute(ctx: NodeContext, input: z.infer<TSchema>): NodeResult;
 
   get outputNodeTypes(): readonly NodeType[] {

@@ -1,3 +1,4 @@
+import * as fs from "node:fs/promises";
 /** CLI regression scenarios with explicitly invented identity/eligibility facts. */
 import variants from "../../benchmark/reference/2025/issue77-synthetic.json" with {
   type: "json",
@@ -7,11 +8,11 @@ type Invoke = (...args: string[]) => Promise<string>;
 type Form = { node_type: string; data: Record<string, unknown> };
 async function source(name: string): Promise<Form[]> {
   return JSON.parse(
-    await Deno.readTextFile(
+    await fs.readFile(
       new URL(
         `../../benchmark/cases/f1040/2025/${name}/input.json`,
         import.meta.url,
-      ),
+      ), "utf8",
     ),
   ).forms;
 }
@@ -22,6 +23,7 @@ const general = {
   taxpayer_ssn: variants.taxpayer_ssn,
   taxpayer_dob: "1985-06-15",
   taxpayer_ssn_valid_for_employment: true,
+  taxpayer_ssn_issued_before_due_date: true,
   taxpayer_tin_issued_by_due_date: true,
   address_line1: "1 Example Way",
   address_city: "Austin",
@@ -69,8 +71,7 @@ async function compute(
   if (
     expectedWarnings === null
       ? (result.warnings ?? []).some((warning: string) =>
-        warning !==
-          "Refund is more than double total withholding — verify refundable credits."
+        !isAdvisory(warning)
       )
       : JSON.stringify(result.warnings ?? []) !==
         JSON.stringify(expectedWarnings)
@@ -80,6 +81,15 @@ async function compute(
     );
   }
   return result;
+}
+// Informational warnings an archived case may carry: the refund advisory and
+// the K-1 default that a box with no stated passive status is nonpassive
+// (2025 Instructions for Form 8582; the totals already reflect the default).
+function isAdvisory(warning: string): boolean {
+  return warning ===
+      "Refund is more than double total withholding — verify refundable credits." ||
+    /^Schedule K-1 \(Form 10(65|20-S)\) .+ has no passive or nonpassive status, so it was treated as nonpassive/
+      .test(warning);
 }
 function equal(actual: unknown, expected: number, label: string) {
   if (actual !== expected) {
@@ -104,6 +114,7 @@ export async function smokeIssue77(invoke: Invoke): Promise<void> {
           spouse_ssn: variants.spouse_ssn,
           spouse_dob: "1985-06-15",
           spouse_ssn_valid_for_employment: true,
+          spouse_ssn_issued_before_due_date: true,
           spouse_tin_issued_by_due_date: true,
         },
       },
@@ -182,11 +193,11 @@ export async function smokeIssue77(invoke: Invoke): Promise<void> {
 /** Replay every completed fixture through persisted public CLI inputs. */
 export async function smokeCompletedIssue77(invoke: Invoke): Promise<void> {
   const archived = JSON.parse(
-    await Deno.readTextFile(
+    await fs.readFile(
       new URL(
         "../../benchmark/reference/2025/issue77-original-incomplete.json",
         import.meta.url,
-      ),
+      ), "utf8",
     ),
   );
   const fields = [
@@ -200,15 +211,15 @@ export async function smokeCompletedIssue77(invoke: Invoke): Promise<void> {
   ];
   for (const name of Object.keys(archived)) {
     const fixture = JSON.parse(
-      await Deno.readTextFile(
+      await fs.readFile(
         new URL(
           `../../benchmark/cases/f1040/2025/${name}/correct.json`,
           import.meta.url,
-        ),
+        ), "utf8",
       ),
     );
     const expected = fixture.correct;
-    // Refund advisory is informational; every executor or other warning fails.
+    // Advisories are informational; every executor or other warning fails.
     const result = await compute(invoke, await source(name), null);
     for (const field of fields) {
       equal(result.summary[field] ?? 0, expected[field], `${name} ${field}`);

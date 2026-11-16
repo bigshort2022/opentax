@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import { inputSchema as generalInputSchema } from "../../../../nodes/inputs/general/filing/general/index.ts";
 import { assertLine36EstimatedTaxSource } from "./line36-estimated-tax-source.ts";
@@ -13,7 +14,7 @@ const general = {
   address_state: "TX",
   address_zip: "78701",
   digital_assets: false,
-  apply_overpayment_to_2026_estimated_tax_amount: 500,
+  apply_overpayment_to_next_year_estimated_tax_amount: 500,
 };
 const filed = {
   line34_overpayment: 2_000,
@@ -22,7 +23,7 @@ const filed = {
   line38_underpayment_penalty: 250,
 };
 
-Deno.test("line 36 final export accepts only a reconciled filer-owned election", () => {
+test("line 36 final export accepts only a reconciled filer-owned election", () => {
   assertLine36EstimatedTaxSource(filed, { general });
   for (
     const changed of [
@@ -45,14 +46,14 @@ Deno.test("line 36 final export accepts only a reconciled filer-owned election",
   assertEquals(
     generalInputSchema.safeParse({
       ...general,
-      apply_overpayment_to_2026_estimated_tax_amount: 0,
+      apply_overpayment_to_next_year_estimated_tax_amount: 0,
     }).success,
     false,
   );
   assertEquals(
     generalInputSchema.safeParse({
       ...general,
-      apply_overpayment_to_2026_estimated_tax_amount: 500.5,
+      apply_overpayment_to_next_year_estimated_tax_amount: 500.5,
     }).success,
     false,
   );

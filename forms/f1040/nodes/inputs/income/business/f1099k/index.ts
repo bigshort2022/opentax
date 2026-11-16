@@ -15,9 +15,11 @@ import {
   Form8949Part,
 } from "../../../../intermediate/forms/income/investments/form8949/index.ts";
 import type { NodeContext } from "../../../../../../../core/types/node-context.ts";
+import { assertDatesInTaxYear, ISO_DATE } from "../../../../utils.ts";
 
-// TY2025 issuer reporting threshold. This does not limit the recipient's
-// obligation to report taxable income from payments below the threshold.
+// Issuer reporting threshold for TY2025 and TY2026 (2026 Instructions for
+// Form 1099-K, box 1a: over $20,000 and over 200 transactions). It does not
+// limit the recipient's obligation to report income below the threshold.
 const TPSO_GROSS_THRESHOLD = 20_000;
 const MONTHLY_SUM_ROUNDING_TOLERANCE = 1;
 
@@ -103,7 +105,7 @@ export const itemSchema = z.object({
       transaction_id: z.string().trim().min(1),
       description: z.string().trim().min(1).max(100),
       date_acquired: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-      date_sold: z.string().regex(/^2025-\d{2}-\d{2}$/),
+      date_sold: z.string().regex(ISO_DATE),
       proceeds: z.number().int().positive(),
       cost_basis: z.number().int().nonnegative(),
       selling_expenses_review: z.object({
@@ -130,7 +132,7 @@ export const itemSchema = z.object({
         refund_transaction_id: z.string().trim().min(1),
         amount: z.number().int().positive(),
         refund_record_reference: z.string().trim().min(1),
-        issued_in_2025: z.literal(true),
+        issued_in_tax_year: z.literal(true),
         same_business_sale: z.literal(true),
         not_claimed_elsewhere: z.literal(true),
       }).strict(),
@@ -684,7 +686,7 @@ function incomeOutputs(k99s: K99Items): NodeOutput[] {
   ];
 }
 
-// Exported for reference (TY2025 threshold)
+// Exported for reference (TY2025 and TY2026 threshold)
 export const TY2025 = {
   TPSO_GROSS_THRESHOLD,
 } as const;
@@ -701,11 +703,16 @@ class F1099kNode extends TaxNode<typeof inputSchema> {
     agi_aggregator,
   ]);
 
-  compute(_ctx: NodeContext, input: z.infer<typeof inputSchema>): NodeResult {
+  compute(ctx: NodeContext, input: z.infer<typeof inputSchema>): NodeResult {
     const parsed = inputSchema.parse(input);
 
     for (const item of parsed.f1099ks) {
       validateItem(item);
+      assertDatesInTaxYear(
+        ctx.taxYear,
+        (item.personal_item_sales_review ?? []).map((sale) => sale.date_sold),
+        `1099-K personal item sales need a ${ctx.taxYear} sale date`,
+      );
     }
 
     const outputs: NodeOutput[] = [

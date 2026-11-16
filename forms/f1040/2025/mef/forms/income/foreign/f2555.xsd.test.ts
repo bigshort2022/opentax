@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import { buildExecutionPlan } from "../../../../../../../core/runtime/planner.ts";
 import { execute } from "../../../../../../../core/runtime/executor.ts";
@@ -10,17 +13,20 @@ import {
   resolveHousingLimit2025,
 } from "../../../../../nodes/intermediate/forms/income/foreign/form2555/housing_limits_2025.ts";
 import { registry } from "../../../../registry.ts";
+import { shiftDatedFacts } from "../../../../../../../scripts/testing/sample-year.ts";
+import { CONFIG_BY_YEAR } from "../../../../../nodes/config/index.ts";
+import { resolveHousingLimit } from "../../../../../nodes/intermediate/forms/income/foreign/form2555/housing_limits.ts";
 import { buildMefXml } from "../../../builder.ts";
 import { type FilerIdentity, FilingStatus } from "../../../types.ts";
 
 const XSD_PATH = new URL(
-  "../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+  "../../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
   import.meta.url,
 ).pathname;
 
 let xsdAvailable = false;
 try {
-  Deno.statSync(XSD_PATH);
+  sys.statSync(XSD_PATH);
   xsdAvailable = true;
 } catch {
   // The local IRS schema bundle is optional in CI.
@@ -119,21 +125,21 @@ const filer: FilerIdentity = {
 };
 
 async function validateXsd(xml: string): Promise<void> {
-  const tmpPath = await Deno.makeTempFile({ suffix: ".xml" });
+  const tmpPath = await sys.makeTempFile({ suffix: ".xml" });
   try {
-    await Deno.writeTextFile(tmpPath, xml);
-    const output = await new Deno.Command("xmllint", {
+    await fs.writeFile(tmpPath, xml);
+    const output = await new sys.Command("xmllint", {
       args: ["--noout", "--schema", XSD_PATH, tmpPath],
       stdout: "piped",
       stderr: "piped",
     }).output();
     assertEquals(output.code, 0, new TextDecoder().decode(output.stderr));
   } finally {
-    await Deno.remove(tmpPath);
+    await sys.remove(tmpPath);
   }
 }
 
-Deno.test("Form 2555 derives qualifying days from the 12-month period", () => {
+test("Form 2555 derives qualifying days from the 12-month period", () => {
   const fullYear = calculatePhysicalPresence2555(filingDetails, 2025);
   assertEquals(fullYear.qualifyingDays, 365);
   assertEquals(fullYear.line42, 100_000);
@@ -157,7 +163,7 @@ Deno.test("Form 2555 derives qualifying days from the 12-month period", () => {
   );
 });
 
-Deno.test("Form 2555 employee housing follows Parts VI, VII, and VIII in order", () => {
+test("Form 2555 employee housing follows Parts VI, VII, and VIII in order", () => {
   const lines = calculatePhysicalPresence2555(employeeHousingDetails, 2025);
   assertEquals(lines.line28, 30_000);
   assertEquals(lines.line29b, 39_000);
@@ -175,7 +181,7 @@ Deno.test("Form 2555 employee housing follows Parts VI, VII, and VIII in order",
   assertEquals(lines.line45, 139_200);
 });
 
-Deno.test("Form 2555 housing refuses an expense outside qualifying days", () => {
+test("Form 2555 housing refuses an expense outside qualifying days", () => {
   assertThrows(
     () =>
       calculatePhysicalPresence2555({
@@ -193,7 +199,7 @@ Deno.test("Form 2555 housing refuses an expense outside qualifying days", () => 
   );
 });
 
-Deno.test("Form 2555 housing requires its structured expense source", () => {
+test("Form 2555 housing requires its structured expense source", () => {
   assertThrows(
     () =>
       calculatePhysicalPresence2555({
@@ -205,7 +211,7 @@ Deno.test("Form 2555 housing requires its structured expense source", () => {
   );
 });
 
-Deno.test("Form 2555 rejects a listed Toronto location under the standard-limit route", () => {
+test("Form 2555 rejects a listed Toronto location under the standard-limit route", () => {
   assertThrows(
     () =>
       calculatePhysicalPresence2555({
@@ -222,7 +228,7 @@ Deno.test("Form 2555 rejects a listed Toronto location under the standard-limit 
   );
 });
 
-Deno.test("Form 2555 Notice 2025-16 table is complete and explicit", () => {
+test("Form 2555 Notice 2025-16 table is complete and explicit", () => {
   assertEquals(NOTICE_2025_16_ROWS.length, 136);
   assertEquals(
     new Set(
@@ -267,7 +273,7 @@ Deno.test("Form 2555 Notice 2025-16 table is complete and explicit", () => {
   });
 });
 
-Deno.test("Form 2555 requires exact reviewed adjusted-location matching", () => {
+test("Form 2555 requires exact reviewed adjusted-location matching", () => {
   const toronto = {
     kind: "notice_table" as const,
     location: "Toronto",
@@ -301,7 +307,7 @@ Deno.test("Form 2555 requires exact reviewed adjusted-location matching", () => 
   );
 });
 
-Deno.test("Form 2555 Notice 'other cities' categories are selected, never guessed", () => {
+test("Form 2555 Notice 'other cities' categories are selected, never guessed", () => {
   const colombiaOther = {
     kind: "notice_table" as const,
     location: "All cities other than Bogota",
@@ -347,13 +353,7 @@ Deno.test("Form 2555 Notice 'other cities' categories are selected, never guesse
   );
 });
 
-Deno.test({
-  name:
-    "XSD: Form 2555 Toronto adjusted housing limit reaches native line 29a/29b",
-  sanitizeOps: false,
-  sanitizeResources: false,
-  ignore: !xsdAvailable,
-}, async () => {
+test.skipIf(!xsdAvailable)("XSD: Form 2555 Toronto adjusted housing limit reaches native line 29a/29b", async () => {
   const torontoHousing: PhysicalPresenceFiling = {
     ...employeeHousingDetails,
     foreign_address: address,
@@ -400,7 +400,7 @@ Deno.test({
   await validateXsd(xml);
 });
 
-Deno.test("Form 2555 aggregate facts cannot create invalid MeF XML", () => {
+test("Form 2555 aggregate facts cannot create invalid MeF XML", () => {
   assertThrows(
     () => buildMefXml({ form2555: { foreign_wages: 50_000 } }, filer),
     Error,
@@ -408,7 +408,7 @@ Deno.test("Form 2555 aggregate facts cannot create invalid MeF XML", () => {
   );
 });
 
-Deno.test("Form 2555 rejects wage and exclusion mismatches across documents", () => {
+test("Form 2555 rejects wage and exclusion mismatches across documents", () => {
   const wageMismatch = {
     f1040: { line1h_other_earned: 90_000 },
     agi_aggregator: { line1h_other_earned: 90_000 },
@@ -438,12 +438,7 @@ Deno.test("Form 2555 rejects wage and exclusion mismatches across documents", ()
   );
 });
 
-Deno.test({
-  name: "XSD: Form 2555 physical presence and FEIE reconcile through graph",
-  sanitizeOps: false,
-  sanitizeResources: false,
-  ignore: !xsdAvailable,
-}, async () => {
+test.skipIf(!xsdAvailable)("XSD: Form 2555 physical presence and FEIE reconcile through graph", async () => {
   const result = execute(buildExecutionPlan(registry), registry, {
     general: {
       filing_status: "single",
@@ -482,12 +477,7 @@ Deno.test({
   await validateXsd(xml);
 });
 
-Deno.test({
-  name: "XSD: Form 2555 part-year FEIE uses only 2025 qualifying days",
-  sanitizeOps: false,
-  sanitizeResources: false,
-  ignore: !xsdAvailable,
-}, async () => {
+test.skipIf(!xsdAvailable)("XSD: Form 2555 part-year FEIE uses only 2025 qualifying days", async () => {
   const partYear = {
     ...filingDetails,
     tax_home_established_date: "2024-06-01",
@@ -523,13 +513,7 @@ Deno.test({
   await validateXsd(xml);
 });
 
-Deno.test({
-  name:
-    "XSD: Form 2555 employee housing excludes the housing amount before FEIE and reconciles to Schedule 1",
-  sanitizeOps: false,
-  sanitizeResources: false,
-  ignore: !xsdAvailable,
-}, async () => {
+test.skipIf(!xsdAvailable)("XSD: Form 2555 employee housing excludes the housing amount before FEIE and reconciles to Schedule 1", async () => {
   const result = execute(buildExecutionPlan(registry), registry, {
     general: {
       filing_status: "single",
@@ -586,4 +570,86 @@ Deno.test({
     '<TotalIncomeExclusionAmt referenceDocumentId="IRS2555',
   );
   await validateXsd(xml);
+});
+
+// Draft 2026 Form 2555 (lines 32, 37 and 39): a $132,900 exclusion
+// (Rev. Proc. 2025-32 §4.39) prorated by days in the 2026 tax year.
+test("Form 2555 reads the 2026 exclusion", () => {
+  const in2026 = shiftDatedFacts(filingDetails, 1);
+  const fullYear = calculatePhysicalPresence2555(in2026, 2026);
+  assertEquals([fullYear.qualifyingDays, fullYear.line39], [365, 1]);
+  assertEquals([fullYear.line40, fullYear.line42], [132_900, 100_000]);
+  const partYear = calculatePhysicalPresence2555({
+    ...in2026,
+    tax_home_established_date: "2025-06-01",
+    physical_presence_begin: "2025-07-01",
+    physical_presence_end: "2026-06-30",
+  }, 2026);
+  assertEquals(partYear.qualifyingDays, 181);
+  assertEquals(partYear.line40, 65_904);
+});
+
+// Notice 2026-25: an unlisted location takes the generally applicable
+// $39,870 (30% of $132,900), $109.23 a day in the draft 2026 Instructions
+// for Form 2555, line 29b; Toronto is $62,700 ($171.78 a day). The housing
+// base is $21,264 (16% of $132,900, sec. 2).
+test("Form 2555 reads the Notice 2026-25 housing limits for 2026", () => {
+  const gothenburg = calculatePhysicalPresence2555(
+    shiftDatedFacts(employeeHousingDetails, 1),
+    2026,
+  );
+  assertEquals(
+    [gothenburg.line29b, gothenburg.line30, gothenburg.line32],
+    [39_870, 30_000, 21_264],
+  );
+  assertEquals(gothenburg.line33, 8_736);
+  const torontoSelection = {
+    kind: "notice_table" as const,
+    location: "Toronto",
+    location_match_verified: true as const,
+    review_document_reference: "Notice 2026-25 Section 3 reviewed for Toronto",
+  };
+  const table = CONFIG_BY_YEAR[2026]!.foreignHousingLimits;
+  assertEquals(
+    resolveHousingLimit(table, "CA", "Toronto", torontoSelection, 365),
+    { line29a: "Toronto, Canada", line29b: 62_700 },
+  );
+  assertEquals(
+    resolveHousingLimit(table, "CA", "Toronto", torontoSelection, 181).line29b,
+    31_092,
+  );
+  const standard = {
+    kind: "standard_unlisted" as const,
+    verified_not_listed: true as const,
+    notice_review_document_reference: "Notice 2026-25 Section 3 reviewed",
+  };
+  assertEquals(
+    resolveHousingLimit(table, "SE", "Gothenburg", standard, 181).line29b,
+    19_771,
+  );
+  // The United Kingdom's other-cities row covers Manchester; Belfast takes
+  // the generally applicable limitation.
+  assertEquals(
+    resolveHousingLimit(table, "GB", "Manchester", {
+      ...torontoSelection,
+      location: table.rows.find(([country, , location]) =>
+        country === "GB" && location.startsWith("All cities other than")
+      )![2],
+    }, 365).line29b,
+    44_200,
+  );
+  assertThrows(
+    () => resolveHousingLimit(table, "GB", "Manchester", standard, 365),
+    Error,
+    "listed housing location",
+  );
+  assertEquals(
+    resolveHousingLimit(table, "GB", "Belfast", standard, 365).line29b,
+    39_870,
+  );
+  // Notice 2026-25 lists Mexico City alone; other Mexican cities are unlisted.
+  assertEquals(
+    resolveHousingLimit(table, "MX", "Puebla", standard, 365).line29b,
+    39_870,
+  );
 });

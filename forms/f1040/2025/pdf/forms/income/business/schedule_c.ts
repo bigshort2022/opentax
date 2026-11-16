@@ -16,7 +16,7 @@ import {
   computeTotalExpenses,
   homeOfficeDeduction,
   inputSchema,
-  mealsDeductiblePct,
+  deductibleMeals,
   projectScheduleCItems,
   type ScheduleCItem,
   wagesLessEmploymentCredits,
@@ -308,8 +308,7 @@ function projectBusiness(
     line5,
     line6,
     line7,
-    line_24b_meals: filing?.meals_deduction ??
-      (item.line_24b_meals ?? 0) * mealsDeductiblePct(item),
+    line_24b_meals: filing?.meals_deduction ?? deductibleMeals(item),
     line_26_wages: wagesLessEmploymentCredits(item, wotcReduction),
     line27b: line48,
     line28,
@@ -397,7 +396,8 @@ function proprietorIdentity(
   return { proprietor_name: name, proprietor_ssn: ssn.replaceAll("-", "") };
 }
 
-export const scheduleCPdf: PdfFormDescriptor = {
+export function scheduleCPdfFor(taxYear: number): PdfFormDescriptor {
+  return {
   pendingKey: "schedule_c",
   pdfUrl: "https://www.irs.gov/pub/irs-prior/f1040sc--2025.pdf",
   fields,
@@ -407,6 +407,7 @@ export const scheduleCPdf: PdfFormDescriptor = {
       assertFarmWotcReturn(
         allPending.form8995a ?? allPending.form8995,
         allPending,
+        taxYear,
         undefined,
         { key: "schedule_c", value: raw },
       );
@@ -425,7 +426,7 @@ export const scheduleCPdf: PdfFormDescriptor = {
       assertCurrentYearSection481aMatches(
         allPending.f3115,
         input.section481a_adjustments ?? [],
-        2025,
+        taxYear,
       );
     }
     if (input.schedule_cs.length === 0) {
@@ -470,7 +471,7 @@ export const scheduleCPdf: PdfFormDescriptor = {
     items.forEach((item) =>
       assertScheduleCInterestExempt(
         item,
-        CONFIG_BY_YEAR[2025].smallBizGrossReceipts,
+        CONFIG_BY_YEAR[taxYear].smallBizGrossReceipts,
       )
     );
     const wotc = wotcReductionsByBusiness(input);
@@ -599,7 +600,7 @@ export const scheduleCPdf: PdfFormDescriptor = {
         ? `  Reference: ${String(fields.business_reference)}`
         : "");
     await appendExpenseStatement(document, {
-      title: "Schedule C (2025) - Part V other expenses",
+      title: `Schedule C (${taxYear}) - Part V other expenses`,
       proprietorName: String(fields.proprietor_name ?? ""),
       proprietorSsn: String(fields.proprietor_ssn ?? ""),
       activityLabel: businessLabel,
@@ -608,4 +609,7 @@ export const scheduleCPdf: PdfFormDescriptor = {
       expectedTotal: Number(fields.part_v_statement_total),
     });
   },
-};
+  };
+}
+
+export const scheduleCPdf: PdfFormDescriptor = scheduleCPdfFor(2025);

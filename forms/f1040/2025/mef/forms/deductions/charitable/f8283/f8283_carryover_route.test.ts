@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../../scripts/support/sys.ts";
 import {
   assertEquals,
   assertRejects,
@@ -25,25 +28,25 @@ const attachmentDescription = form8283CarryoverAttachmentDescription(
 
 async function assertCarryoverBundleXsd(xml: string): Promise<void> {
   const xsdPath = new URL(
-    "../../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+    "../../../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
     import.meta.url,
   ).pathname;
   try {
-    await Deno.stat(xsdPath);
+    await sys.stat(xsdPath);
   } catch {
     throw new Error(`Missing verification prerequisite: ${xsdPath}`);
   }
-  const path = await Deno.makeTempFile({ suffix: ".xml" });
+  const path = await sys.makeTempFile({ suffix: ".xml" });
   try {
-    await Deno.writeTextFile(path, xml);
-    const checked = await new Deno.Command("xmllint", {
+    await fs.writeFile(path, xml);
+    const checked = await new sys.Command("xmllint", {
       args: ["--noout", "--schema", xsdPath, path],
       stdout: "piped",
       stderr: "piped",
     }).output();
     assertEquals(checked.code, 0, new TextDecoder().decode(checked.stderr));
   } finally {
-    await Deno.remove(path);
+    await sys.remove(path);
   }
 }
 
@@ -135,7 +138,7 @@ async function reviewedSource() {
   };
 }
 
-Deno.test("Form 8283 carryover binds native Section A, FMV statement, prior PDF and Schedule A", async () => {
+test("Form 8283 carryover binds native Section A, FMV statement, prior PDF and Schedule A", async () => {
   const { pending, attachment } = await reviewedSource();
   const bundle = await buildMefBundle(pending, {
     filer: testFiler(),
@@ -170,7 +173,7 @@ Deno.test("Form 8283 carryover binds native Section A, FMV statement, prior PDF 
   await assertCarryoverBundleXsd(bundle.xml);
 });
 
-Deno.test("Form 8283 multiple carried gifts each have a native form, statement, prior PDF, and preview", async () => {
+test("Form 8283 multiple carried gifts each have a native form, statement, prior PDF, and preview", async () => {
   const { pending, attachment } = await reviewedSource();
   const secondPdf = await PDFDocument.create();
   secondPdf.addPage([612, 792]);
@@ -295,7 +298,7 @@ Deno.test("Form 8283 multiple carried gifts each have a native form, statement, 
   );
 });
 
-Deno.test("Form 8283 carryover refuses an unsupplied or modified prior-year PDF", async () => {
+test("Form 8283 carryover refuses an unsupplied or modified prior-year PDF", async () => {
   const { pending, attachment } = await reviewedSource();
   assertThrows(
     () => buildMefXml(pending, testFiler()),
@@ -326,7 +329,7 @@ Deno.test("Form 8283 carryover refuses an unsupplied or modified prior-year PDF"
   );
 });
 
-Deno.test("Form 8283 carryover rejects a divergent ledger or line 13", async () => {
+test("Form 8283 carryover rejects a divergent ledger or line 13", async () => {
   const { pending } = await reviewedSource();
   const context = { filer: testFiler(), pending };
   assertThrows(
@@ -358,7 +361,7 @@ Deno.test("Form 8283 carryover rejects a divergent ledger or line 13", async () 
   );
 });
 
-Deno.test("Form 8283 and Schedule A PDF descriptors project the same carried gift", async () => {
+test("Form 8283 and Schedule A PDF descriptors project the same carried gift", async () => {
   const { pending } = await reviewedSource();
   const [form] = form8283Pdf.instances?.(
     pending.f8283,
@@ -377,7 +380,7 @@ Deno.test("Form 8283 and Schedule A PDF descriptors project the same carried gif
   assertEquals(scheduleAPdf.includeWhen?.(schedule!, pending), true);
 });
 
-Deno.test("exchange-listed stock above $5,000 retains Section A prior PDF and current carryover", async () => {
+test("exchange-listed stock above $5,000 retains Section A prior PDF and current carryover", async () => {
   const { pending: base, attachment } = await reviewedSource();
   const evidence = {
     ...base.f8283.carryover_evidence[0],

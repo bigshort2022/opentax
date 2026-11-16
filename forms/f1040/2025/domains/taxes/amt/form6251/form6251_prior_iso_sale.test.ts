@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import { execute } from "../../../../../../../core/runtime/executor.ts";
 import { buildExecutionPlan } from "../../../../../../../core/runtime/planner.ts";
@@ -24,7 +25,7 @@ const general = {
   address_zip: "78701",
 };
 
-Deno.test("prior ISO sale replays 2024 lot and 2025 Form 8949 into native/PDF Form 6251", () => {
+test("prior ISO sale replays 2024 lot and 2025 Form 8949 into native/PDF Form 6251", () => {
   const result = execute(buildExecutionPlan(registry), registry, {
     general,
     ...priorIsoSaleFixture(general.taxpayer_ssn),
@@ -59,12 +60,12 @@ Deno.test("prior ISO sale replays 2024 lot and 2025 Form 8949 into native/PDF Fo
   assertThrows(
     () => mef6251.build(filed, { pending: changedSale, filer }),
     Error,
-    "raw 2025 broker/Form 8949 row",
+    "raw current-year broker/Form 8949 row",
   );
   assertThrows(
     () => form6251Pdf.instances?.(filed, filer, changedSale),
     Error,
-    "raw 2025 broker/Form 8949 row",
+    "raw current-year broker/Form 8949 row",
   );
   const changedPrior = {
     ...filed,
@@ -108,7 +109,7 @@ Deno.test("prior ISO sale replays 2024 lot and 2025 Form 8949 into native/PDF Fo
   );
 });
 
-Deno.test("prior ISO lot rejects a mismatched 2024 AMT spread and disqualifying sale date", () => {
+test("prior ISO lot rejects a mismatched 2024 AMT spread and disqualifying sale date", () => {
   const source = priorIsoSaleFixture();
   const review = source.form6251_prior_iso_sale.prior_iso_sale_review;
   const row = {
@@ -125,22 +126,52 @@ Deno.test("prior ISO lot rejects a mismatched 2024 AMT spread and disqualifying 
       assertPriorIsoSaleCalculation({
         ...review,
         prior_2024_form6251_line2i: 14_999,
-      }, row),
+      }, row, 2025),
     Error,
-    "exact 2024 Form 3921 and Form 6251 bases",
+    "exact prior-year Form 3921 and Form 6251 bases",
   );
   assertThrows(
     () =>
       assertPriorIsoSaleCalculation(
         { ...review, sale_date: "2025-05-31" },
-        row,
+        row, 2025,
       ),
     Error,
     "one qualifying full-lot",
   );
 });
 
-Deno.test("prior ISO loss sale caps regular and AMT Schedule D losses separately", () => {
+test("prior ISO lot dates follow the return's year", () => {
+  const review = priorIsoSaleFixture().form6251_prior_iso_sale
+    .prior_iso_sale_review;
+  const row = {
+    source_transaction_id: "broker-lot-A",
+    part: "E",
+    proceeds: 40_000,
+    regular_basis: 10_000,
+    amt_basis: 25_000,
+    regular_gain: 30_000,
+    amt_gain: 15_000,
+  };
+  const next = {
+    ...review,
+    exercise_date: "2025-06-01",
+    sale_date: "2026-07-02",
+  };
+  assertPriorIsoSaleCalculation(next, row, 2026);
+  assertThrows(
+    () => assertPriorIsoSaleCalculation(review, row, 2026),
+    Error,
+    "one qualifying full-lot",
+  );
+  assertThrows(
+    () => assertPriorIsoSaleCalculation(next, row, 2025),
+    Error,
+    "one qualifying full-lot",
+  );
+});
+
+test("prior ISO loss sale caps regular and AMT Schedule D losses separately", () => {
   const source = priorIsoSaleLossFixture(general.taxpayer_ssn);
   const result = execute(buildExecutionPlan(registry), registry, {
     general,
@@ -180,6 +211,6 @@ Deno.test("prior ISO loss sale caps regular and AMT Schedule D losses separately
   assertThrows(
     () => form6251Pdf.instances?.(filed, filer, changedSale),
     Error,
-    "raw 2025 broker/Form 8949 row",
+    "raw current-year broker/Form 8949 row",
   );
 });

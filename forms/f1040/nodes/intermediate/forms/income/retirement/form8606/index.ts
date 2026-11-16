@@ -5,6 +5,7 @@ import {
   rothOwnerPrintFields,
 } from "./roth-inventory.ts";
 import {
+  assertRothActivityTaxYear,
   reviewedRothActivity,
   rothActivityReviewSchema,
 } from "./roth-activity.ts";
@@ -28,26 +29,51 @@ export enum IraOwner {
 
 export const filingDetailsSchema = z.object({
   owner: z.nativeEnum(IraOwner),
-  prior_basis_documented_from_2024_form8606: z.literal(true),
+  prior_basis_documented_from_prior_year_form8606: z.literal(true),
   no_ira_distributions_or_conversions_confirmed: z.boolean(),
   other_spouse_form8606_not_required_confirmed: z.literal(true).optional(),
 });
 
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.valueOf()) &&
+    date.toISOString().slice(0, 10) === value;
+});
+
+// Form 8606 line 2 is line 14 of the last Form 8606 filed for 2001 or later
+// (2025 Instructions for Form 8606, Total Basis Chart—Line 2).
+const FIRST_LINE14_BASIS_YEAR = 2001;
+
 export const distributionEvidenceSchema = z.object({
   prior_form8606: z.object({
-    tax_year: z.literal(2024),
-    source_document_reference: z.string().trim().min(1),
+    tax_year: z.number().int().min(FIRST_LINE14_BASIS_YEAR).describe(
+      "Year of the last Form 8606 filed (2001 or later, before this tax year); its line 14 is this year's line 2",
+    ),
+    source_document_reference: z.string().trim().min(1).describe(
+      "Record showing the basis: that Form 8606, or the taxpayer's statement of it, such as an intake answer",
+    ),
     owner_ssn: z.string().regex(/^\d{9}$/),
-    filed_line14_basis: z.number().int().positive(),
+    filed_line14_basis: z.number().int().positive().describe(
+      "Total traditional IRA basis; equals the 1099-R prior_ira_basis",
+    ),
   }).strict(),
   year_end_statement: z.object({
-    as_of: z.literal("2025-12-31"),
-    source_document_reference: z.string().trim().min(1),
+    // December 31 of the return year (Form 8606 line 6).
+    as_of: isoDate,
+    source_document_reference: z.string().trim().min(1).describe(
+      "Record of the December 31 value, such as the custodian statement or the taxpayer's stated value; a different reference from the basis record",
+    ),
     owner_ssn: z.string().regex(/^\d{9}$/),
-    all_traditional_ira_balances_included_confirmed: z.literal(true),
-    total_fair_market_value: z.number().int().nonnegative(),
+    all_traditional_ira_balances_included_confirmed: z.literal(true).describe(
+      "The value covers all of the owner's traditional, SEP and SIMPLE IRAs (Form 8606 line 6)",
+    ),
+    total_fair_market_value: z.number().int().nonnegative().describe(
+      "Form 8606 line 6; equals the 1099-R year_end_ira_value",
+    ),
   }).strict(),
-  form1099r_source_document_reference: z.string().trim().min(1),
+  form1099r_source_document_reference: z.string().trim().min(1).describe(
+    "The 1099-R's source_document_reference",
+  ),
   no_current_nondeductible_contribution_confirmed: z.boolean(),
   no_other_traditional_ira_distribution_or_conversion_confirmed: z.literal(
     true,
@@ -57,7 +83,8 @@ export const distributionEvidenceSchema = z.object({
 
 export const zeroBasisSourceSchema = z.object({
   form5498: z.object({
-    tax_year: z.literal(2025),
+    // The return year's Form 5498; its prior Form 8606 is for the year before.
+    tax_year: z.number().int(),
     source_document_reference: z.string().trim().min(1),
     custodian_ein: z.string().regex(/^\d{9}$/),
     owner_ssn: z.string().regex(/^\d{9}$/),
@@ -68,7 +95,7 @@ export const zeroBasisSourceSchema = z.object({
     box2_rollover_contributions: z.literal(0),
   }).strict(),
   prior_form8606: z.object({
-    tax_year: z.literal(2024),
+    tax_year: z.number().int(),
     source_document_reference: z.string().trim().min(1),
     owner_ssn: z.string().regex(/^\d{9}$/),
     filed_line14_basis: z.literal(0),
@@ -81,17 +108,8 @@ export const currentContributionSourceSchema = z.object({
     source_document_reference: z.string().trim().min(1),
     custodian_ein: z.string().regex(/^\d{9}$/),
     owner_ssn: z.string().regex(/^\d{9}$/),
-    designated_tax_year: z.literal(2025),
-    received_on: z.string().regex(/^2025-\d{2}-\d{2}$|^2026-\d{2}-\d{2}$/)
-      .refine((value) => {
-        const date = new Date(`${value}T00:00:00Z`);
-        return !Number.isNaN(date.valueOf()) &&
-          date.toISOString().slice(0, 10) === value &&
-          value >= "2025-01-01" && value <= "2026-04-15";
-      }, {
-        message:
-          "2025 IRA contribution receipt must be dated by April 15, 2026",
-      }),
+    designated_tax_year: z.number().int(),
+    received_on: isoDate,
     contribution_amount: z.number().int().positive(),
   }).strict(),
 }).strict();
@@ -142,7 +160,7 @@ export const inputSchema = z.object({
   // Line 2: prior-year carry-forward basis (from prior Form 8606, line 14)
   prior_basis: z.number().nonnegative().optional(),
 
-  // Line 6: FMV of all traditional IRAs as of December 31, 2025
+  // Line 6: FMV of all traditional IRAs as of December 31 of the return year
   // Optional when routed from ira_deduction_worksheet (no distributions this year).
   year_end_ira_value: z.number().nonnegative().optional(),
 
@@ -307,13 +325,60 @@ type PartIResult = {
   readonly line14RemainingBasis: number;
 };
 
-function reviewedDistributionPartI(input: Form8606Input) {
+/**
+ * A contribution for the return year is made from January 1 through the
+ * return's April 15 due date (IRC §219(f)(3)); one made after December 31 is
+ * Form 8606 line 4.
+ */
+export function contributionReceiptWindow(taxYear: number) {
+  return {
+    first: `${taxYear}-01-01`,
+    last: `${taxYear + 1}-04-15`,
+    postYearPrefix: `${taxYear + 1}-`,
+  };
+}
+
+/** The year-end value, Forms 5498 and contribution receipts are for the return year. */
+export function assertForm8606SourceYears(
+  input: Pick<
+    Form8606Input,
+    "distribution_evidence" | "zero_basis_source" | "current_contribution_source"
+  >,
+  taxYear: number,
+): void {
+  const window = contributionReceiptWindow(taxYear);
+  const zero = input.zero_basis_source;
+  const current = input.current_contribution_source;
+  const receipt = current?.contribution_receipt;
+  if (
+    (input.distribution_evidence !== undefined &&
+      input.distribution_evidence.year_end_statement.as_of !==
+        `${taxYear}-12-31`) ||
+    (zero !== undefined &&
+      (zero.form5498.tax_year !== taxYear ||
+        zero.prior_form8606.tax_year !== taxYear - 1)) ||
+    (current !== undefined && current.form5498.tax_year !== taxYear) ||
+    (receipt !== undefined &&
+      (receipt.designated_tax_year !== taxYear ||
+        receipt.received_on < window.first ||
+        receipt.received_on > window.last))
+  ) {
+    throw new Error(
+      `Form 8606 sources must be for ${taxYear}, with contributions received by ${window.last}`,
+    );
+  }
+}
+
+function reviewedDistributionPartI(input: Form8606Input, taxYear: number) {
   const evidence = input.distribution_evidence!;
   const priorBasis = input.prior_basis ?? 0;
   const contribution = input.nondeductible_contributions;
   const source = input.current_contribution_source;
   const received = source?.contribution_receipt.received_on;
-  const postYear = received?.startsWith("2026-") ? contribution : 0;
+  const window = contributionReceiptWindow(taxYear);
+  const postYear = received?.startsWith(window.postYearPrefix)
+    ? contribution
+    : 0;
   const basis = priorBasis + contribution - postYear;
   const totalBasis = priorBasis + contribution;
   const distribution = input.traditional_distributions ?? 0;
@@ -333,7 +398,7 @@ function reviewedDistributionPartI(input: Form8606Input) {
       source.contribution_receipt.custodian_ein !==
         source.form5498.custodian_ein ||
       source.contribution_receipt.owner_ssn !== source.form5498.owner_ssn ||
-      !received || received < "2025-01-01" || received > "2026-04-15"
+      !received || received < window.first || received > window.last
     )) ||
     (source === undefined && contribution !== 0) ||
     distribution <= 0 || (input.roth_conversion ?? 0) !== 0 ||
@@ -418,10 +483,13 @@ function computePartI(input: Form8606Input): PartIResult {
 
 // Line 15c: taxable part of the traditional IRA distributions, after basis.
 // Exported so Form 5329 line 1 uses the same figure Part I puts on Form 1040 line 4b.
-export function taxableTraditionalDistribution(input: Form8606Input): number {
+export function taxableTraditionalDistribution(
+  input: Form8606Input,
+  taxYear: number,
+): number {
   const parsed = inputSchema.parse(input);
   return parsed.distribution_evidence
-    ? reviewedDistributionPartI(parsed).taxableTraditionalDist
+    ? reviewedDistributionPartI(parsed, taxYear).taxableTraditionalDist
     : computePartI(parsed).taxableTraditionalDist;
 }
 
@@ -549,8 +617,18 @@ class Form8606Node extends TaxNode<typeof inputSchema> {
   readonly inputSchema = inputSchema;
   readonly outputNodes = new OutputNodes([f1040, agi_aggregator]);
 
-  compute(_ctx: NodeContext, rawInput: Form8606Input): NodeResult {
+  compute(ctx: NodeContext, rawInput: Form8606Input): NodeResult {
     const input = inputSchema.parse(rawInput);
+    assertForm8606SourceYears(input, ctx.taxYear);
+    if (input.roth_activity_review) {
+      assertRothActivityTaxYear(input.roth_activity_review, ctx.taxYear);
+    }
+    const priorYear = input.distribution_evidence?.prior_form8606.tax_year;
+    if (priorYear !== undefined && priorYear >= ctx.taxYear) {
+      throw new Error(
+        "Form 8606 line 2 basis comes from a Form 8606 filed for an earlier year",
+      );
+    }
     if (input.roth_owner_inventory_reviews) {
       if (
         Object.entries(input).some(([key, value]) =>
@@ -613,7 +691,7 @@ class Form8606Node extends TaxNode<typeof inputSchema> {
     }
 
     const reviewed = input.distribution_evidence
-      ? reviewedDistributionPartI(input)
+      ? reviewedDistributionPartI(input, ctx.taxYear)
       : undefined;
     const {
       taxableTraditionalDist,

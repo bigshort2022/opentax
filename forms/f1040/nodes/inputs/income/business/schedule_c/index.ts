@@ -1,3 +1,4 @@
+import { priorYearDepreciationTotal } from "../../../../intermediate/forms/deductions/business/form4562/prior-year.ts";
 import { filedOwnedScheduleC } from "../../../../owned-business-filing.ts";
 import { patronFiledBusinessLines } from "../../../deductions/business/qbi_patron/calculation.ts";
 import { assertPatrScheduleCIncome } from "../f1099patr/schedule-c-source.ts";
@@ -38,6 +39,7 @@ import {
   computeGrossIncome,
   computeNetProfit,
   computeTotalExpenses,
+  deductibleMeals,
   homeOfficeDeduction,
   inputSchema,
   isSeExempt,
@@ -47,6 +49,7 @@ import {
   projectScheduleCItems,
   projectSection481aScheduleCItems,
   type ScheduleCItem,
+  scheduleCSchedule1Line3,
   wagesLessEmploymentCredits,
   wotcReductionsByBusiness,
 } from "./model.ts";
@@ -59,6 +62,7 @@ export {
   computeGrossIncome,
   computeNetProfit,
   computeTotalExpenses,
+  deductibleMeals,
   homeOfficeDeduction,
   inputSchema,
   itemSchema,
@@ -71,16 +75,22 @@ export {
 };
 export type { ScheduleCItem };
 
-// ── TY2025 Constants ────────────────────────────────────────────────────────
-
-const SE_TAX_THRESHOLD = 400; // Net profit >= $400 → Schedule SE
-const CLERGY_SE_THRESHOLD = 108.28; // Clergy SE threshold (no Form 4361)
-// Schedule SE line 4c threshold for the combined businesses. Clergy Schedule C income
-// carries the lower church-employee threshold, so it sets the test for the whole return.
-function seThreshold(items: readonly ScheduleCItem[]): number {
-  return items.some((item) => item.clergy_schedule_c === true)
-    ? CLERGY_SE_THRESHOLD
-    : SE_TAX_THRESHOLD;
+// AMT workpapers whose schemas attest TY2025 dates.
+function assertTy2025OnlyFacts(
+  taxYear: number,
+  input: z.infer<typeof inputSchema>,
+): void {
+  if (taxYear === 2025) return;
+  const dated = input.schedule_cs.some((item) =>
+    item.amt_mining_cost_workpaper !== undefined ||
+    item.amt_long_term_contract_workpaper !== undefined ||
+    item.amt_long_term_contract_workpapers !== undefined
+  );
+  if (dated) {
+    throw new Error(
+      `Schedule C AMT workpapers are not yet supported for TY${taxYear}`,
+    );
+  }
 }
 
 function amtDepletionOutputs(item: ScheduleCItem): NodeOutput[] {
@@ -169,10 +179,37 @@ class ScheduleCNode extends TaxNode<typeof inputSchema> {
   ]);
 
   compute(ctx: NodeContext, input: z.infer<typeof inputSchema>): NodeResult {
+    // Prior-year assets become this activity's depreciation (Pub. 946,
+    // Appendix A); the finalized rows carry the deduction to every reader.
+    if (!input.schedule_cs?.some((item) => item.prior_year_assets)) {
+      return this.computeRows(ctx, input);
+    }
+    const schedule_cs = input.schedule_cs.map((item) => {
+      if (!item.prior_year_assets) return item;
+      const { prior_year_assets: assets, ...rest } = item;
+      const { rows, total } = priorYearDepreciationTotal(assets, ctx.taxYear);
+      return {
+        ...rest,
+        line_13_depreciation: (item.line_13_depreciation ?? 0) + total,
+        prior_year_depreciation_rows: rows,
+      };
+    });
+    const result = this.computeRows(ctx, { ...input, schedule_cs });
+    return {
+      ...result,
+      outputs: [
+        ...result.outputs,
+        { nodeType: this.nodeType, fields: { schedule_cs } },
+      ],
+    };
+  }
+
+  private computeRows(ctx: NodeContext, input: z.infer<typeof inputSchema>): NodeResult {
     const cfg = CONFIG_BY_YEAR[ctx.taxYear];
     if (!cfg) throw new Error(`No f1040 config for year ${ctx.taxYear}`);
     // Validate schema — throws on invalid data (negative amounts, bad enums)
     inputSchema.parse(input);
+    assertTy2025OnlyFacts(ctx.taxYear, input);
     assertDistinctMiningSources(input.schedule_cs);
     assertDistinctLongTermContractSources(input.schedule_cs);
     const statutoryTotals = new Map<string, number>();
@@ -333,13 +370,11 @@ class ScheduleCNode extends TaxNode<typeof inputSchema> {
     const netProfits = atRisk.map((result, index) =>
       input.patron_filing_review
         ? patronFiledBusinessLines("schedule_c", items[index]).profit
-        : (ctx.taxYear === 2025
-          ? filedOwnedScheduleC(
-            items[index],
-            false,
-            reductions.get(items[index].business_reference ?? "") ?? 0,
-          )?.profit
-          : undefined) ?? result.atRiskNet
+        : filedOwnedScheduleC(
+          items[index],
+          false,
+          reductions.get(items[index].business_reference ?? "") ?? 0,
+        )?.profit ?? result.atRiskNet
     );
     const fishingEvidenceItems = items.filter((item) =>
       item.schedule_j_fishing_evidence !== undefined
@@ -417,8 +452,7 @@ class ScheduleCNode extends TaxNode<typeof inputSchema> {
       },
     }));
 
-    // Aggregate net profits → single schedule1 output and AGI aggregator
-    const totalNetProfit = netProfits.reduce((sum, p) => sum + p, 0);
+    const totalNetProfit = scheduleCSchedule1Line3(netProfits);
     outputs.push(
       this.outputNodes.output(schedule1, { line3_schedule_c: totalNetProfit }),
     );
@@ -537,13 +571,13 @@ class ScheduleCNode extends TaxNode<typeof inputSchema> {
     // Schedule SE: combine the businesses first, then test the total.
     // i1040sse, More Than One Business: "If you had a loss in one business, it reduces the
     // income from another. Figure the combined SE tax on one Schedule SE." The $400 test is
-    // on the combined line 4c, not on each business on its own.
-    const seItems = items.filter((item) => !isSeExempt(item));
+    // on the combined line 4c, which Schedule SE applies after adding Schedule F, so the
+    // signed total is sent even when it is small or a loss.
     const seNetProfit = items.reduce(
       (sum, item, i) => isSeExempt(item) ? sum : sum + netProfits[i],
       0,
     );
-    if (seNetProfit >= seThreshold(seItems)) {
+    if (seNetProfit !== 0) {
       outputs.push(
         this.outputNodes.output(schedule_se, {
           net_profit_schedule_c: seNetProfit,

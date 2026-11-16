@@ -1,3 +1,5 @@
+import { test } from "bun:test";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import {
   assertEquals,
   assertRejects,
@@ -17,6 +19,14 @@ import { buildMefXml } from "../../../../../2025/mef/builder.ts";
 import { buildPending } from "../../../../../2025/mef/execution/pending.ts";
 import { buildPdfBytes } from "../../../../../2025/pdf/builder.ts";
 import { projectStagedForm8958Documents } from "./staged_documents.ts";
+
+type StagedStart = Parameters<typeof projectStagedForm8958Documents>[0];
+type StagedFiler = Parameters<typeof projectStagedForm8958Documents>[1];
+const project2025 = (start: StagedStart, filer: StagedFiler) =>
+  projectStagedForm8958Documents(start, filer, {
+    taxYear: 2025,
+    formType: "f1040",
+  });
 
 const source = {
   domicile_state: CommunityPropertyState.CA,
@@ -115,8 +125,8 @@ const filer = {
   filingStatus: MefFilingStatus.MarriedFilingSeparately,
 };
 
-Deno.test("f8958 staged XML and PDF are derived from the reconciled ledger", () => {
-  const result = projectStagedForm8958Documents(start, filer);
+test("f8958 staged XML and PDF are derived from the reconciled ledger", () => {
+  const result = project2025(start, filer);
   assertEquals(result.execution.diagnostics, []);
   assertEquals(result.execution.pending.f1040?.line1a_wages, 50_000);
   assertEquals(result.execution.pending.f1040?.line25a_w2_withheld, 5_000);
@@ -139,7 +149,7 @@ Deno.test("f8958 staged XML and PDF are derived from the reconciled ledger", () 
   );
 });
 
-Deno.test("f8958 staged projection requires the reviewed spouse return to match both allocated columns", () => {
+test("f8958 staged projection requires the reviewed spouse return to match both allocated columns", () => {
   for (
     const reviewed_spouse_return of [
       { ...source.reviewed_spouse_return, ssn: "999999999" },
@@ -159,14 +169,14 @@ Deno.test("f8958 staged projection requires the reviewed spouse return to match 
     ]
   ) {
     assertThrows(() =>
-      projectStagedForm8958Documents(
+      project2025(
         { ...start, f8958: { ...source, reviewed_spouse_return } },
         filer,
       )
     );
   }
   assertThrows(() =>
-    projectStagedForm8958Documents(
+    project2025(
       {
         ...start,
         f8958: {
@@ -180,7 +190,27 @@ Deno.test("f8958 staged projection requires the reviewed spouse return to match 
   );
 });
 
-Deno.test("f8958 staged projection rejects altered W-2 and filer source", () => {
+test("f8958 staged projection runs the TY2026 return under its own year", () => {
+  const source2026 = {
+    ...source,
+    community_property_period: {
+      ...source.community_property_period,
+      from: "2026-01-01",
+      through: "2026-12-31",
+    },
+    reviewed_spouse_return: { ...source.reviewed_spouse_return, tax_year: 2026 },
+  };
+  const result = projectStagedForm8958Documents(
+    { ...start, f8958: source2026 },
+    filer,
+    { taxYear: 2026, formType: "f1040" },
+  );
+  assertEquals(result.execution.diagnostics, []);
+  assertEquals(result.execution.pending.f1040?.line1a_wages, 50_000);
+  assertThrows(() => project2025({ ...start, f8958: source2026 }, filer));
+});
+
+test("f8958 staged projection rejects altered W-2 and filer source", () => {
   for (
     const changed of [
       { ...start, general: { ...start.general, taxpayer_ssn: "999999999" } },
@@ -191,13 +221,13 @@ Deno.test("f8958 staged projection rejects altered W-2 and filer source", () => 
       },
     ]
   ) {
-    assertThrows(() => projectStagedForm8958Documents(changed, filer));
+    assertThrows(() => project2025(changed, filer));
   }
 });
 
-Deno.test("f8958 staged projection rejects non-wage rows and absent filer identity", () => {
+test("f8958 staged projection rejects non-wage rows and absent filer identity", () => {
   assertThrows(() =>
-    projectStagedForm8958Documents(
+    project2025(
       {
         ...start,
         f8958: {
@@ -213,14 +243,14 @@ Deno.test("f8958 staged projection rejects non-wage rows and absent filer identi
     )
   );
   assertThrows(() =>
-    projectStagedForm8958Documents(
+    project2025(
       start,
       { ...filer, firstName: undefined },
     )
   );
 });
 
-Deno.test("f8958 staged whole-dollar allocations conserve both shares and preserve the earner", () => {
+test("f8958 staged whole-dollar allocations conserve both shares and preserve the earner", () => {
   // These are reviewed-ledger arithmetic cases, not state-law determinations.
   for (
     const [gross, withheld, taxpayerWage, taxpayerWithheld] of [
@@ -254,7 +284,7 @@ Deno.test("f8958 staged whole-dollar allocations conserve both shares and preser
       line25a_w2_withheld: spouseWithheld,
       line25d_total_withholding: spouseWithheld,
     });
-    const result = projectStagedForm8958Documents(input, filer);
+    const result = project2025(input, filer);
     const pending = result.execution.pending;
     assertEquals(pending.f1040.line11_agi, taxpayerWage);
     assertEquals(pending.f1040.line25d_total_withholding, taxpayerWithheld);
@@ -271,8 +301,8 @@ Deno.test("f8958 staged whole-dollar allocations conserve both shares and preser
   }
 });
 
-Deno.test("f8958 complete staged execution remains blocked by both public exporters", async () => {
-  const staged = projectStagedForm8958Documents(start, filer);
+test("f8958 complete staged execution remains blocked by both public exporters", async () => {
+  const staged = project2025(start, filer);
   // The staged projector deliberately accepts a minimal general source;
   // public export also needs the retained digital-assets answer.
   const executed = f1040_2025.executeReturn({
@@ -302,23 +332,19 @@ Deno.test("f8958 complete staged execution remains blocked by both public export
 });
 
 const componentSchema =
-  ".state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Common/IRS8958/IRS8958.xsd";
+  "irs/mef/2025v5.4/IndividualIncomeTax/Common/IRS8958/IRS8958.xsd";
 let componentSchemaAvailable = false;
 try {
-  componentSchemaAvailable = Deno.statSync(componentSchema).isFile;
+  componentSchemaAvailable = sys.statSync(componentSchema).isFile;
 } catch { /* local IRS schema */ }
-Deno.test({
-  name:
-    "f8958 staged wage and withholding component validates against TY2025 XSD",
-  ignore: !componentSchemaAvailable,
-  fn: async () => {
-    const staged = projectStagedForm8958Documents(start, filer);
+test.skipIf(!componentSchemaAvailable)("f8958 staged wage and withholding component validates against TY2025 XSD", async () => {
+    const staged = project2025(start, filer);
     // Supply only the component namespace/required document ID, not a fake return.
     const xml = staged.xml.replace(
       "<IRS8958>",
       '<IRS8958 xmlns="http://www.irs.gov/efile" documentId="IRS8958Staged">',
     );
-    const child = new Deno.Command("xmllint", {
+    const child = new sys.Command("xmllint", {
       args: ["--noout", "--schema", componentSchema, "-"],
       stdin: "piped",
       stdout: "piped",
@@ -329,5 +355,4 @@ Deno.test({
     await writer.close();
     const result = await child.output();
     assertEquals(result.code, 0, new TextDecoder().decode(result.stderr));
-  },
-});
+  });

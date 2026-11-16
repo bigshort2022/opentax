@@ -12,11 +12,11 @@ import {
   inputSchema as form1099gInputSchema,
 } from "../../../../../../nodes/inputs/income/other/f1099g/index.ts";
 import { assertSCorpK1CodeJSources } from "../../../../../../nodes/inputs/income/rental-passthrough/k1_s_corp/index.ts";
-import { schedule1OtherIncomeRows } from "../../../../../mef/forms/income/other/schedule1/schedule1_other_income_rows.ts";
-import { schedule1ActivityNotForProfitTotal } from "../../../../../mef/forms/income/other/schedule1/schedule1_nonbusiness_sources.ts";
+import { schedule1OtherIncomeRows } from "../../../../../mef/forms/general/return-assembly/schedule1/schedule1_other_income_rows.ts";
+import { schedule1ActivityNotForProfitTotal } from "../../../../../mef/forms/general/return-assembly/schedule1/schedule1_nonbusiness_sources.ts";
 import { assertPersonalPropertyRentalSource } from "../../../../../domains/income/business/personal-property-rental-source.ts";
-import { appendSchedule1OtherIncomeStatement } from "../../../income/other/schedule1/schedule1_other_income_statement.ts";
-import { appendSchedule1AlimonyStatement } from "../../../income/other/schedule1/schedule1_alimony_statement.ts";
+import { appendSchedule1OtherIncomeStatement } from "./schedule1_other_income_statement.ts";
+import { appendSchedule1AlimonyStatement } from "./schedule1_alimony_statement.ts";
 import { assertTaxableAlimonySchedule1 } from "../../../../../../nodes/inputs/income/other/alimony_received/index.ts";
 
 // IRS Schedule 1 (2025) AcroForm field names.
@@ -53,6 +53,12 @@ const fields: ReadonlyArray<PdfFieldEntry> = [
     kind: "text",
     domainKey: "line8r_taxable_scholarships",
     pdfField: "topmostSubform[0].Page1[0].f1_30[0]",
+  },
+  // Line 8t: f1_31 is 8s, f1_32 is 8t, f1_33 is 8u (2025 Schedule 1).
+  {
+    kind: "text",
+    domainKey: "line8t_nqdc_distribution",
+    pdfField: "topmostSubform[0].Page1[0].f1_32[0]",
   },
   {
     kind: "text",

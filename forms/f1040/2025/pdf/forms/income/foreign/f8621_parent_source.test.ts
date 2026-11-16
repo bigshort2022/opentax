@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import { PDFDocument } from "pdf-lib";
 import { createHash } from "node:crypto";
@@ -35,7 +36,7 @@ const parentSource = {
     year_end_value_usd: 20_000,
   }],
   jointly_owned_with_spouse: false,
-  shares_acquired_during_2025: true,
+  shares_acquired_during_tax_year: true,
   acquisition_date: "2025-03-17",
   election_status: "section1291_no_new_election",
   no_outstanding_section1294_election: true,
@@ -75,7 +76,7 @@ function copy(document_id: string, contents: string) {
   };
 }
 
-Deno.test("Form 8621 parent facts reconcile across source, native, and staged page 1", () => {
+test("Form 8621 parent facts reconcile across source, native, and staged page 1", () => {
   const source = projectForm8621ParentSource(item);
   assertEquals(source.share_classes[0].year_end_shares, 100);
   const [native] = form8621.build({ items: [{ item, excessEvents: [] }] });
@@ -96,11 +97,11 @@ Deno.test("Form 8621 parent facts reconcile across source, native, and staged pa
   assertEquals(page["topmostSubform[0].Page1[0].f1_27[0]"], undefined);
 });
 
-Deno.test("Form 8621 QEF and MTM parent pages use calculated Part III/IV amounts", () => {
+test("Form 8621 QEF and MTM parent pages use calculated Part III/IV amounts", () => {
   const qef = itemSchema.parse({
     ...item,
     regime: PficRegime.QEF,
-    parent_source: { ...parentSource, election_status: "qef_new_2025" },
+    parent_source: { ...parentSource, election_status: "qef_new_election" },
     qef_ordinary_income: 1500,
     qef_ordinary_951_or_1293g_reduction: 100,
     qef_capital_gain: 800,
@@ -122,7 +123,7 @@ Deno.test("Form 8621 QEF and MTM parent pages use calculated Part III/IV amounts
   const mtm = itemSchema.parse({
     ...item,
     regime: PficRegime.MTM,
-    parent_source: { ...parentSource, election_status: "mtm_new_2025" },
+    parent_source: { ...parentSource, election_status: "mtm_new_election" },
     mtm_adjusted_basis_at_year_end: 23000,
     mtm_unreversed_inclusions: 2000,
   });
@@ -161,7 +162,7 @@ Deno.test("Form 8621 QEF and MTM parent pages use calculated Part III/IV amounts
   );
 });
 
-Deno.test("Form 8621 printable source checks retained issuer, QEF, MTM, and prior election copies", () => {
+test("Form 8621 printable source checks retained issuer, QEF, MTM, and prior election copies", () => {
   const issuer = copy("issuer-2025-001", "Fund annual report, 2025");
   const qefStatement = {
     ...copy(
@@ -179,7 +180,7 @@ Deno.test("Form 8621 printable source checks retained issuer, QEF, MTM, and prio
     parent_source: {
       ...parentSource,
       issuer_record: issuer,
-      election_status: "qef_new_2025",
+      election_status: "qef_new_election",
       qef_annual_statement: qefStatement,
     },
   });
@@ -219,7 +220,7 @@ Deno.test("Form 8621 printable source checks retained issuer, QEF, MTM, and prio
     parent_source: {
       ...parentSource,
       issuer_record: issuer,
-      election_status: "mtm_new_2025",
+      election_status: "mtm_new_election",
       mtm_year_end_value_record: {
         ...copy("market-2025", "Exchange 2025 quote: 20000"),
         quoted_value_usd: 20000,
@@ -247,7 +248,7 @@ Deno.test("Form 8621 printable source checks retained issuer, QEF, MTM, and prio
   );
 });
 
-Deno.test("Form 8621 staged parent creates a distinct Part V and statement for each source event", async () => {
+test("Form 8621 staged parent creates a distinct Part V and statement for each source event", async () => {
   const source = {
     kind: ExcessEventKind.Distribution as const,
     holding_period_start: "2024-01-01",
@@ -264,7 +265,7 @@ Deno.test("Form 8621 staged parent creates a distinct Part V and statement for e
     ...item,
     parent_source: {
       ...parentSource,
-      shares_acquired_during_2025: false,
+      shares_acquired_during_tax_year: false,
       acquisition_date: undefined,
       section1291_prior_distribution_records: [{
         source_event_index: 0,
@@ -429,7 +430,7 @@ Deno.test("Form 8621 staged parent creates a distinct Part V and statement for e
   );
 });
 
-Deno.test("Form 8621 prints Part V only for excess distributions in a mixed block", () => {
+test("Form 8621 prints Part V only for excess distributions in a mixed block", () => {
   const mixedSource = {
     kind: ExcessEventKind.Distribution as const,
     holding_period_start: "2024-01-01",
@@ -446,7 +447,7 @@ Deno.test("Form 8621 prints Part V only for excess distributions in a mixed bloc
     ...item,
     parent_source: {
       ...parentSource,
-      shares_acquired_during_2025: false,
+      shares_acquired_during_tax_year: false,
       acquisition_date: undefined,
       section1291_prior_distribution_records: [{
         source_event_index: 0,
@@ -492,7 +493,7 @@ Deno.test("Form 8621 prints Part V only for excess distributions in a mixed bloc
   assertEquals(packet.forms[0].partV.length, 1);
 });
 
-Deno.test("Form 8621 parent source rejects changed shares, election, and acquisition facts", () => {
+test("Form 8621 parent source rejects changed shares, election, and acquisition facts", () => {
   assertThrows(
     () => projectForm8621ParentSource({ ...item, shares_owned: 101 }),
     Error,
@@ -505,7 +506,7 @@ Deno.test("Form 8621 parent source rejects changed shares, election, and acquisi
           ...item,
           parent_source: {
             ...parentSource,
-            election_status: "qef_new_2025",
+            election_status: "qef_new_election",
           },
         } as typeof item,
       ),

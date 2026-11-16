@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import {
   assert,
   assertEquals,
@@ -30,7 +31,7 @@ const general = {
 };
 const filingDetails = {
   owner: IraOwner.Spouse,
-  prior_basis_documented_from_2024_form8606: true as const,
+  prior_basis_documented_from_prior_year_form8606: true as const,
   no_ira_distributions_or_conversions_confirmed: true,
   other_spouse_form8606_not_required_confirmed: true as const,
 };
@@ -76,7 +77,7 @@ function filedReturn() {
   return normalizeForm8606TestPending(result.pending);
 }
 
-Deno.test("spouse zero-opening-basis contribution reconciles joint return, native owner and PDF", () => {
+test("spouse zero-opening-basis contribution reconciles joint return, native owner and PDF", () => {
   const pending = filedReturn();
   const filer = extractFilerIdentity(general);
   assertEquals(pending.form8606.print_line1_nondeductible, 7_000);
@@ -87,7 +88,7 @@ Deno.test("spouse zero-opening-basis contribution reconciles joint return, nativ
   assert(typeof xml === "string");
   assertStringIncludes(
     xml,
-    "<Form8606IRANamelineTxt>Blair Saver</Form8606IRANamelineTxt>",
+    "<Form8606IRANamelineTxt>BLAIR&lt;SAVER</Form8606IRANamelineTxt>",
   );
   assertStringIncludes(
     xml,
@@ -103,7 +104,7 @@ Deno.test("spouse zero-opening-basis contribution reconciles joint return, nativ
   assertEquals(pdf.print_line14_remaining_basis, 7_000);
 });
 
-Deno.test("spouse zero-opening-basis route rejects missing separate-form review and owner, source or return tampering", () => {
+test("spouse zero-opening-basis route rejects missing separate-form review and owner, source or return tampering", () => {
   const pending = filedReturn();
   const filer = extractFilerIdentity(general);
   const changed = (next: Record<string, Record<string, unknown>>) => ({

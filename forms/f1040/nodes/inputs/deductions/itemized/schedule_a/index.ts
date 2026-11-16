@@ -13,9 +13,14 @@ import { TaxNode } from "../../../../../../../core/types/tax-node.ts";
 import { OutputNodes } from "../../../../../../../core/types/output-nodes.ts";
 import { standard_deduction } from "../../../../intermediate/worksheets/deductions/standard/standard_deduction/index.ts";
 import type { NodeContext } from "../../../../../../../core/types/node-context.ts";
+import { personalLine18 } from "../../../../intermediate/forms/deductions/casualty/form4684/line18.ts";
 import { FilingStatus } from "../../../../types.ts";
 import { CONFIG_BY_YEAR } from "../../../../config/index.ts";
 import type { F1040Config } from "../../../../config/index.ts";
+import {
+  charitableFloorAmount,
+  mortgageInsurancePremiumDeduction,
+} from "./limits-2026.ts";
 
 // Publication 526 (2025), Worksheet 2, lines 4-10. These are source
 // classifications, not the percentage of the final Schedule A deduction.
@@ -28,6 +33,28 @@ export const noncashContributionCategorySchema = z.enum([
 export type NoncashContributionCategory = z.infer<
   typeof noncashContributionCategorySchema
 >;
+
+// A carryover keeps the limit category of its contribution year (Pub. 526
+// (2025), Carryovers); these match this year's charitable_* carryforwards.
+export enum CharitableCarryoverCategory {
+  Cash60 = "cash_60",
+  Noncash50 = "noncash_50",
+  CashOther30 = "cash_other_30",
+  NoncashOther30 = "noncash_other_30",
+  CapitalGain30 = "capital_gain_30",
+  CapitalGain20 = "capital_gain_20",
+}
+const NONCASH_CARRYOVER_CATEGORIES: ReadonlySet<CharitableCarryoverCategory> =
+  new Set([
+    CharitableCarryoverCategory.Noncash50,
+    CharitableCarryoverCategory.NoncashOther30,
+    CharitableCarryoverCategory.CapitalGain30,
+    CharitableCarryoverCategory.CapitalGain20,
+  ]);
+// Form 8283 is filed for a noncash gift over $500, including in each
+// carryover year (Instructions for Form 8283 (Rev. 12-2025), When To File).
+const FORM8283_NONCASH_THRESHOLD = 500;
+const CHARITABLE_CARRYOVER_YEARS = 5;
 const noncashContributionItemSchema = z.object({
   producing_mining_charitable_amt_source: charitableNaturalResourceSourceSchema
     .optional(),
@@ -60,6 +87,29 @@ const capitalGainCarryoverSchema = z.object({
   // surviving-spouse cases as requiring special carryover treatment.
   ordinary_carryover_rules_confirmed: z.literal(true),
 });
+
+const priorCharitableCarryoverSchema = z.object({
+  contribution_year: z.number().int().describe(
+    "Year the gift was made; carryovers last 5 years",
+  ),
+  category: z.nativeEnum(CharitableCarryoverCategory).describe(
+    "The gift's limit category in its own year: cash_60 (cash to 50% limit organizations), noncash_50, cash_other_30 and noncash_other_30 (other organizations), capital_gain_30, capital_gain_20",
+  ),
+  amount: z.number().int().positive().describe(
+    "Carryover still unused at the start of this year",
+  ),
+  source_document_reference: z.string().trim().min(1).describe(
+    "Record of the carryover, such as the prior-year return or carryover worksheet",
+  ),
+  // Pub. 526 names status changes, NOLs, standard-deduction years, and
+  // surviving-spouse cases as requiring special carryover treatment.
+  ordinary_carryover_rules_confirmed: z.literal(true).describe(
+    "None of Pub. 526's additional carryover rules apply: no change of marital or joint/separate status, NOL, standard deduction in a carryover year, or new surviving spouse",
+  ),
+  original_gift_500_or_less_confirmed: z.literal(true).optional().describe(
+    "Noncash categories: the original gift's deduction was $500 or less, so no Form 8283 is required",
+  ),
+}).strict();
 
 export const homeMortgageNonqualifyingUseReviewSchema = z.object({
   loan_document_reference: z.string().trim().min(1),
@@ -127,22 +177,50 @@ export const inputSchema = z.object({
   // Line 5a: State and local income taxes — mutually exclusive with line_5a_sales_tax
   // per IRC §164(b)(5) election. Provide one or the other, never both.
   line_5a_state_income_tax: z.number().nonnegative().optional(),
+  // State and local income taxes paid other than W-2 withholding: estimated
+  // payments and prior-year balances paid in the tax year. Added to the W-2
+  // withholding; use instead of an entered full line 5a, never with one.
+  line_5a_other_state_income_tax: z.number().nonnegative().optional(),
+  // From the w2 node: boxes 17 and 19 (and SDI/PFML). Kept apart from the
+  // entered fields so neither replaces the other; compute() retains line 5a.
+  w2_state_local_income_tax: z.number().nonnegative().optional(),
   // Separate issued retirement withholding contribution; preserve wage/other taxes.
   retirement_state_local_withholding: z.number().nonnegative().optional(),
   // Line 5a (alternative): General sales tax deduction in lieu of income taxes
   // IRC §164(b)(5)(A) — taxpayer elects sales tax OR income tax, not both.
   line_5a_sales_tax: z.number().nonnegative().optional(),
-  line_5b_real_estate_tax: z.number().nonnegative().optional(),
+  line_5b_real_estate_tax: z.union([
+    z.number().nonnegative(),
+    z.array(z.number().nonnegative()),
+  ]).transform((value) =>
+    Array.isArray(value)
+      ? value.reduce((sum, amount) => sum + amount, 0)
+      : value
+  ).optional(),
   line_5c_personal_property_tax: z.number().nonnegative().optional(),
   line_6_other_taxes: z.number().nonnegative().optional(),
   line_6_other_tax_items: z.array(otherTaxItemSchema).min(1).max(2)
     .optional(),
-  line_8a_mortgage_interest_1098: z.number().nonnegative().optional(),
+  line_8a_mortgage_interest_1098: z.union([
+    z.number().nonnegative(),
+    z.array(z.number().nonnegative()),
+  ]).transform((value) =>
+    Array.isArray(value)
+      ? value.reduce((sum, amount) => sum + amount, 0)
+      : value
+  ).optional(),
+  // Pub. 936 Table 1 line 12 when Form 1098 interest was limited without a
+  // reviewed amount; the node applied the non-MFS debt limits.
+  form1098_table1_average_balance: z.number().nonnegative().optional(),
   line_8b_mortgage_interest_no_1098: z.number().nonnegative().optional(),
   line_8b_seller_financed: sellerFinancedLine8bSchema.optional(),
   home_mortgage_nonqualifying_use_review:
     homeMortgageNonqualifyingUseReviewSchema.optional(),
   line_8c_points_no_1098: z.number().nonnegative().optional(),
+  // TY2026 line 8d: premiums on a contract issued after 2006 for acquisition
+  // debt on a qualified residence, before the AGI phaseout.
+  line_8d_mortgage_insurance_premiums: z.number().nonnegative().optional(),
+  mortgage_insurance_premiums_qualified_confirmed: z.literal(true).optional(),
   form8396_interest_credit_reduction: z.number().int().nonnegative()
     .optional(),
   form8396_interest_reporting_line: z.enum(["8a", "8b"]).optional(),
@@ -154,6 +232,12 @@ export const inputSchema = z.object({
   // Pub. 526 Worksheet 2 lines 5/7: cash to a second-category organization
   // or held for the use of any qualified organization.
   cash_contributions_other_30: z.number().nonnegative().optional(),
+  // TY2026 1040 line 12f: the part of the 50%-organization cash gifts made to
+  // donor-advised funds or supporting organizations (IRC §170(p)).
+  cash_contributions_to_daf_or_supporting_organizations: z.number()
+    .nonnegative().optional(),
+  // The amount printed on the line 11 dotted line; it stays within line 11.
+  line_11_qualified_contributions: z.number().positive().optional(),
   qualified_conservation_contributions: z.number().nonnegative().optional(),
   noncash_contribution_items: z.array(noncashContributionItemSchema).optional(),
   capital_gain_50_percent_election_confirmed: z.literal(true).optional(),
@@ -165,12 +249,23 @@ export const inputSchema = z.object({
   // capital-gain property carryovers to 50%-limit organizations.
   capital_gain_property_carryovers: z.array(capitalGainCarryoverSchema)
     .optional(),
+  // Prior-year carryovers outside the 50% capital-gain election (line 13).
+  prior_charitable_carryovers: z.array(priorCharitableCarryoverSchema).min(1)
+    .optional(),
   // Filed values. Nonzero direct input is rejected; this node finalizes them.
   line_11_cash_contributions: z.number().nonnegative().optional(),
   line_12_noncash_contributions: z.number().nonnegative().optional(),
   line_13_contribution_carryover: z.number().nonnegative().optional(),
-  line_15_casualty_theft_loss: z.number().nonnegative().optional(),
-  line_16_other_deductions: z.number().nonnegative().optional(),
+  line_15_casualty_theft_loss: z.number().nonnegative().optional().describe(
+    "Computed from form4684 personal_casualties (Form 4684 line 18)",
+  ),
+  line_16_other_deductions: z.number().nonnegative().optional().describe(
+    "Other itemized deductions; a net qualified disaster loss comes from form4684 personal_casualties",
+  ),
+  // From Form 4684: line 16 (before the line 17 AGI limit) and line 15, the
+  // net qualified disaster loss that goes on line 16 when itemizing.
+  form4684_line16_loss: z.number().int().positive().optional(),
+  net_qualified_disaster_loss: z.number().int().positive().optional(),
 }).superRefine((data, ctx) => {
   if (
     data.line_8b_seller_financed &&
@@ -208,6 +303,17 @@ export const inputSchema = z.object({
     }
   }
   if (
+    data.filing_status === FilingStatus.MFS &&
+    (data.form1098_table1_average_balance ?? 0) > 375_000
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["form1098_table1_average_balance"],
+      message:
+        "MFS Form 1098 mortgages over $375,000 need reviewed Pub. 936 deductible interest",
+    });
+  }
+  if (
     data.home_mortgage_nonqualifying_use_review !== undefined &&
     (data.line_8a_mortgage_interest_1098 ?? 0) +
           (data.line_8b_mortgage_interest_no_1098 ?? 0) <= 0
@@ -217,6 +323,41 @@ export const inputSchema = z.object({
       path: ["home_mortgage_nonqualifying_use_review"],
       message:
         "Schedule A line 8 mortgage-use review needs positive filed home interest",
+    });
+  }
+  if (
+    data.line_11_qualified_contributions !== undefined &&
+    data.line_11_qualified_contributions >
+      (data.cash_contributions_to_50_percent_organizations ?? 0) +
+        (data.cash_contributions_other_30 ?? 0)
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["line_11_qualified_contributions"],
+      message:
+        "Schedule A line 11 qualified contributions cannot exceed sourced cash gifts",
+    });
+  }
+  if (
+    (data.cash_contributions_to_daf_or_supporting_organizations ?? 0) >
+      (data.cash_contributions_to_50_percent_organizations ?? 0)
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["cash_contributions_to_daf_or_supporting_organizations"],
+      message:
+        "Donor-advised fund and supporting organization gifts are part of the 50%-organization cash gifts",
+    });
+  }
+  if (
+    (data.line_8d_mortgage_insurance_premiums ?? 0) > 0 &&
+    data.mortgage_insurance_premiums_qualified_confirmed !== true
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["mortgage_insurance_premiums_qualified_confirmed"],
+      message:
+        "Schedule A line 8d needs confirmation the premiums are for a post-2006 contract on qualified residence acquisition debt",
     });
   }
   if (data.force_itemized === true && data.force_standard === true) {
@@ -251,6 +392,32 @@ export const inputSchema = z.object({
           "Appreciated capital-gain property in the 50% category needs a sourced basis reduction",
       });
     }
+  }
+  const priorCarryovers = data.prior_charitable_carryovers ?? [];
+  for (const [index, item] of priorCarryovers.entries()) {
+    if (
+      NONCASH_CARRYOVER_CATEGORIES.has(item.category) &&
+      item.original_gift_500_or_less_confirmed !== true
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["prior_charitable_carryovers", index],
+        message:
+          "A noncash carryover of a gift over $500 needs Form 8283 in the carryover year; confirm original_gift_500_or_less_confirmed",
+      });
+    }
+  }
+  if (
+    priorCarryovers.length > 0 &&
+    (election ||
+      data.other_prior_charitable_carryovers_absent_confirmed === true)
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["prior_charitable_carryovers"],
+      message:
+        "Prior charitable carryovers cannot combine with the capital-gain 50% election or its no-other-carryover confirmation",
+    });
   }
   if (!election && (data.capital_gain_property_carryovers?.length ?? 0) > 0) {
     ctx.addIssue({
@@ -367,6 +534,14 @@ export const inputSchema = z.object({
         "Qualified conservation contributions need the separate 50% or 100% Worksheet 2 limits and substantiation route",
     });
   }
+  if ((data.line_15_casualty_theft_loss ?? 0) > 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["line_15_casualty_theft_loss"],
+      message:
+        "Schedule A line 15 is Form 4684 line 18; enter each casualty in form4684 personal_casualties (see 'opentax node template form4684 --full')",
+    });
+  }
   for (
     const line of [
       "line_11_cash_contributions",
@@ -378,8 +553,9 @@ export const inputSchema = z.object({
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: [line],
-        message:
-          "Unclassified charitable deduction cannot be filed directly; provide categorized current-year source contributions. Prior-year carryovers need their original category and substantiation route.",
+        message: line === "line_13_contribution_carryover"
+          ? "Schedule A line 13 is computed; enter each prior-year carryover in prior_charitable_carryovers with contribution_year, category, amount, source_document_reference and ordinary_carryover_rules_confirmed, plus original_gift_500_or_less_confirmed for a noncash category (see 'opentax node template schedule_a --full')"
+          : "Unclassified charitable deduction cannot be filed directly; provide categorized current-year source contributions",
       });
     }
   }
@@ -388,6 +564,8 @@ export const inputSchema = z.object({
   // deduct both. Reject when both are provided with nonzero values.
   const hasSalesTax = (data.line_5a_sales_tax ?? 0) > 0;
   const hasIncomeTax = ((data.line_5a_state_income_tax ?? 0) +
+    (data.line_5a_other_state_income_tax ?? 0) +
+    (data.w2_state_local_income_tax ?? 0) +
     (data.retirement_state_local_withholding ?? 0)) > 0;
   if (hasSalesTax && hasIncomeTax) {
     ctx.addIssue({
@@ -401,6 +579,33 @@ export const inputSchema = z.object({
 });
 
 type ScheduleAInput = z.infer<typeof inputSchema>;
+
+// Schedule A line 5a: an entered full line 5a, or W-2 withholding plus the
+// other state and local income taxes paid (2025 i1040sca, line 5a).
+function withW2StateTax(input: ScheduleAInput): ScheduleAInput {
+  const withheld = input.w2_state_local_income_tax ?? 0;
+  const other = input.line_5a_other_state_income_tax;
+  if (input.w2_state_local_income_tax === undefined && other === undefined) {
+    return input;
+  }
+  const entered = input.line_5a_state_income_tax;
+  if (entered !== undefined && other !== undefined) {
+    throw new Error(
+      "Schedule A line 5a is either the full amount or the taxes beyond W-2 withholding, not both",
+    );
+  }
+  if (entered !== undefined && entered + 0.005 < withheld) {
+    throw new Error(
+      "Schedule A line 5a is less than its W-2 state and local withholding; enter other payments as line_5a_other_state_income_tax",
+    );
+  }
+  return {
+    ...input,
+    line_5a_state_income_tax: entered ?? withheld + (other ?? 0),
+    line_5a_other_state_income_tax: undefined,
+    w2_state_local_income_tax: 0,
+  };
+}
 
 function computeMedicalDeduction(input: ScheduleAInput, agi: number): number {
   return Math.max(
@@ -434,7 +639,10 @@ function computeSALT(input: ScheduleAInput, cfg: F1040Config): number {
   return Math.min(saltTotal, Math.round(effectiveSaltCap(input, cfg)));
 }
 
-function computeInterestTotal(input: ScheduleAInput): number {
+function computeInterestTotal(
+  input: ScheduleAInput,
+  mortgageInsurance: number,
+): number {
   const mortgage = Math.round(input.line_8a_mortgage_interest_1098 ?? 0) +
     Math.round(input.line_8b_mortgage_interest_no_1098 ?? 0);
   return Math.max(
@@ -442,7 +650,7 @@ function computeInterestTotal(input: ScheduleAInput): number {
     mortgage -
       Math.round(input.form8396_interest_credit_reduction ?? 0),
   ) +
-    Math.round(input.line_8c_points_no_1098 ?? 0) +
+    Math.round(input.line_8c_points_no_1098 ?? 0) + mortgageInsurance +
     Math.round(input.line_9_investment_interest ?? 0);
 }
 
@@ -544,7 +752,10 @@ export function reconcileProducingMiningCharitableAmt(
   if (input.agi === undefined) {
     throw new Error("Producing617 AMT charity needs finalized AGI");
   }
-  if ((input.capital_gain_property_carryovers?.length ?? 0) > 0) {
+  if (
+    (input.capital_gain_property_carryovers?.length ?? 0) > 0 ||
+    (input.prior_charitable_carryovers?.length ?? 0) > 0
+  ) {
     throw new Error(
       "Producing617 current AMT charity needs separately sourced prior AMT carryovers before using older gifts",
     );
@@ -630,6 +841,108 @@ export function reconcileProducingMiningCharitableAmt(
   };
 }
 
+const CARRYOVER_ITEM_CATEGORY: Readonly<
+  Partial<Record<CharitableCarryoverCategory, NoncashContributionCategory>>
+> = {
+  [CharitableCarryoverCategory.Noncash50]: "noncash_50",
+  [CharitableCarryoverCategory.NoncashOther30]: "other_30",
+  [CharitableCarryoverCategory.CapitalGain30]: "capital_gain_30",
+  [CharitableCarryoverCategory.CapitalGain20]: "capital_gain_20",
+};
+
+function carryoverTotal(
+  carryovers: readonly { category: CharitableCarryoverCategory; amount: number }[],
+  include: (category: CharitableCarryoverCategory) => boolean,
+): number {
+  return carryovers.filter((item) => include(item.category))
+    .reduce((sum, item) => sum + item.amount, 0);
+}
+
+/** Schedule A line 13 for prior-year carryovers. Each keeps its category's
+ * limit and is used after this year's gifts in that category (Pub. 526
+ * (2025), Carryovers). When this year's gifts and every carryover fit their
+ * limits together, all are deductible in any order; a return where a limit
+ * binds needs the carryover ordering, which is refused. */
+function computePriorCarryovers(
+  input: ScheduleAInput,
+  agi: number,
+  taxYear: number,
+): number {
+  const carryovers = input.prior_charitable_carryovers ?? [];
+  if (carryovers.length === 0) return 0;
+  if (
+    carryovers.some((item) =>
+      item.contribution_year < taxYear - CHARITABLE_CARRYOVER_YEARS ||
+      item.contribution_year >= taxYear
+    )
+  ) {
+    throw new Error(
+      "Charitable carryover contribution year is outside the five-year carryover window",
+    );
+  }
+  const items = input.noncash_contribution_items ?? [];
+  const noncashCarryovers = carryoverTotal(
+    carryovers,
+    (category) => NONCASH_CARRYOVER_CATEGORIES.has(category),
+  );
+  if (
+    noncashCarryovers > 0 &&
+    items.reduce((sum, item) => sum + item.amount, 0) + noncashCarryovers >
+      FORM8283_NONCASH_THRESHOLD
+  ) {
+    throw new Error(
+      "Noncash gifts and carryovers over $500 need Form 8283 for this carryover year",
+    );
+  }
+  const merged = computeContributions(
+    {
+      ...input,
+      cash_contributions_to_50_percent_organizations:
+        (input.cash_contributions_to_50_percent_organizations ?? 0) +
+        carryoverTotal(
+          carryovers,
+          (category) => category === CharitableCarryoverCategory.Cash60,
+        ),
+      cash_contributions_other_30: (input.cash_contributions_other_30 ?? 0) +
+        carryoverTotal(
+          carryovers,
+          (category) => category === CharitableCarryoverCategory.CashOther30,
+        ),
+      noncash_contribution_items: [
+        ...items,
+        ...carryovers.flatMap((item) => {
+          const category = CARRYOVER_ITEM_CATEGORY[item.category];
+          return category
+            ? [{
+              source: `${item.contribution_year} carryover`,
+              amount: item.amount,
+              category,
+            }]
+            : [];
+        }),
+      ],
+    },
+    agi,
+    taxYear,
+  );
+  if (Object.values(merged.carryforwards).some((amount) => amount > 0)) {
+    throw new Error(
+      "Prior-year charitable carryovers that this year's AGI limits do not fully allow need the Pub. 526 carryover ordering, which is not supported",
+    );
+  }
+  return carryoverTotal(carryovers, () => true);
+}
+
+/** Line 15 is Form 4684 line 18: line 16 less 10% of AGI (2025 Form 4684,
+ * lines 17 and 18). */
+function casualtyLine15(input: ScheduleAInput): number | undefined {
+  if (input.form4684_line16_loss === undefined) return undefined;
+  if (input.agi === undefined) {
+    throw new Error("Form 4684 line 17 needs computed AGI");
+  }
+  return personalLine18(input.form4684_line16_loss, input.agi).line18;
+}
+
 function computeElectedCapitalGainCarryovers(
   input: ScheduleAInput,
   agi: number,
@@ -682,6 +995,37 @@ function computeElectedCapitalGainCarryovers(
   return { allowed, remaining };
 }
 
+// Pub. 505 (2026) Worksheet 2-5 applies the floor to the year's total gifts.
+// How it interacts with the percentage limits and carryovers (IRC
+// §170(b)(1)(I)(ii)) awaits the final Schedule A worksheet, so a return the
+// limits or carryovers reach is refused rather than guessed.
+function assertCharitableFloorSupported(
+  contributions: { carryforwards: Record<string, number> },
+  input: ScheduleAInput,
+): void {
+  if (
+    Object.values(contributions.carryforwards).some((amount) => amount > 0) ||
+    (input.capital_gain_property_carryovers?.length ?? 0) > 0 ||
+    (input.prior_charitable_carryovers?.length ?? 0) > 0
+  ) {
+    throw new Error(
+      "TY2026 charitable 0.5% floor with AGI-limited gifts or carryovers needs the final Schedule A limitation worksheet",
+    );
+  }
+}
+
+// IRC §170(p): cash to §170(b)(1)(A) organizations other than donor-advised
+// funds and supporting organizations.
+function nonitemizerCashSource(input: ScheduleAInput) {
+  const cash = input.cash_contributions_to_50_percent_organizations ?? 0;
+  if (cash === 0) return {};
+  const excluded = input.cash_contributions_to_daf_or_supporting_organizations;
+  if (excluded === undefined) {
+    return { nonitemizer_charitable_cash_unclassified: true };
+  }
+  return { nonitemizer_charitable_cash: cash - excluded };
+}
+
 class ScheduleANode extends TaxNode<typeof inputSchema> {
   readonly nodeType = "schedule_a";
   readonly inputSchema = inputSchema;
@@ -691,8 +1035,8 @@ class ScheduleANode extends TaxNode<typeof inputSchema> {
     form6251,
   ]);
 
-  compute(ctx: NodeContext, input: ScheduleAInput): NodeResult {
-    inputSchema.parse(input);
+  compute(ctx: NodeContext, rawInput: ScheduleAInput): NodeResult {
+    const input = withW2StateTax(inputSchema.parse(rawInput));
     const cfg = CONFIG_BY_YEAR[ctx.taxYear];
     if (!cfg) throw new Error(`No f1040 config for year ${ctx.taxYear}`);
     const agi = input.agi ?? 0;
@@ -702,7 +1046,8 @@ class ScheduleANode extends TaxNode<typeof inputSchema> {
       (input.noncash_contribution_items ?? []).some((item) =>
         item.amount > 0
       ) ||
-      (input.capital_gain_property_carryovers?.length ?? 0) > 0;
+      (input.capital_gain_property_carryovers?.length ?? 0) > 0 ||
+      (input.prior_charitable_carryovers?.length ?? 0) > 0;
     if (hasContributions && input.agi === undefined) {
       throw new Error("Schedule A charitable limits require computed AGI");
     }
@@ -740,13 +1085,41 @@ class ScheduleANode extends TaxNode<typeof inputSchema> {
       );
     }
     const taxesTotal = saltCapped + Math.round(input.line_6_other_taxes ?? 0);
+    const mortgageInsurance = mortgageInsurancePremiumDeduction(
+      cfg,
+      input.filing_status,
+      agi,
+      input.line_8d_mortgage_insurance_premiums ?? 0,
+    );
+    const priorCarryovers = computePriorCarryovers(input, agi, ctx.taxYear);
+    const line13Carryover = electedCarryovers.allowed + priorCarryovers;
+    const charitableBeforeFloor = Math.round(contributions.cash) +
+      Math.round(contributions.noncash) +
+      Math.round(line13Carryover);
+    const charitableFloor = charitableFloorAmount(
+      cfg,
+      agi,
+      charitableBeforeFloor,
+    );
+    if (charitableFloor > 0) assertCharitableFloorSupported(contributions, input);
+    if (
+      ctx.taxYear >= 2026 && (input.line_16_other_deductions ?? 0) > 0
+    ) {
+      throw new Error(
+        "TY2026 Schedule A line 17 needs its categories; gambling losses are limited to 90% (IRC §165(d) as amended by P.L. 119-21 §70114)",
+      );
+    }
+    const casualtyLoss = casualtyLine15(input);
     const totalItemized = computeMedicalDeduction(input, agi) +
       taxesTotal +
-      computeInterestTotal(input) +
-      Math.round(contributions.cash) + Math.round(contributions.noncash) +
-      Math.round(electedCarryovers.allowed) +
-      Math.round(input.line_15_casualty_theft_loss ?? 0) +
-      Math.round(input.line_16_other_deductions ?? 0);
+      computeInterestTotal(input, mortgageInsurance) +
+      charitableBeforeFloor - charitableFloor +
+      (casualtyLoss ?? 0) +
+      Math.round(input.line_16_other_deductions ?? 0) +
+      (input.net_qualified_disaster_loss ?? 0);
+    const nonitemizerCash = cfg.nonitemizerCharitableLimit > 0
+      ? nonitemizerCashSource(input)
+      : {};
 
     const outputs: NodeOutput[] = [
       ...(charitableAmt &&
@@ -761,14 +1134,17 @@ class ScheduleANode extends TaxNode<typeof inputSchema> {
       this.outputNodes.output(standard_deduction, {
         itemized_deductions: totalItemized,
         force_itemized: input.force_itemized,
+        ...(input.force_standard === true && { force_standard: true }),
         itemized_taxes: taxesTotal,
         itemized_investment_interest: input.line_9_investment_interest ?? 0,
         niit_allocable_state_local_tax: niitAllocatedTax,
+        ...nonitemizerCash,
       }),
       ...(totalItemized > 0 || input.force_itemized === true
         ? [this.outputNodes.output(form8995, {
           itemized_deductions: totalItemized,
           force_itemized: input.force_itemized,
+          ...(input.force_standard === true && { force_standard: true }),
         })]
         : []),
     ];
@@ -777,14 +1153,31 @@ class ScheduleANode extends TaxNode<typeof inputSchema> {
       finalizations: [{
         nodeType: this.nodeType,
         fields: {
+          ...(rawInput.w2_state_local_income_tax === undefined &&
+              rawInput.line_5a_other_state_income_tax === undefined
+            ? {}
+            : {
+              line_5a_state_income_tax: input.line_5a_state_income_tax,
+              line_5a_other_state_income_tax: 0,
+              w2_state_local_income_tax: 0,
+            }),
           line_11_cash_contributions: contributions.cash,
           line_12_noncash_contributions: contributions.noncash,
-          line_13_contribution_carryover: electedCarryovers.allowed,
+          line_13_contribution_carryover: line13Carryover,
           ...(charitableAmt
             ? { charitable_amt_reconciliation: charitableAmt }
             : {}),
           charitable_limits_finalized: true,
           capital_gain_election_finalized: election,
+          ...(casualtyLoss !== undefined
+            ? { line_15_casualty_theft_loss: casualtyLoss }
+            : {}),
+          ...(mortgageInsurance > 0
+            ? { line_8d_mortgage_insurance_allowed: mortgageInsurance }
+            : {}),
+          ...(charitableFloor > 0
+            ? { charitable_agi_floor: charitableFloor }
+            : {}),
         },
       }],
       carryforwards: {

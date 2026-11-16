@@ -1,7 +1,11 @@
+import { mefTaxYear } from "../../../support/year-config.ts";
 import { z } from "zod";
 import { element, elements } from "../../../../../mef/xml.ts";
 import type { MefBuildContext, MefFormDescriptor } from "../../../form-descriptor.ts";
-import { inputSchema as form8889SourceSchema } from "../../../../../nodes/intermediate/forms/adjustments/health/form8889/index.ts";
+import {
+  inputSchema as form8889SourceSchema,
+  withReturnBeneficiaryNames,
+} from "../../../../../nodes/intermediate/forms/adjustments/health/form8889/index.ts";
 import {
   reconcileCode2Form8889,
   reconcileDatedExceptionForm8889,
@@ -160,7 +164,9 @@ function buildIRS8889(
     throw new Error("Form 8889 MeF needs owner-labeled computed forms");
   }
   if (Object.keys(raw).length === 0) return [];
-  const fields = filingInputSchema.parse(raw);
+  const fields = filingInputSchema.parse(
+    withReturnBeneficiaryNames(raw, context?.filer),
+  );
   if (
     fields.forms.length < 1 || fields.forms.length > 2 ||
     (fields.forms.length === 2 &&
@@ -175,28 +181,43 @@ function buildIRS8889(
     fields.forms,
     context?.pending,
     context?.filer,
+    mefTaxYear(context),
   );
   reconcileDatedExceptionForm8889(
     fields.forms,
     context?.pending,
     context?.filer,
+    mefTaxYear(context),
   );
-  reconcileCode2Form8889(fields.forms, context?.pending, context?.filer);
+  reconcileCode2Form8889(
+    fields.forms,
+    context?.pending,
+    context?.filer,
+    mefTaxYear(context),
+  );
   reconcilePrimaryLastMonthRuleForm8889(
     fields.forms,
     context?.pending,
     context?.filer,
+    mefTaxYear(context),
   );
-  reconcileRolloverForm8889(fields.forms, context?.pending, context?.filer);
+  reconcileRolloverForm8889(
+    fields.forms,
+    context?.pending,
+    context?.filer,
+    mefTaxYear(context),
+  );
   reconcilePairedForm8889(
     fields.forms,
     context?.pending,
     context?.filer,
+    mefTaxYear(context),
   );
   reconcilePrimaryMixedMedicalForm8889(
     fields.forms,
     context?.pending,
     context?.filer,
+    mefTaxYear(context),
   );
   if (fields.forms.length === 2) {
     const sum = (key: string) =>

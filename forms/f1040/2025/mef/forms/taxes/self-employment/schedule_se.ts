@@ -1,10 +1,12 @@
 import { assertOwnedScheduleSE } from "../../../../domains/taxes/self-employment/schedule-se/schedule-se-owner-source.ts";
 import { element, elements } from "../../../../../mef/xml.ts";
 import { scheduleSELines } from "../../../../../nodes/intermediate/forms/taxes/self-employment/schedule_se/calculation.ts";
-import { CONFIG_BY_YEAR } from "../../../../../nodes/config/index.ts";
 import type { MefBuildContext, MefFormDescriptor } from "../../../form-descriptor.ts";
 import { FilingStatus as MefFilingStatus } from "../../../../../mef/header.ts";
 import { scheduleSeSpouseProprietor } from "../../../../domains/taxes/self-employment/schedule-se/schedule-se-proprietor.ts";
+import { mefTaxYear, mefYearConfig } from "../../../support/year-config.ts";
+import { withMinisterialEarnings } from "../../../../../nodes/intermediate/forms/taxes/self-employment/schedule_se/ministerial.ts";
+import { assertFileableClergyReturn } from "../../../../domains/income/wages/clergy/clergy_source.ts";
 
 export interface Fields {
   net_profit_schedule_c?: number | null;
@@ -43,18 +45,60 @@ export const FIELD_MAP: ReadonlyArray<readonly [keyof Fields, string]> = [
   ["wages_8919", "WagesSubjectToSSTAmt"],
 ];
 
+/** Clergy presentation for one proprietor's Schedule SE. */
+interface ClergyScheduleSE {
+  /** Line A: Form 4361 minister with $400 or more of other SE earnings. */
+  readonly lineA: (owner: "T" | "S") => boolean;
+  /** Document ID of the owner's line 2 ministerial explanation statement. */
+  readonly explanationId: (owner: "T" | "S") => string | undefined;
+}
+
+function clergyScheduleSE(context?: MefBuildContext): ClergyScheduleSE {
+  const facts = context?.pending
+    ? assertFileableClergyReturn(
+      context.pending as Readonly<Record<string, Record<string, unknown>>>,
+      mefTaxYear(context),
+      context.filer,
+    )
+    : undefined;
+  const owners = (["T", "S"] as const).filter((owner) =>
+    facts?.scheduleSeExplanations.has(owner)
+  );
+  const ids = context?.documentIdsByPendingKey
+    ?.allowable_se_expense_explanation_statement ?? [];
+  return {
+    lineA: (owner) => facts?.scheduleSeLineA.has(owner) === true,
+    explanationId(owner) {
+      const index = owners.indexOf(owner);
+      if (index === -1) return undefined;
+      if (context?.documentIdsByPendingKey && ids[index] === undefined) {
+        throw new Error(
+          "Schedule SE ministerial earnings need their attached explanation",
+        );
+      }
+      return ids[index];
+    },
+  };
+}
+
 function buildIRS1040ScheduleSE(
-  fields: Input,
+  rawFields: Input,
   context?: MefBuildContext,
+  clergy: ClergyScheduleSE = clergyScheduleSE(context),
 ): string {
-  const lines = scheduleSELines(fields, CONFIG_BY_YEAR[2025].ssWageBase);
+  // Line 2 adds a minister's net earnings to Schedule C and K-1 profit; owned
+  // instances already carry them (i1040sse, Ministers).
+  const fields = withMinisterialEarnings(rawFields);
+  const cfg = mefYearConfig(context);
+  const lines = scheduleSELines(fields, cfg.ssWageBase, cfg);
   const optional = fields.farm_optional_method_elected === true;
   const hasSeIncome = SE_INCOME_KEYS.some((key) =>
     typeof fields[key] === "number"
   );
   if (!hasSeIncome) return "";
-  // The printed 2025 Schedule SE directs the filer to stop at line 4c.
-  if (optional && !lines) return "";
+  // Under $400 on line 4c the filer stops, and i1040sse says not to file
+  // Schedule SE when lines 1a and 2 total less than $434.
+  if (!lines) return "";
 
   const pending = context?.pending;
   const spouseOwned = fields.owner_recipient === "S" ||
@@ -87,12 +131,17 @@ function buildIRS1040ScheduleSE(
     throw new Error("Schedule SE SSN does not match the filer");
   }
 
+  const owner = spouseOwned ? "S" : "T";
   const ssnChild = element("SSN", ssn);
+  const explanationId = clergy.explanationId(owner);
   const value = (key: keyof Fields, tag: string): string => {
     const amount = fields[key];
     return typeof amount === "number" ? element(tag, amount) : "";
   };
   const children = [
+    // IRS1040ScheduleSE.xsd (TY2025): line A ExemptForm4361Ind is the first
+    // element after SSN.
+    clergy.lineA(owner) ? element("ExemptForm4361Ind", "X") : "",
     optional ? "" : value("net_profit_schedule_f", "NetFarmProfitLossAmt"),
     value("net_profit_schedule_c", "NetNonFarmProfitLossAmt"),
     lines ? element("SETotalNetEarningsOrLossAmt", lines.line3) : "",
@@ -113,7 +162,19 @@ function buildIRS1040ScheduleSE(
       ? element("SETaxFarmOptionalMethodAmt", lines.line15)
       : "",
   ];
-  return elements("IRS1040ScheduleSE", [ssnChild, ...children]);
+  // The TY2025 schema puts the statement reference on the IRS1040ScheduleSE
+  // root (referenceDocumentName fixed "AllowableSEExpenseExplanationStatement");
+  // NetNonFarmProfitLossAmt carries no reference attributes.
+  return elements(
+    "IRS1040ScheduleSE",
+    [ssnChild, ...children],
+    explanationId
+      ? {
+        referenceDocumentId: explanationId,
+        referenceDocumentName: "AllowableSEExpenseExplanationStatement",
+      }
+      : undefined,
+  );
 }
 
 export const scheduleSE: MefFormDescriptor<
@@ -128,16 +189,19 @@ export const scheduleSE: MefFormDescriptor<
     const owned = context?.pending
       ? assertOwnedScheduleSE(
         context.pending as Record<string, Record<string, unknown>>,
+        mefTaxYear(context),
         context.filer,
       )
       : undefined;
+    const clergy = clergyScheduleSE(context);
     return owned
       ? owned.instances.map((row) =>
         buildIRS1040ScheduleSE(
           { ...row, owner_recipient: row.recipient },
           context,
+          clergy,
         )
       )
-      : buildIRS1040ScheduleSE(fields, context);
+      : buildIRS1040ScheduleSE(fields, context, clergy);
   },
 };

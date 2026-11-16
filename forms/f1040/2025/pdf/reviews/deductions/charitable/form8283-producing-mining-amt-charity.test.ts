@@ -1,8 +1,21 @@
-import { assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
+import {
+  assertEquals,
+  assertRejects,
+  assertStringIncludes,
+  assertThrows,
+} from "@std/assert";
 import { f1040_2025 } from "../../../../index.ts";
 import { buildPending } from "../../../../mef/execution/pending.ts";
 import { buildMefBundle } from "../../../../mef/builder.ts";
 import { buildPdfBytes, type PdfPageOrigin } from "../../../builder.ts";
+import { assertForm6251CharitableSource } from "../../../../domains/taxes/amt/form6251/form6251_charitable_source.ts";
+import {
+  reconcileProducingMiningCharitableAmt,
+  scheduleA,
+} from "../../../../../nodes/inputs/deductions/itemized/schedule_a/index.ts";
 import {
   producingMiningAmtCharityCases,
   reviewedProducingMiningAmtCharityGift,
@@ -39,7 +52,7 @@ const expectations = {
   },
 };
 for (const kind of producingMiningAmtCharityCases) {
-  Deno.test(`Producing617 ${kind} owned AMT charity line3 and distinct carry full packet`, async () => {
+  test(`Producing617 ${kind} owned AMT charity line3 and distinct carry full packet`, async () => {
     const source = await reviewedProducingMiningAmtCharityGift(kind);
     const want = expectations[kind];
     const r = f1040_2025.executeReturn(source.inputs);
@@ -129,11 +142,11 @@ for (const kind of producingMiningAmtCharityCases) {
       origins,
     );
     assertEquals(origins.filter((o) => o.formKey === "form8995a").length, 2);
-    const dir = (Deno.env.get("FORM8283_AMT_CHARITY_EVIDENCE_DIR") ??
+    const dir = (process.env.FORM8283_AMT_CHARITY_EVIDENCE_DIR ??
       ".state/research/form8283-producing617-amt-charity") + "/" + kind;
-    await Deno.mkdir(dir + "/attachments", { recursive: true });
-    await Deno.writeFile(dir + "/return.pdf", pdf);
-    await Deno.writeTextFile(dir + "/return.xml", bundle.xml);
+    await fs.mkdir(dir + "/attachments", { recursive: true });
+    await fs.writeFile(dir + "/return.pdf", pdf);
+    await fs.writeFile(dir + "/return.xml", bundle.xml);
     for (
       const [name, value] of Object.entries({
         source: { inputs: source.inputs, filer: source.filer },
@@ -143,7 +156,7 @@ for (const kind of producingMiningAmtCharityCases) {
         calculation: source.calc,
       })
     ) {
-      await Deno.writeTextFile(
+      await fs.writeFile(
         dir + "/" + name + ".json",
         JSON.stringify(value, null, 2),
       );
@@ -152,17 +165,17 @@ for (const kind of producingMiningAmtCharityCases) {
     for (const attachment of source.attachments) {
       const { bytes, ...record } = attachment;
       metadata.push(record);
-      await Deno.writeFile(dir + "/attachments/" + attachment.fileName, bytes);
+      await fs.writeFile(dir + "/attachments/" + attachment.fileName, bytes);
     }
-    await Deno.writeTextFile(
+    await fs.writeFile(
       dir + "/attachments.json",
       JSON.stringify(metadata, null, 2),
     );
-    const x = await new Deno.Command("xmllint", {
+    const x = await new sys.Command("xmllint", {
       args: [
         "--noout",
         "--schema",
-        ".state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+        "irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
         dir + "/return.xml",
       ],
     }).output();
@@ -239,3 +252,34 @@ for (const kind of producingMiningAmtCharityCases) {
     }
   });
 }
+
+test("Producing617 AMT charity source replays against the return's year", async () => {
+  const source = await reviewedProducingMiningAmtCharityGift(
+    "partly_limited_amt",
+  );
+  const p = buildPending(f1040_2025.executeReturn(source.inputs).pending);
+  const fields = p.form6251 as Record<string, unknown>;
+  assertForm6251CharitableSource(fields, p, 2025);
+  const regular = scheduleA.inputSchema.parse({
+    ...p.schedule_a,
+    line_11_cash_contributions: undefined,
+    line_12_noncash_contributions: undefined,
+    line_13_contribution_carryover: undefined,
+  });
+  const ty2026 = {
+    ...p,
+    schedule_a: {
+      ...p.schedule_a,
+      charitable_amt_reconciliation: reconcileProducingMiningCharitableAmt(
+        regular,
+        2026,
+      ),
+    },
+  };
+  assertForm6251CharitableSource(fields, ty2026, 2026);
+  assertThrows(
+    () => assertForm6251CharitableSource(fields, ty2026, 2025),
+    Error,
+    "differs from owned source",
+  );
+});

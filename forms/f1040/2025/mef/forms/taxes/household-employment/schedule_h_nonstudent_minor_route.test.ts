@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import {
   inputSchema,
@@ -33,7 +34,7 @@ const source = {
         birth_date_source_reference: "working-minor-age-record",
         education_status_source_reference: "2025-nonenrollment-record",
         principal_occupation_source_reference: "2025-household-work-record",
-        not_a_student_during_2025_verified: true,
+        not_a_student_during_tax_year_verified: true,
         household_services_principal_occupation_verified: true,
       },
       ordinary_cash_only: true,
@@ -62,7 +63,7 @@ const filer: FilerIdentity = {
   filingStatus: FilingStatus.Single,
 };
 
-Deno.test("Schedule H nonstudent minor principal-work route joins calculation, native, PDF and Schedule 2", () => {
+test("Schedule H nonstudent minor principal-work route joins calculation, native, PDF and Schedule 2", () => {
   const filedSource = inputSchema.parse(source);
   const result = schedule_h.compute(
     { taxYear: 2025, formType: "f1040" },

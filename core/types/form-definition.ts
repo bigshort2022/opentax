@@ -4,6 +4,7 @@ import type { FilerIdentity } from "../../forms/f1040/mef/header.ts";
 import type { ExecuteResult } from "../runtime/executor.ts";
 import type { MefBundle } from "../../forms/f1040/2025/mef/builder.ts";
 import type { MefPdfAttachment } from "../../forms/f1040/2025/mef/form-descriptor.ts";
+import type { DiagnosticsReport } from "../validation/types.ts";
 
 export interface PreparedFormReturn {
   readonly bundle: MefBundle;
@@ -28,6 +29,8 @@ export interface FormDefinition {
   readonly formType: string; // e.g. "f1040"
   readonly taxYear: number; // e.g. 2025
   readonly mefSchemaVersion: string; // e.g. "2025v3.0"
+  /** Shown with every PDF export, e.g. that it prints on IRS draft forms. */
+  readonly pdfNotice?: string;
   readonly inputNodes: readonly InputNodeEntry[];
   readonly registry: Record<string, TaxNode>;
   /** Single form-owned execution entrypoint for validated source inputs. */
@@ -52,4 +55,9 @@ export interface FormDefinition {
   readonly buildPending: (
     pending: Record<string, unknown>,
   ) => Record<string, unknown>;
+  /** A submission type with its own rule set; absent means the Form 1040 rules. */
+  readonly mefRuleReport?: (
+    pending: Readonly<Record<string, unknown>>,
+    xml: string,
+  ) => DiagnosticsReport;
 }

@@ -1,52 +1,147 @@
 /**
  * MeF Business Rules: IND
  * Auto-generated from 1040_Business_Rules_2025v3.0.csv
- * 201 rules (120 implemented, 81 stubs)
- *
- * Stubs kept as alwaysPass — all require runtime/external context:
- *   - e-File database lookups (prior-year AGI/PIN match, SSN lock status, duplicate
- *     SSN cross-instance checks, IP PIN verification, death-date cross-reference)
- *   - Per-item iteration over DependentDetail array (uniqueness, relationship codes,
- *     ITIN/ATIN checks, age checks, death-certificate attachments)
- *   - Dependent count operations (CTC × $2,000 / ODC × $500 cap, ACTC × $1,700 cap)
- *   - Server-side processing context (TaxPeriodEndDt vs. receipt date, prior-year
- *     acceptance status, post-original return count limits, processing-year signature)
- *   - Format validation without an available regex predicate (IP address, numeric PIN)
- *   - Pure informational / policy alerts (IND-067-10, IND-145-01, IND-162, IND-450,
- *     IND-607, IND-617, IND-644, IND-663)
+ * 201 rules. Database and duplicate rules check what the return itself
+ * carries: identifiers the IRS could have issued, PIN formats, dates against
+ * 'ReturnTs', and no TIN used twice within this return.
  */
 
-import type { RuleDef } from "../../../../../../../core/validation/types.ts";
+import type { RuleCheck, RuleDef } from "../../../../../../../core/validation/types.ts";
 import {
+  ageAtYearEnd,
   all,
   allDistinct,
-  alwaysFail,
-  alwaysPass,
+  allMatch,
+  amount,
+  amountEq,
+  amountLt,
+  amountLte,
   any,
+  attachmentCount,
+  attachmentCountStartingWith,
+  constant,
   contains,
   dateYearGte,
+  eachGroup,
   eqDiff,
   eqField,
-  eqNum,
   eqStr,
   eqSum,
+  everyItem,
   filingStatusIs,
   filingStatusNot,
   formAbsent,
+  formCountOf,
   formPresent,
+  groupCount,
   gt,
   hasNonZero,
   hasValue,
   ifThen,
   ifThenUnless,
+  isItinOrAtin,
   isZero,
+  known,
+  minus,
+  noneMatchHeaderSSN,
   not,
   notGtField,
+  notGtWeightedCount,
   noValue,
+  plus,
+  rule,
+  someMatchesFilerSSN,
+  someRepeated,
   ssnNotEqual,
+  strIn,
   validSSN,
+  yearOf,
 } from "../../../../../../../core/validation/mod.ts";
-import { rule } from "../../../../../../../core/validation/mod.ts";
+import {
+  dateBeforeReceipt,
+  issuableTins,
+  plausibleBirthDate,
+  postOriginalReturn,
+  priorYearReturn,
+  processingYear,
+  validFiveDigitPins,
+  validIpPins,
+} from "../../../../../../../core/validation/predicates.ts";
+import { manifestText, submissionEnvelope } from "../envelope.ts";
+
+const tin = (v: unknown): string => String(v ?? "").replace(/\D/g, "");
+
+const SELF_SELECT = any(
+  eqStr("PINTypeCd", "Self-Select On-Line"),
+  eqStr("PINTypeCd", "Self-Select Practitioner"),
+);
+
+// Other returns are the IRS's to compare; within this one no filer or
+// dependent TIN may appear twice.
+const NO_TIN_REPEATED = not(someRepeated("PrimarySSN", "SpouseSSN", "DependentSSN"));
+
+const QUALIFYING_PERSON_IP_PINS = [
+  "1040/IdentityProtectionPIN",
+  "2441/IdentityProtectionPIN",
+  "ScheduleEIC/IdentityProtectionPIN",
+] as const;
+
+// MeF accepts the current and two prior tax years.
+const MEF_ACCEPTS_TAX_YEAR = ifThen(
+  known(processingYear),
+  amountLte(minus(processingYear, constant(3)), amount("TaxYr")),
+);
+const POST_ORIGINAL_WINDOW = all(known(processingYear), MEF_ACCEPTS_TAX_YEAR);
+
+/** A Self-Select PIN signer authenticates with one of prior-year PIN or AGI, or an IP PIN, each well formed. */
+const priorYearSignIn = (filer: "Primary" | "Spouse", ipPin: string): RuleCheck =>
+  ifThen(
+    all(SELF_SELECT, hasValue(`${filer}SignaturePIN`)),
+    all(
+      any(
+        hasValue(`${filer}PriorYearPIN`),
+        hasValue(`${filer}PriorYearAGIAmt`),
+        hasValue(ipPin),
+      ),
+      not(all(hasValue(`${filer}PriorYearPIN`), hasValue(`${filer}PriorYearAGIAmt`))),
+      validFiveDigitPins(`${filer}PriorYearPIN`),
+      allMatch(`${filer}PriorYearAGIAmt`, /^-?\d+$/),
+      validIpPins(ipPin),
+    ),
+  );
+
+/** A death date the IRS could hold: in or after 'TaxYr' and not after the return was made. */
+const deathDateOnFile = (xml: string): RuleCheck =>
+  all(dateYearGte(xml, "TaxYr"), dateBeforeReceipt(xml));
+
+/** A Self-Select signer under 16 must show a prior return: its PIN or a non-zero AGI. */
+const youngFilerHasFiled = (filer: "Primary" | "Spouse", pinType: string): RuleCheck =>
+  ifThen(
+    all(eqStr("PINTypeCd", pinType), amountLt(ageAtYearEnd(`${filer}BirthDt`), constant(16))),
+    any(hasValue(`${filer}PriorYearPIN`), hasNonZero(`${filer}PriorYearAGIAmt`)),
+  );
+
+/** A child-tax-credit dependent's Schedule EIC birth year, when filed, makes them under 17. */
+const ctcChildUnder17: RuleCheck = (dependent) => {
+  const ssn = tin(dependent.field("DependentSSN"));
+  return (dependent.groupInstances?.("QualifyingChildInformation") ?? [])
+    .filter((child) => tin(child.field("QualifyingChildSSN")) === ssn)
+    .every((child) =>
+      !child.hasValue("ChildBirthYr") ||
+      dependent.num("TaxYr") - child.num("ChildBirthYr") < 17
+    );
+};
+
+/** 'ReturnTs' is after April 15 of the next year, moved past a weekend. */
+const filedAfterDueDate: RuleCheck = (ctx) => {
+  const m = String(ctx.field("ReturnHeader/ReturnTs") ?? "")
+    .match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return false;
+  const april15 = Date.UTC(ctx.num("TaxYr") + 1, 3, 15);
+  const weekday = new Date(april15).getUTCDay();
+  const due = april15 + (weekday === 6 ? 2 : weekday === 0 ? 1 : 0) * 86_400_000;
+  return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) > due;
+};
 
 export const IND_RULES: readonly RuleDef[] = [
   rule(
@@ -60,14 +155,17 @@ export const IND_RULES: readonly RuleDef[] = [
     "IND-002",
     "reject",
     "incorrect_data",
-    alwaysPass,
+    dateBeforeReceipt("TaxPeriodEndDt", true),
     "'TaxPeriodEndDt' in the Submission Manifest must be before the date the return was received.",
   ),
   rule(
     "IND-005-01",
     "reject",
     "incorrect_data",
-    ifThen(hasValue("PaymentAmt"), eqField("PaymentAmt", "PaymentAmt")),
+    ifThen(
+      all(formPresent("form9465"), hasValue("Payment/PaymentAmt")),
+      eqField("9465/PaymentAmt", "Payment/PaymentAmt"),
+    ),
     "If Form 9465 and IRS Payment Record are present in the return, then Form 9465, 'PaymentAmt' must be equal to 'PaymentAmt' in IRS Payment Record.",
   ),
   rule(
@@ -109,7 +207,7 @@ export const IND_RULES: readonly RuleDef[] = [
     "IND-016",
     "reject",
     "missing_data",
-    ifThen(hasValue("USAddress"), hasValue("WorkPerformedResidingInUSInd")),
+    ifThen(hasValue("FECRecord/USAddress"), hasValue("FECRecord/WorkPerformedResidingInUSInd")),
     "If 'USAddress' has a value in [FECRecord], then checkbox 'WorkPerformedResidingInUSInd' must be checked.",
   ),
   rule(
@@ -257,14 +355,14 @@ export const IND_RULES: readonly RuleDef[] = [
     "IND-031-04",
     "reject",
     "incorrect_data",
-    alwaysPass,
+    priorYearSignIn("Primary", "ReturnHeader/IdentityProtectionPIN"),
     "'PrimaryPriorYearPIN' or 'PrimaryPriorYearAGIAmt' in the Return Header must match the e-File database. If you are unable to provide a valid 'PrimaryPriorYearPIN' or 'PrimaryPriorYearAGIAmt', then you may instead provide an Identity Protection PIN (IP PIN) to electronically file your return. An IP PIN may not be used if you are filing Form 9465 standalone. If you wish to get an IP PIN and you don't already have an account on IRS.gov, then you must register to validate your identity. Please visit www.irs.gov/getanippin for further information and resubmit your return.",
   ),
   rule(
     "IND-032-04",
     "reject",
     "incorrect_data",
-    alwaysPass,
+    priorYearSignIn("Spouse", "ReturnHeader/SpouseIdentityProtectionPIN"),
     "'SpousePriorYearPIN' or 'SpousePriorYearAGIAmt' in the Return Header must match the e-File database. If you are unable to provide a valid 'SpousePriorYearPIN' or 'SpousePriorYearAGIAmt', then you may instead provide an Identity Protection PIN (IP PIN) to electronically file your return. An IP PIN may not be used if you are filing Form 9465 standalone. If you wish to get an IP PIN and you don't already have an account on IRS.gov, then you must register to validate your identity. Please visit www.irs.gov/getanippin for further information and resubmit your return.",
   ),
   rule(
@@ -285,14 +383,14 @@ export const IND_RULES: readonly RuleDef[] = [
     "IND-035-01",
     "reject",
     "database",
-    alwaysPass,
+    deathDateOnFile("PrimaryDeathDt"),
     "'PrimaryDeathDt' in the return must match that in the e-File database.",
   ),
   rule(
     "IND-036-01",
     "reject",
     "database",
-    alwaysPass,
+    deathDateOnFile("SpouseDeathDt"),
     "'SpouseDeathDt' in the return must match that in the e-File database.",
   ),
   rule(
@@ -356,7 +454,11 @@ export const IND_RULES: readonly RuleDef[] = [
     "IND-052",
     "reject_and_stop",
     "data_mismatch",
-    ifThen(hasValue("ManifestTIN"), eqField("ManifestTIN", "PrimarySSN")),
+    (ctx) => {
+      const envelope = submissionEnvelope(ctx);
+      return envelope === undefined ||
+        manifestText(envelope, "TIN") === String(ctx.field("PrimarySSN") ?? "");
+    },
     "The TIN present in the IRS Submission Manifest must be equal to the Primary SSN in the Return Header.",
   ),
   rule(
@@ -370,7 +472,7 @@ export const IND_RULES: readonly RuleDef[] = [
     "IND-055-02",
     "reject",
     "incorrect_data",
-    noValue("AddressLine2Txt"),
+    noValue("ReturnHeader/AddressLine2Txt"),
     "'AddressLine2Txt' in the Return Header must not have a value.",
   ),
   rule(
@@ -418,7 +520,7 @@ export const IND_RULES: readonly RuleDef[] = [
     "IND-061",
     "reject",
     "incorrect_data",
-    alwaysPass,
+    ifThen(priorYearReturn, noValue("EstimatedPaymentDueDt")),
     "IRS ES Payment Record must not be present in a prior year return.",
   ),
   rule(
@@ -439,14 +541,30 @@ export const IND_RULES: readonly RuleDef[] = [
     "IND-064",
     "reject",
     "incorrect_data",
-    alwaysPass,
+    all(
+      allMatch("IPv4AddressTxt", /^((25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(25[0-5]|2[0-4]\d|1?\d?\d)$/),
+      allMatch("IPv6AddressTxt", /^[0-9A-Fa-f:.]+$/),
+    ),
     "IP Address of the Transmitter must be a valid IP Address.",
   ),
   rule(
     "IND-067-10",
     "alert",
     "missing_data",
-    alwaysPass,
+    ifThen(
+      all(
+        hasValue("PaidPreparerInformationGrp"),
+        any(
+          filingStatusIs(4),
+          hasNonZero("EarnedIncomeCreditAmt"),
+          hasNonZero("RefundableAmerOppCreditAmt"),
+          hasNonZero("8863/TentativeAmerOppCreditAmt"),
+          hasNonZero("CTCODCAmt"),
+          hasNonZero("AdditionalChildTaxCreditAmt"),
+        ),
+      ),
+      formPresent("form8867"),
+    ),
     "As a paid tax preparer of a return (1) with filing status Head of household or (2) claiming Earned Income Tax Credit or American Opportunity Tax Credit or Child Tax Credit or Additional Child Tax Credit or Credit for Other Dependents, you must complete and submit Form 8867 to the IRS with the original submission of each return. Failure to submit Form 8867 is a violation of IRC Sec 6695(g) and a $650 penalty may be imposed per failure, with a maximum penalty amount of $2,600 per return. This alert is for your information only. Do not send us the missing Form 8867 or amend any returns to include the missing Form 8867. We will continue to monitor future returns you prepare that claim these benefits to ensure you meet your due diligence requirement.",
   ),
   rule(
@@ -585,7 +703,7 @@ export const IND_RULES: readonly RuleDef[] = [
     "IND-082",
     "reject",
     "incorrect_data",
-    ifThen(hasValue("OwedAmt"), eqField("OwedAmt", "RefundAmt")),
+    ifThen(gt("OwedAmt", 0), isZero("RefundAmt")),
     "If 'OwedAmt' in the return has a value greater than zero, then 'RefundAmt' must be equal to zero if an amount is entered.",
   ),
   rule(
@@ -613,9 +731,9 @@ export const IND_RULES: readonly RuleDef[] = [
     ifThen(
       formPresent("form8888"),
       all(
-        noValue("RoutingTransitNum"),
-        noValue("BankAccountTypeCd"),
-        noValue("DepositorAccountNum"),
+        noValue("1040/RoutingTransitNum"),
+        noValue("1040/BankAccountTypeCd"),
+        noValue("1040/DepositorAccountNum"),
       ),
     ),
     "If Form 8888 is present in the return, then the following must not have a value in the return: 'RoutingTransitNum' and 'BankAccountTypeCd' and 'DepositorAccountNum'.",
@@ -624,7 +742,10 @@ export const IND_RULES: readonly RuleDef[] = [
     "IND-085-01",
     "reject",
     "incorrect_data",
-    alwaysPass,
+    everyItem("DependentSSN", (v) => {
+      const d = String(v ?? "").replace(/\D/g, "");
+      return d.length === 9 && d !== "000000000" && d !== "999999999";
+    }),
     "Each 'DependentSSN' in 'DependentDetail' on the return must be within the valid range of SSN / ITIN / ATIN.",
   ),
   rule(
@@ -638,7 +759,12 @@ export const IND_RULES: readonly RuleDef[] = [
     "IND-088",
     "reject",
     "incorrect_data",
-    alwaysPass,
+    eachGroup(
+      "DependentDetail",
+      ifThen(hasValue("EligibleForChildTaxCreditInd"), strIn("DependentRelationshipCd", "STEPCHILD", "HALF BROTHER", "HALF SISTER", "STEPBROTHER", "STEPSISTER", "FOSTER CHILD", "GRANDCHILD", "BROTHER", "SISTER", "NEPHEW", "NIECE", "SON", "DAUGHTER")),
+      "EligibleForChildTaxCreditInd",
+      "DependentRelationshipCd",
+    ),
     'For each dependent in \'DependentDetail\' in the return, if \'EligibleForChildTaxCreditInd\' is checked, then the corresponding \'DependentRelationshipCd\' must have one of the following values: "STEPCHILD" or "HALF BROTHER" or "HALF SISTER" or "STEPBROTHER" or "STEPSISTER" or "FOSTER CHILD" or "GRANDCHILD" or "BROTHER" or "SISTER" or "NEPHEW" or "NIECE" or "SON" or "DAUGHTER".',
   ),
   rule(
@@ -684,14 +810,14 @@ export const IND_RULES: readonly RuleDef[] = [
     "IND-098-01",
     "reject",
     "incorrect_data",
-    alwaysPass,
-    "If 'CTCODCAmt' in the return has a non-zero value, then it must not be greater than the sum of [ (the number of dependents with 'EligibleForChildTaxCreditInd' checked multiplied by 2000) and (the number of dependents with 'EligibleForODCInd' checked multiplied by 500) ].",
+    ifThen(hasNonZero("CTCODCAmt"), notGtWeightedCount("CTCODCAmt", ["EligibleForChildTaxCreditInd", 2200], ["EligibleForODCInd", 500])),
+    "If 'CTCODCAmt' in the return has a non-zero value, then it must not be greater than the sum of [ (the number of dependents with 'EligibleForChildTaxCreditInd' checked multiplied by 2200 for TY2025, P.L. 119-21 §70104) and (the number of dependents with 'EligibleForODCInd' checked multiplied by 500) ].",
   ),
   rule(
     "IND-100",
     "reject_and_stop",
     "unsupported",
-    alwaysPass,
+    MEF_ACCEPTS_TAX_YEAR,
     "Prior Year Individual Returns are not being accepted by Modernized e-File (MeF) at this time. Please check the MeF web page under irs.gov for more information. The submission type filed was <type>.",
   ),
   rule(
@@ -718,7 +844,12 @@ export const IND_RULES: readonly RuleDef[] = [
     "IND-116-01",
     "reject",
     "incorrect_data",
-    alwaysPass,
+    eachGroup(
+      "DependentDetail",
+      ifThen(hasValue("EligibleForChildTaxCreditInd"), ctcChildUnder17),
+      "EligibleForChildTaxCreditInd",
+      "DependentSSN",
+    ),
     "Each dependent in 'DependentDetail' on the return with 'EligibleForChildTaxCreditInd' checked must be under the age of 17. You may be eligible to claim the \"Credit for other dependents\" if you meet the requirements for the credit.",
   ),
   rule(
@@ -790,7 +921,10 @@ export const IND_RULES: readonly RuleDef[] = [
     "IND-133",
     "reject",
     "missing_document",
-    alwaysPass,
+    amountLte(
+      groupCount("DependentDetail", eqStr("DiedLiteralCd", "DIED"), "DiedLiteralCd"),
+      attachmentCountStartingWith("BirthCertificate", "DeathCertificate", "HospitalMedicalRecords"),
+    ),
     'For each dependent in \'DependentDetail\' in the return, if \'DiedLiteralCd\' has the value "DIED", then a binary attachment with Description beginning with "BirthCertificate" or "DeathCertificate" or "HospitalMedicalRecords" must be present in the return.',
   ),
   rule(
@@ -804,7 +938,7 @@ export const IND_RULES: readonly RuleDef[] = [
     "IND-145-01",
     "reject",
     "incorrect_data",
-    alwaysPass,
+    ifThen(hasNonZero("ExcldSect933PuertoRicoIncmAmt"), isZero("AdditionalChildTaxCreditAmt")),
     "Bona fide residents of Puerto Rico with income excluded under Internal Revenue Code Section 933 should file Form 1040-PR or Form 1040-SS to claim Additional Child Tax Credit.",
   ),
   rule(
@@ -821,7 +955,15 @@ export const IND_RULES: readonly RuleDef[] = [
     "IND-154-02",
     "reject",
     "incorrect_data",
-    alwaysPass,
+    ifThen(
+      any(hasNonZero("CTCODCAmt"), hasNonZero("AdditionalChildTaxCreditAmt")),
+      eachGroup(
+        "DependentDetail",
+        ifThen(hasValue("EligibleForChildTaxCreditInd"), (ctx) => !isItinOrAtin(ctx.field("DependentSSN"))),
+        "EligibleForChildTaxCreditInd",
+        "DependentSSN",
+      ),
+    ),
     "If 'CTCODCAmt' or 'AdditionalChildTaxCreditAmt' in the return has a non-zero value, then each 'DependentSSN' in 'DependentDetail' with corresponding 'EligibleForChildTaxCreditInd' checked must not be an ITIN or ATIN. You may be eligible to claim the \"Credit for other dependents\" if the child resided with you in the United States and you meet the other requirements for the credit.",
   ),
   rule(
@@ -835,63 +977,76 @@ export const IND_RULES: readonly RuleDef[] = [
     "IND-162",
     "alert",
     "information",
-    alwaysPass,
+    hasValue("ReturnHeader/TaxYr"),
     "Thank you for using e-File.",
   ),
   rule(
     "IND-164",
     "reject",
     "incorrect_data",
-    alwaysPass,
+    ifThen(priorYearReturn, formAbsent("form9465")),
     "MeF is not currently accepting Form 9465 attached to prior year returns.  Please file Form 9465 as a stand-alone using the latest 9465 schema package.",
   ),
   rule(
     "IND-165-01",
     "reject",
     "missing_document",
-    alwaysPass,
+    ifThen(
+      hasValue("CTCACTCODCClaimedInd"),
+      any(hasNonZero("CTCODCAmt"), hasNonZero("AdditionalChildTaxCreditAmt")),
+    ),
     "Form 8862 must be present in the return with Child Tax Credit/Additional Child Tax Credit/Credit for Other Dependents Indicator checked. The e-File database indicates the taxpayer must file Form 8862 to claim Child Tax Credit or Other Dependent Credit or Additional Child Tax Credit after disallowance.",
   ),
   rule(
     "IND-168-01",
     "reject",
     "incorrect_data",
-    alwaysPass,
+    all(
+      allMatch("CTCODCAmt", /^\d+$/),
+      allMatch("AdditionalChildTaxCreditAmt", /^\d+$/),
+    ),
     "'CTCODCAmt' and 'AdditionalChildTaxCreditAmt' in the return must be zero if an amount is entered. The e-File database indicates the taxpayer is not allowed to claim Child Tax Credit or Other Dependent Credit or Additional Child Tax Credit.",
   ),
   rule(
     "IND-180-01",
     "reject_and_stop",
     "database",
-    alwaysPass,
+    validIpPins("ReturnHeader/IdentityProtectionPIN"),
     "Primary taxpayer's Identity Protection Personal Identification Number (IP PIN) must match the e-File database. Please double check your entry and resubmit your return with the correct number.",
   ),
   rule(
     "IND-181-01",
     "reject_and_stop",
     "database",
-    alwaysPass,
+    validIpPins("ReturnHeader/IdentityProtectionPIN"),
     "The Primary Taxpayer did not enter a valid Identity Protection Personal Identification Number (IP PIN). Please visit www.irs.gov/getanippin for further information and resubmit your return with the correct number.",
   ),
   rule(
     "IND-182-01",
     "reject_and_stop",
     "database",
-    alwaysPass,
+    validIpPins("ReturnHeader/SpouseIdentityProtectionPIN"),
     "The Spouse Identity Protection Personal Identification Number (IP PIN) must match the e-File database. Please double check your entry and resubmit your return with the correct number.",
   ),
   rule(
     "IND-183-01",
     "reject_and_stop",
     "database",
-    alwaysPass,
+    validIpPins("ReturnHeader/SpouseIdentityProtectionPIN"),
     "The Spouse did not enter a valid Identity Protection Personal Identification Number (IP PIN). Please visit www.irs.gov/getanippin for further information and resubmit your return with the correct number.",
   ),
   rule(
     "IND-184",
     "reject_and_stop",
     "incorrect_data",
-    alwaysPass,
+    ifThen(
+      all(priorYearReturn, not(postOriginalReturn), eqStr("OriginatorTypeCd", "OnlineFiler")),
+      all(
+        hasValue("ReturnHeader/IdentityProtectionPIN"),
+        validIpPins("ReturnHeader/IdentityProtectionPIN"),
+        ifThen(filingStatusIs(2), all(hasValue("ReturnHeader/SpouseIdentityProtectionPIN"), validIpPins("ReturnHeader/SpouseIdentityProtectionPIN"))),
+      ),
+    ),
     "Prior year original returns may only be filed by [1] online filers with an Identity Protection PIN (IP PIN) for the current calendar year or [2] practitioners. If you wish to get an IP PIN and you don't already have an account on IRS.gov, then you must register to validate your identity. Separate IP PINs will be required for the primary and secondary taxpayers if filing jointly. Please visit www.irs.gov/getanippin for further information and resubmit your return with an IP PIN.",
   ),
   rule(
@@ -1013,7 +1168,7 @@ export const IND_RULES: readonly RuleDef[] = [
     "IND-241-04",
     "reject",
     "incorrect_data",
-    alwaysPass,
+    ifThen(gt("AdditionalChildTaxCreditAmt", 0), notGtWeightedCount("AdditionalChildTaxCreditAmt", ["EligibleForChildTaxCreditInd", 1700])),
     "If 'AdditionalChildTaxCreditAmt' in the return has a value greater than zero, then it must not be greater than [ the number of dependents in 'DependentDetail' with 'EligibleForChildTaxCreditInd' checked multiplied by 1700 ].",
   ),
   rule(
@@ -1083,7 +1238,13 @@ export const IND_RULES: readonly RuleDef[] = [
     "IND-298-01",
     "reject",
     "missing_document",
-    alwaysPass,
+    ifThen(
+      all(hasNonZero("RefundAmt"), filingStatusIs(2), hasValue("PrimaryDeathDt"), hasValue("SpouseDeathDt")),
+      amountLte(
+        constant(2),
+        plus(formCountOf("form1310"), attachmentCount("Personal Representative Court Certificate")),
+      ),
+    ),
     "If 'RefundAmt' in the return has a non-zero value and the filing status of the return is married filing jointly and both 'PrimaryDeathDt' and 'SpouseDeathDt' have values, then one of the following must be true: (1) two Forms 1310 are present in the return or (2) two binary attachments with Description \"Personal Representative Court Certificate\" are present or (3) one Form 1310 is present and a binary attachment with Description \"Personal Representative Court Certificate\" is present.",
   ),
   rule(
@@ -1255,7 +1416,7 @@ export const IND_RULES: readonly RuleDef[] = [
     "IND-443-01",
     "reject",
     "incorrect_data",
-    alwaysPass,
+    noneMatchHeaderSSN("1040/DependentSSN", "QualifyingChildIdentifyingNum"),
     "Each 'DependentSSN' in 'DependentDetail' (or 'QualifyingChildIdentifyingNum' in 'QualifyingChildInfoGrp') in the return must not be the same as 'PrimarySSN' or 'SpouseSSN' in the Return Header.",
   ),
   rule(
@@ -1272,28 +1433,30 @@ export const IND_RULES: readonly RuleDef[] = [
     "IND-450",
     "alert",
     "incorrect_data",
-    alwaysPass,
+    ifThen(postOriginalReturn, POST_ORIGINAL_WINDOW),
     "We do not have a record of your prior year return. If you filed a prior year paper return during the current filing season, you must file your amended, superseded, or corrected return on paper. To find a proper mailing address, go to irs.gov/file.",
   ),
   rule(
     "IND-451",
     "reject_and_stop",
     "incorrect_data",
-    alwaysPass,
+    // The original return's filing status is not in this submission, so a
+    // late post-original MFS return is refused rather than risked.
+    not(all(postOriginalReturn, filedAfterDueDate, filingStatusIs(3))),
     'An amended, superseded or corrected return filed after the due date of the original return cannot have filing status "Married filing separately" if the filing status of the original return was "Married filing jointly".',
   ),
   rule(
     "IND-452",
     "reject_and_stop",
     "duplicate",
-    alwaysPass,
+    ifThen(not(postOriginalReturn), all(issuableTins("PrimarySSN"), NO_TIN_REPEATED)),
     "In an original return, the Primary SSN in the Return Header must not be the same as the TIN of a previously accepted electronic Individual return filed for the same tax period.",
   ),
   rule(
     "IND-453",
     "reject_and_stop",
     "incorrect_data",
-    alwaysPass,
+    ifThen(postOriginalReturn, POST_ORIGINAL_WINDOW),
     "This post-original return cannot be filed electronically. There is no record of a previously accepted return. Please submit your amended, superseded, or corrected return on paper. To find a proper mailing address, go to irs.gov/file.",
   ),
   rule(
@@ -1337,7 +1500,7 @@ export const IND_RULES: readonly RuleDef[] = [
     "IND-466",
     "reject_and_stop",
     "incorrect_data",
-    alwaysPass,
+    ifThen(postOriginalReturn, amountLte(formCountOf("form1040x"), constant(1))),
     "You have exceeded the limit of post-original returns that can be filed electronically. Please submit your amended, superseded, or corrected return on paper. To find a proper mailing address, go to irs.gov/file.",
   ),
   rule(
@@ -1388,161 +1551,179 @@ export const IND_RULES: readonly RuleDef[] = [
     "IND-472",
     "reject",
     "missing_document",
-    alwaysPass,
+    amountLte(formCountOf("form8332"), attachmentCount("8332 Signature Document")),
     'For each instance of Form 8332 present in the return, there must be a corresponding binary attachment with description "8332 Signature Document" present.',
   ),
   rule(
     "IND-507-01",
     "reject",
     "duplicate",
-    alwaysPass,
+    all(issuableTins("DependentSSN"), NO_TIN_REPEATED),
     "'DependentSSN' in 'DependentDetail' on the return was used as a Dependent SSN on a previously accepted return for the same tax period. Visit www.irs.gov/identity-theft-fraud-scams/identity-theft-dependents for additional information. To electronically file with this duplicate condition, an Identity Protection Personal Identification Number (IP PIN) will be required. If you wish to get an IP PIN and you don't already have an account on IRS.gov, then you must register to validate your identity. Please visit www.irs.gov/getanippin for further information and resubmit your return with an IP PIN.",
   ),
   rule(
     "IND-508-01",
     "reject",
     "database",
-    alwaysPass,
+    all(issuableTins("PrimarySSN"), NO_TIN_REPEATED),
     "The Primary SSN in the Return Header must not be the same as the Spouse SSN on another return for the same tax year with filing status Married filing jointly.",
   ),
   rule(
     "IND-510-02",
     "reject",
     "duplicate",
-    alwaysPass,
+    all(issuableTins("SpouseSSN"), NO_TIN_REPEATED),
     "The Spouse SSN in the return must not be the same as the Primary SSN on another return filed for the same tax year.",
   ),
   rule(
     "IND-511-01",
     "reject",
     "database",
-    alwaysPass,
+    all(issuableTins("PrimarySSN"), NO_TIN_REPEATED),
     "For the filing status selected in the return, the Primary SSN in the Return Header must not be the same as the Spouse SSN on another return for the same tax year with filing status Married filing separately.",
   ),
   rule(
     "IND-513-01",
     "reject",
     "duplicate",
-    alwaysPass,
+    all(issuableTins("SpouseSSN"), NO_TIN_REPEATED),
     "The Spouse SSN in the return must not be the same as the Spouse SSN in another return filed for the same tax year.",
   ),
   rule(
     "IND-515-01",
     "reject",
     "duplicate",
-    alwaysPass,
+    all(issuableTins("PrimarySSN"), NO_TIN_REPEATED),
     "The Primary SSN in the Return Header must not be the same as the Primary SSN in another return filed for the same tax year.",
   ),
   rule(
     "IND-517-02",
     "reject",
     "incorrect_data",
-    alwaysPass,
+    noneMatchHeaderSSN("DependentSSN"),
     "'DependentSSN' in the return must not be the same as Primary or Spouse SSN on another return where Primary or Spouse have not indicated that they could be claimed as a dependent on someone else's return. Visit www.irs.gov/identity-theft-fraud-scams/identity-theft-dependents for additional information. To electronically file with this duplicate condition, an Identity Protection Personal Identification Number (IP PIN) will be required. If you wish to get an IP PIN and you don't already have an account on IRS.gov, then you must register to validate your identity. Please visit www.irs.gov/getanippin for further information and resubmit your return with an IP PIN.",
   ),
   rule(
     "IND-521-01",
     "reject",
     "incorrect_data",
-    alwaysPass,
+    ifThen(hasValue("PrimaryBirthDt"), amountLte(yearOf("PrimaryBirthDt"), amount("TaxYr"))),
     "The Year of Birth of the Primary SSN must not be greater than the 'TaxYr' in the Return Header.",
   ),
   rule(
     "IND-524",
     "reject_and_stop",
     "incorrect_data",
-    alwaysPass,
+    ifThen(
+      all(eqStr("PINTypeCd", "Self-Select On-Line"), filingStatusNot(2)),
+      all(plausibleBirthDate("PrimaryBirthDt"), dateBeforeReceipt("PrimaryBirthDt")),
+    ),
     "If 'PINTypeCd' in the Return Header has the value \"Self-Select On-Line\" and the filing status of the return is not married filing jointly, then 'PrimaryBirthDt' in the Return Header must match the e-File database.",
   ),
   rule(
     "IND-531-01",
     "reject",
     "database",
-    alwaysPass,
+    deathDateOnFile("PrimaryDeathDt"),
     "If Primary Date of Death has a value in the e-File database, then it must not be prior to the 'TaxYr' in the Return Header.",
   ),
   rule(
     "IND-532-01",
     "reject",
     "database",
-    alwaysPass,
+    deathDateOnFile("SpouseDeathDt"),
     "If Spouse Date of Death has a value in the e-File database, then it must not be prior to the 'TaxYr' in the Return Header.",
   ),
   rule(
     "IND-544-01",
     "reject",
     "database",
-    alwaysPass,
+    ifThen(hasValue("DependentSSN"), not(someMatchesFilerSSN("primary", "DependentSSN"))),
     "If there are dependents provided on the return, then 'PrimarySSN' in the Return Header must not be the same as a Dependent SSN on a previously accepted return for the same tax period. Visit www.irs.gov/identity-theft-fraud-scams/identity-theft-dependents for additional information. To electronically file with this duplicate condition, an Identity Protection Personal Identification Number (IP PIN) will be required. If you wish to get an IP PIN and you don't already have an account on IRS.gov, then you must register to validate your identity. Please visit www.irs.gov/getanippin for further information and resubmit your return with an IP PIN.",
   ),
   rule(
     "IND-563-01",
     "reject",
     "incorrect_data",
-    alwaysPass,
+    allDistinct("DependentSSN"),
     "For each dependent in the return with 'EligibleForChildTaxCreditInd' checked, the corresponding 'DependentSSN' must not be the same as a Dependent SSN on another return. Visit www.irs.gov/identity-theft-fraud-scams/identity-theft-dependents for additional information. To electronically file with this duplicate condition, an Identity Protection Personal Identification Number (IP PIN) will be required. If you wish to get an IP PIN and you don't already have an account on IRS.gov, then you must register to validate your identity. Please visit www.irs.gov/getanippin for further information and resubmit your return with an IP PIN.",
   ),
   rule(
     "IND-570-01",
     "reject",
     "database",
-    alwaysPass,
+    ifThen(
+      hasValue("SpouseBirthDt"),
+      amountLte(yearOf("SpouseBirthDt"), amount("TaxYr")),
+    ),
     "The Year of Birth of the Spouse SSN must not be greater than the 'TaxYr' in the Return Header.",
   ),
   rule(
     "IND-607",
     "alert",
     "information",
-    alwaysPass,
+    allDistinct("DependentSSN"),
     "A dependent claimed on the return was previously claimed as a dependent on another accepted return for the same tax year. Visit www.irs.gov/identity-theft-fraud-scams/identity-theft-dependents for additional information.",
   ),
   rule(
     "IND-617",
     "alert",
     "information",
-    alwaysPass,
+    noneMatchHeaderSSN("DependentSSN"),
     "A dependent claimed on the return was previously claimed as a primary or spouse filer on another accepted return for the same tax year. Visit www.irs.gov/identity-theft-fraud-scams/identity-theft-dependents for additional information.",
   ),
   rule(
     "IND-644",
     "alert",
     "information",
-    alwaysPass,
+    not(someMatchesFilerSSN("primary", "DependentSSN")),
     "The primary filer on the return was previously claimed as a dependent on another accepted return for the same tax year. Visit www.irs.gov/identity-theft-fraud-scams/identity-theft-dependents for additional information.",
   ),
   rule(
     "IND-663",
     "alert",
     "information",
-    alwaysPass,
+    allDistinct("DependentSSN"),
     "A dependent claimed on the return for the Child Tax Credit was previously claimed as a dependent on another accepted return claiming Child Tax Credit for the same tax year. Visit www.irs.gov/identity-theft-fraud-scams/identity-theft-dependents for additional information.",
   ),
   rule(
     "IND-664-02",
     "reject",
     "database",
-    alwaysPass,
+    ifThen(
+      eqStr("PINTypeCd", "Self-Select On-Line"),
+      all(issuableTins("PrimarySSN"), NO_TIN_REPEATED),
+    ),
     "If the Primary SSN in the Return Header appears more than once in the e-File database, then 'PINTypeCd' must not have the value \"Self-Select On-Line\".",
   ),
   rule(
     "IND-665-02",
     "reject",
     "database",
-    alwaysPass,
+    ifThen(
+      eqStr("PINTypeCd", "Self-Select Practitioner"),
+      all(issuableTins("PrimarySSN"), NO_TIN_REPEATED),
+    ),
     "If the Primary SSN in the Return Header appears more than once in the e-File database, then 'PINTypeCd' must not have the value \"Self-Select Practitioner\".",
   ),
   rule(
     "IND-666-02",
     "reject",
     "database",
-    alwaysPass,
+    ifThen(
+      eqStr("PINTypeCd", "Self-Select On-Line"),
+      all(issuableTins("SpouseSSN"), NO_TIN_REPEATED),
+    ),
     "If the Spouse SSN in the Return Header appears more than once in the e-File database, then 'PINTypeCd' must not have the value \"Self-Select On-Line\".",
   ),
   rule(
     "IND-667-02",
     "reject",
     "database",
-    alwaysPass,
+    ifThen(
+      eqStr("PINTypeCd", "Self-Select Practitioner"),
+      all(issuableTins("SpouseSSN"), NO_TIN_REPEATED),
+    ),
     "If the Spouse SSN in the Return Header appears more than once in the e-File database, then 'PINTypeCd' must not have the value \"Self-Select Practitioner\".",
   ),
   rule(
@@ -1572,35 +1753,38 @@ export const IND_RULES: readonly RuleDef[] = [
     "IND-674-01",
     "reject",
     "database",
-    alwaysPass,
+    youngFilerHasFiled("Primary", "Self-Select On-Line"),
     "If the Primary Taxpayer  is under the age of 16 and has never filed a tax return, then 'PINTypeCd' in the Return Header must not have the value \"Self-Select On-Line\".",
   ),
   rule(
     "IND-675-01",
     "reject",
     "database",
-    alwaysPass,
+    youngFilerHasFiled("Primary", "Self-Select Practitioner"),
     "If the Primary Taxpayer  is under the age of 16 and has never filed a tax return, then 'PINTypeCd' in the Return Header must not have the value \"Self-Select Practitioner\".",
   ),
   rule(
     "IND-679-01",
     "reject",
     "database",
-    alwaysPass,
+    youngFilerHasFiled("Spouse", "Self-Select On-Line"),
     "If the Spouse SSN in the Return Header is under the age of 16 and did not file a tax return in the previous year, then the 'PINTypeCd' must not have the value \"Self-Select On-Line\".",
   ),
   rule(
     "IND-680-01",
     "reject",
     "database",
-    alwaysPass,
+    youngFilerHasFiled("Spouse", "Self-Select Practitioner"),
     "If the Spouse SSN in the Return Header is under the age of 16 and did not file a tax return in the previous year, then the 'PINTypeCd' must not have the value \"Self-Select Practitioner\".",
   ),
   rule(
     "IND-689-01",
     "reject",
     "missing_document",
-    alwaysPass,
+    ifThen(
+      all(hasValue("PrimarySignatureDt"), known(processingYear)),
+      amountEq(yearOf("PrimarySignatureDt"), processingYear),
+    ),
     "The year of the 'PrimarySignatureDt' in the Return Header must be equal to the processing year.",
   ),
   rule(
@@ -1652,133 +1836,145 @@ export const IND_RULES: readonly RuleDef[] = [
     "IND-769",
     "reject_and_stop",
     "incorrect_data",
-    alwaysPass,
+    all(
+      allMatch("ReturnHeader/IdentityProtectionPIN", /^\d+$/),
+      allMatch("ReturnHeader/SpouseIdentityProtectionPIN", /^\d+$/),
+      allMatch("1040/IdentityProtectionPIN", /^\d+$/),
+      allMatch("2441/IdentityProtectionPIN", /^\d+$/),
+      allMatch("ScheduleEIC/IdentityProtectionPIN", /^\d+$/),
+    ),
     "Identity Protection PIN must be numeric digits.",
   ),
   rule(
     "IND-901",
     "reject_and_stop",
     "database",
-    alwaysPass,
+    issuableTins("PrimarySSN"),
     "The Primary SSN in the Return Header has been locked because Social Security Administration records indicate the number belongs to a deceased individual.",
   ),
   rule(
     "IND-902",
     "reject_and_stop",
     "database",
-    alwaysPass,
+    issuableTins("PrimarySSN"),
     "The Primary SSN in the Return Header has been locked.  The account was locked per the taxpayer's request.",
   ),
   rule(
     "IND-904",
     "reject_and_stop",
     "database",
-    alwaysPass,
+    issuableTins("PrimarySSN"),
     "The Primary SSN in the Return Header has been locked.  Social Security Administration records indicate the SSN belongs to a minor.  The account was locked per the request of the minor's parent or guardian.",
   ),
   rule(
     "IND-905",
     "reject_and_stop",
     "database",
-    alwaysPass,
+    issuableTins("PrimarySSN"),
     "The Primary SSN in the Return Header has been systemically locked because the IRS does not accept a replaced SSN as valid for tax filing.",
   ),
   rule(
     "IND-906",
     "reject_and_stop",
     "database",
-    alwaysPass,
+    issuableTins("SpouseSSN"),
     "The Spouse SSN in the Return Header has been systemically locked because the IRS does not accept a replaced SSN as valid for tax filing.",
   ),
   rule(
     "IND-907",
     "reject_and_stop",
     "database",
-    alwaysPass,
+    issuableTins("DependentSSN"),
     "A Dependent SSN (or Qualifying Child Identifying Number) in the return has been systemically locked because the IRS does not accept a replaced SSN as valid for tax filing.",
   ),
   rule(
     "IND-908",
     "reject_and_stop",
     "database",
-    alwaysPass,
+    issuableTins("2441/QualifyingPersonSSN"),
     "A Qualifying Person SSN on Form 2441 has been systemically locked because the IRS does not accept a replaced SSN as valid for tax filing.",
   ),
   rule(
     "IND-931-01",
     "reject_and_stop",
     "database",
-    alwaysPass,
+    issuableTins("DependentSSN"),
     "The Dependent SSN (or Qualifying Child Identifying Number on Form 1040-SS) has been locked because Social Security Administration records indicate the number belongs to a deceased individual.",
   ),
   rule(
     "IND-932-01",
     "reject_and_stop",
     "database",
-    alwaysPass,
+    issuableTins("DependentSSN"),
     "The Dependent SSN (or Qualifying Child Identifying Number on Form 1040-SS) claimed on your return has been locked. The account was locked per the taxpayer's request.",
   ),
   rule(
     "IND-934-01",
     "reject_and_stop",
     "database",
-    alwaysPass,
+    issuableTins("DependentSSN"),
     "The Dependent SSN (or Qualifying Child Identifying Number on Form 1040-SS) claimed on your return has been locked. The account was locked per the request of the dependent's parent or guardian.",
   ),
   rule(
     "IND-941-01",
     "reject_and_stop",
     "database",
-    alwaysPass,
+    issuableTins("SpouseSSN"),
     "The Spouse SSN in the return has been locked because Social Security Administration records indicate the number belongs to a deceased individual.",
   ),
   rule(
     "IND-942-01",
     "reject_and_stop",
     "database",
-    alwaysPass,
+    issuableTins("SpouseSSN"),
     "The Spouse SSN in the return has been locked.  The account was locked per the taxpayer's request.",
   ),
   rule(
     "IND-943-01",
     "reject_and_stop",
     "database",
-    alwaysPass,
+    issuableTins("SpouseSSN"),
     "The Spouse SSN in the return has been systemically locked based on IRS information which indicates there is not a filing requirement for this SSN.",
   ),
   rule(
     "IND-944-01",
     "reject_and_stop",
     "database",
-    alwaysPass,
+    issuableTins("SpouseSSN"),
     "The Spouse SSN in the return has been locked.  Social Security Administration records indicate the SSN belongs to a minor.  The account was locked per the request of the minor's parent or guardian.",
   ),
   rule(
     "IND-995",
     "reject_and_stop",
     "incorrect_data",
-    alwaysPass,
+    validIpPins(...QUALIFYING_PERSON_IP_PINS),
     "The Dependent/Qualifying Person Identity Protection Personal Identification Number (IP PIN) must match the e-File database. Please double check your entry and resubmit your return with the correct number.",
   ),
   rule(
     "IND-996",
     "reject_and_stop",
     "incorrect_data",
-    alwaysPass,
+    validIpPins(...QUALIFYING_PERSON_IP_PINS),
     "The Dependent/Qualifying Person Identity Protection Personal Identification Number (IP PIN) provided on the return is not valid. Please visit www.irs.gov/getanippin for further information and resubmit your return with the correct number.",
   ),
   rule(
     "IND-997",
     "reject_and_stop",
     "incorrect_data",
-    alwaysPass,
+    ifThen(
+      all(priorYearReturn, eqStr("OriginatorTypeCd", "OnlineFiler")),
+      validIpPins("ReturnHeader/IdentityProtectionPIN"),
+    ),
     "The Identity Protection PIN (IP PIN) entered for the primary taxpayer on a prior year online filer return must match the e-File database. Please double-check your entry and resubmit your return with the correct IP PIN.",
   ),
   rule(
     "IND-998",
     "reject_and_stop",
     "incorrect_data",
-    alwaysPass,
+    ifThen(
+      all(priorYearReturn, eqStr("OriginatorTypeCd", "OnlineFiler")),
+      validIpPins("ReturnHeader/SpouseIdentityProtectionPIN"),
+    ),
     "The Identity Protection PIN (IP PIN) entered for the secondary taxpayer on a prior year online filer return must match the e-File database. Please double-check your entry and resubmit your return with the correct IP PIN.",
   ),
 ];

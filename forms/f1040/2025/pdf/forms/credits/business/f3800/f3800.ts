@@ -1,3 +1,4 @@
+import { mefTaxYear } from "../../../../../mef/support/year-config.ts";
 import { assertCurrentProductionAllocationSource } from "../../../../../../nodes/inputs/credits/business/f3800/production-allocation.ts";
 import {
   assertCurrentOrphanAllocationSource,
@@ -9,7 +10,7 @@ import type {
   PdfFormDescriptor,
 } from "../../../../review-support/form-descriptor.ts";
 import { assertForm3800FinalCreditJoin } from "../../../../../domains/credits/business/form3800/form3800_final_credit_join.ts";
-import { reconcileFiledForm8582CROrdinary } from "../../../../../domains/credits/business/form8582c/form8582cr_filed_ordinary.ts";
+import { reconcileFiledForm8582CROrdinary } from "../../../../../domains/credits/business/form8582cr/form8582cr_filed_ordinary.ts";
 import {
   calculateForm8820,
   inputSchema as f8820InputSchema,
@@ -165,7 +166,11 @@ export const form3800Pdf: PdfFormDescriptor = {
       all.form3800_current_orphan_allocation,
     );
     if (source.f8864_direct_producer_credit) {
-      const { lines } = reconcileForm8864DocumentSource(all.f8864, all);
+      const { lines } = reconcileForm8864DocumentSource(
+        all.f8864,
+        all,
+        mefTaxYear(),
+      );
       const rawSource = f3800InputSchema.parse(raw);
       const rows = prepared.currentRows.filter((row) => row.line === "1l");
       const amounts = prepared.currentAmounts.filter((row) =>
@@ -949,7 +954,7 @@ export const form3800Pdf: PdfFormDescriptor = {
       const filed = f8874InputSchema.parse(all.f8874);
       const credits = calculateForm8874(filed);
       const { lines: passive, nonpassiveForm8874Credit } =
-        reconcileFiledForm8582CROrdinary(all.form8582cr, all);
+        reconcileFiledForm8582CROrdinary(all.form8582cr, all, 2025);
       const rawSource = f3800InputSchema.parse(raw);
       const rows = prepared.currentRows.filter((row) => row.line === "1i");
       const amounts = prepared.currentAmounts.filter((row) =>
@@ -1035,6 +1040,7 @@ export const form3800Pdf: PdfFormDescriptor = {
       const { lines: passive, ledger } = reconcileFiledForm8582CROrdinary(
         all.form8582cr,
         all,
+        2025,
       );
       const rawSource = f3800InputSchema.parse(raw);
       const rows = prepared.currentRows.filter((row) => row.line === "1i");
@@ -1127,6 +1133,7 @@ export const form3800Pdf: PdfFormDescriptor = {
       const { lines: passive, ledger } = reconcileFiledForm8582CROrdinary(
         all.form8582cr,
         all,
+        2025,
       );
       const rawSource = f3800InputSchema.parse(raw);
       const rows = prepared.currentRows.filter((row) => row.line === "1i");
@@ -1231,6 +1238,7 @@ export const form3800Pdf: PdfFormDescriptor = {
       const { lines: passive, ledger } = reconcileFiledForm8582CROrdinary(
         all.form8582cr,
         all,
+        2025,
       );
       const selfRows = ledger.rows.filter((row) =>
         row.source.source_origin.kind === "self"

@@ -8,6 +8,7 @@ import {
   reconcileRolloverForm8889,
   reconcileSpouseOnlyForm8889,
 } from "../../../../domains/adjustments/health/form8889/form8889_spouse_reconciliation.ts";
+import { withReturnBeneficiaryNames } from "../../../../../nodes/intermediate/forms/adjustments/health/form8889/index.ts";
 import { reconcilePrimaryMixedMedicalForm8889 } from "../../../../domains/adjustments/health/form8889/form8889_mixed_medical_reconciliation.ts";
 
 // IRS Form 8889 (2025) AcroForm field names.
@@ -171,7 +172,8 @@ const fields: ReadonlyArray<PdfFieldEntry> = [
   },
 ];
 
-export const form8889Pdf: PdfFormDescriptor = {
+export function form8889PdfFor(taxYear: number): PdfFormDescriptor {
+  return {
   pendingKey: "form8889",
   pdfUrl: "https://www.irs.gov/pub/irs-prior/f8889--2025.pdf",
   instances(pending, filer, allPending) {
@@ -187,7 +189,9 @@ export const form8889Pdf: PdfFormDescriptor = {
         beneficiary_name: z.string().trim().min(1),
         beneficiary_ssn: z.string().regex(/^\d{9}$/),
       }).passthrough(),
-    ).min(1).max(2).parse(pending.forms);
+    ).min(1).max(2).parse(
+      withReturnBeneficiaryNames({ forms: pending.forms }, filer).forms,
+    );
     if (
       (forms.length === 2 &&
         (forms[0]?.owner !== "primary" || forms[1]?.owner !== "spouse"))
@@ -212,13 +216,13 @@ export const form8889Pdf: PdfFormDescriptor = {
         );
       }
     }
-    reconcileSpouseOnlyForm8889(forms, allPending, filer);
-    reconcileDatedExceptionForm8889(forms, allPending, filer);
-    reconcileCode2Form8889(forms, allPending, filer);
-    reconcilePrimaryLastMonthRuleForm8889(forms, allPending, filer);
-    reconcileRolloverForm8889(forms, allPending, filer);
-    reconcilePairedForm8889(forms, allPending, filer);
-    reconcilePrimaryMixedMedicalForm8889(forms, allPending, filer);
+    reconcileSpouseOnlyForm8889(forms, allPending, filer, taxYear);
+    reconcileDatedExceptionForm8889(forms, allPending, filer, taxYear);
+    reconcileCode2Form8889(forms, allPending, filer, taxYear);
+    reconcilePrimaryLastMonthRuleForm8889(forms, allPending, filer, taxYear);
+    reconcileRolloverForm8889(forms, allPending, filer, taxYear);
+    reconcilePairedForm8889(forms, allPending, filer, taxYear);
+    reconcilePrimaryMixedMedicalForm8889(forms, allPending, filer, taxYear);
     const numericKeys = new Set(fields.filter((entry) =>
       entry.domainKey.startsWith("print_line") &&
       entry.domainKey !== "print_line1_coverage" &&
@@ -259,4 +263,7 @@ export const form8889Pdf: PdfFormDescriptor = {
     return forms;
   },
   fields,
-};
+  };
+}
+
+export const form8889Pdf: PdfFormDescriptor = form8889PdfFor(2025);

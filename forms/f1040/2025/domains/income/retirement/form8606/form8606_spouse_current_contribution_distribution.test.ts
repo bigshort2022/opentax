@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import {
   assert,
   assertEquals,
@@ -101,7 +102,7 @@ function filedReturn(receivedOn = "2026-02-15") {
       active_participant: true,
       form8606_filing_details: {
         owner: IraOwner.Spouse,
-        prior_basis_documented_from_2024_form8606: true,
+        prior_basis_documented_from_prior_year_form8606: true,
         no_ira_distributions_or_conversions_confirmed: false,
       },
       form8606_current_contribution_source: {
@@ -123,7 +124,7 @@ for (
     ["2025-12-15", 0, 15_340, 2_340],
   ] as const
 ) {
-  Deno.test(`spouse-owned IRA contribution received ${receiptDate} reconciles Part I, joint Form 1040, native and PDF`, () => {
+  test(`spouse-owned IRA contribution received ${receiptDate} reconciles Part I, joint Form 1040, native and PDF`, () => {
     const pending = filedReturn(receiptDate);
     const filer = extractFilerIdentity(general);
     const fields = pending.form8606;
@@ -141,7 +142,7 @@ for (
     assert(typeof xml === "string");
     assertStringIncludes(
       xml,
-      "<Form8606IRANamelineTxt>Blair Saver</Form8606IRANamelineTxt>",
+      "<Form8606IRANamelineTxt>BLAIR&lt;SAVER</Form8606IRANamelineTxt>",
     );
     assertStringIncludes(
       xml,
@@ -160,7 +161,7 @@ for (
   });
 }
 
-Deno.test("spouse-owned current contribution rejects changed owner, receipt, 5498, prior basis, year-end, 1099-R, worksheet and return", () => {
+test("spouse-owned current contribution rejects changed owner, receipt, 5498, prior basis, year-end, 1099-R, worksheet and return", () => {
   const pending = filedReturn();
   const filer = extractFilerIdentity(general);
   assert(filer?.spouse);
@@ -252,7 +253,7 @@ Deno.test("spouse-owned current contribution rejects changed owner, receipt, 549
         ...pending.ira_deduction_worksheet,
         form8606_filing_details: {
           owner: IraOwner.Taxpayer,
-          prior_basis_documented_from_2024_form8606: true,
+          prior_basis_documented_from_prior_year_form8606: true,
           no_ira_distributions_or_conversions_confirmed: false,
         },
       },

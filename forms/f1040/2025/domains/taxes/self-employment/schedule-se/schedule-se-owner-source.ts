@@ -18,18 +18,42 @@ import {
   inputSchema as fSchema,
   wotcReductionsByFarm,
 } from "../../../../../nodes/intermediate/forms/income/business/schedule_f/model.ts";
+import {
+  inputSchema as k1PartnershipSchema,
+  partnershipOwnerSeSources,
+} from "../../../../../nodes/inputs/income/rental-passthrough/k1_partnership/index.ts";
 import { inputSchema as w2Schema } from "../../../../../nodes/inputs/income/wages/w2/index.ts";
 import {
   ownedScheduleSE,
   type OwnerSources,
 } from "../../../../../nodes/intermediate/forms/taxes/self-employment/schedule_se/owner-calculation.ts";
 import { patronFiledBusinessLines } from "../../../../../nodes/inputs/deductions/business/qbi_patron/calculation.ts";
+import {
+  hasMinisterialSeClaim,
+  inputSchema as clergySchema,
+  ministerialSeSources,
+} from "../../../../../nodes/inputs/income/wages/clergy/index.ts";
+import { ministerialSourceSchema } from "../../../../../nodes/intermediate/forms/taxes/self-employment/schedule_se/ministerial.ts";
+import { z } from "zod";
+
+/** Clergy rows as owner businesses: Schedule SE line 2 (i1040sse, Ministers). */
+function ministerialOwnerRows(raw: unknown) {
+  return z.array(ministerialSourceSchema).parse(raw ?? []).map((row) => ({
+    recipient: row.recipient,
+    source_reference: row.source_reference,
+    kind: "ministerial" as const,
+    net_profit: row.net_earnings,
+  }));
+}
 
 /** Rebuild owner computations from the actual finalized public businesses and W2s. */
 export function assertOwnedScheduleSE(
   pending: Readonly<Record<string, Record<string, unknown>>>,
+  taxYear: number,
   filer?: FilerIdentity,
 ) {
+  const cfg = CONFIG_BY_YEAR[taxYear];
+  if (!cfg) throw new Error(`No f1040 config for year ${taxYear}`);
   const general = pending.general;
   const retained = pending.schedule_se;
   if (!retained?.owner_identity) {
@@ -45,7 +69,10 @@ export function assertOwnedScheduleSE(
         (f && f.schedule_fs.some((item) =>
           computeGrossIncome(item) !== 0 ||
           calculateScheduleFAtRiskNet(item).preliminaryNet !== 0
-        ))
+        )) ||
+        hasMinisterialSeClaim(
+          (pending.clergy as { clergys?: unknown } | undefined)?.clergys,
+        )
       ) {
         throw new Error(
           "Joint business/farm filing needs retained Schedule SE owner calculations",
@@ -54,10 +81,16 @@ export function assertOwnedScheduleSE(
     }
     return undefined;
   }
-  if (
-    !Array.isArray(retained.owner_business_sources) ||
-    retained.owner_business_sources.length === 0
-  ) return undefined;
+  const retainedMinisterial = ministerialOwnerRows(
+    retained.ministerial_sources,
+  );
+  const retainedBusinesses = [
+    ...(Array.isArray(retained.owner_business_sources)
+      ? retained.owner_business_sources
+      : []),
+    ...retainedMinisterial,
+  ];
+  if (retainedBusinesses.length === 0) return undefined;
   if (!general || general.filing_status !== "mfj") {
     throw new Error("Owned Schedule SE requires the actual joint return");
   }
@@ -165,6 +198,21 @@ export function assertOwnedScheduleSE(
       });
     }
   }
+  if (pending.k1_partnership) {
+    source.businesses.push(
+      ...partnershipOwnerSeSources(
+        k1PartnershipSchema.parse(pending.k1_partnership).k1_partnerships,
+        source.identity,
+      ),
+    );
+  }
+  if (pending.clergy) {
+    source.businesses.push(
+      ...ministerialOwnerRows(
+        ministerialSeSources(clergySchema.parse(pending.clergy).clergys),
+      ),
+    );
+  }
   if (pending.w2) {
     for (const row of w2Schema.parse(pending.w2).w2s) {
       if (row.box13_statutory_employee) continue;
@@ -178,12 +226,12 @@ export function assertOwnedScheduleSE(
       });
     }
   }
-  const actual = ownedScheduleSE(source, CONFIG_BY_YEAR[2025].ssWageBase);
+  const actual = ownedScheduleSE(source, cfg.ssWageBase, cfg);
   const retainedActual = ownedScheduleSE({
     identity: retained.owner_identity,
-    businesses: retained.owner_business_sources,
+    businesses: retainedBusinesses,
     wages: retained.owner_wage_sources ?? [],
-  }, CONFIG_BY_YEAR[2025].ssWageBase);
+  }, cfg.ssWageBase, cfg);
   const canonical = (value: unknown): string =>
     JSON.stringify(
       value,

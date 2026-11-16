@@ -1,10 +1,12 @@
+import * as fs from "node:fs/promises";
+import * as sys from "../support/sys.ts";
 /**
  * inspect-pdf-fields.ts
  *
  * Audit real IRS AcroForm fields against every registered PDF descriptor.
  *
  * Usage:
- *   deno run --allow-net=www.irs.gov --allow-read --allow-write scripts/research/inspect-pdf-fields.ts
+ *   bun scripts/research/inspect-pdf-fields.ts
  *
  * Output:
  *   .state/research/ty2025-pdf-field-audit/<pendingKey>-<index>.json
@@ -12,8 +14,7 @@
  */
 
 import { PDFDocument } from "pdf-lib";
-import { ensureDir } from "@std/fs";
-import { join } from "@std/path";
+import { join } from "node:path";
 import { ALL_PDF_FORMS } from "../../forms/f1040/2025/pdf/forms/index.ts";
 import type { PdfFormDescriptor } from "../../forms/f1040/2025/pdf/review-support/form-descriptor.ts";
 
@@ -42,7 +43,7 @@ async function downloadWithCache(url: string): Promise<Uint8Array> {
   const cachePath = join(CACHE_DIR, filename);
 
   try {
-    const cached = await Deno.readFile(cachePath);
+    const cached = await sys.readBytes(cachePath);
     console.log(`  [cache hit] ${filename}`);
     return cached;
   } catch {
@@ -55,7 +56,7 @@ async function downloadWithCache(url: string): Promise<Uint8Array> {
     throw new Error(`HTTP ${response.status} fetching ${url}`);
   }
   const bytes = new Uint8Array(await response.arrayBuffer());
-  await Deno.writeFile(cachePath, bytes);
+  await fs.writeFile(cachePath, bytes);
   console.log(`  [cached] ${filename} (${bytes.length} bytes)`);
   return bytes;
 }
@@ -189,8 +190,8 @@ async function inspectForm(
 }
 
 async function main() {
-  await ensureDir(CACHE_DIR);
-  await ensureDir(DUMP_DIR);
+  await fs.mkdir(CACHE_DIR, { recursive: true });
+  await fs.mkdir(DUMP_DIR, { recursive: true });
 
   const results: Array<FormDump & { error?: string }> = [];
   let formsWithMissing = 0;
@@ -239,7 +240,7 @@ async function main() {
 
     // Write per-form dump
     const dumpPath = join(DUMP_DIR, `${descriptor.pendingKey}-${index}.json`);
-    await Deno.writeTextFile(dumpPath, JSON.stringify(dump, null, 2));
+    await fs.writeFile(dumpPath, JSON.stringify(dump, null, 2));
   }
 
   formsWithUnmapped = results.filter(

@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import {
   directAgriBiodieselPending,
@@ -9,17 +10,17 @@ import {
 } from "./form8864_source.ts";
 import { assertForm6251Form8864Source } from "../../../taxes/amt/form6251/form6251_form8864_source.ts";
 
-Deno.test("Form 8864 direct producer joins Schedule C and its line 9 income", () => {
+test("Form 8864 direct producer joins Schedule C and its line 9 income", () => {
   assertEquals(
     reconcileForm8864DirectProducer(
       directAgriBiodieselSource,
-      directAgriBiodieselPending,
+      directAgriBiodieselPending, 2025,
     ).lines.line9,
     500,
   );
 });
 
-Deno.test("Form 8864 refuses mismatched producer, EIN and income inclusion", () => {
+test("Form 8864 refuses mismatched producer, EIN and income inclusion", () => {
   const business = directAgriBiodieselPending.schedule_c.schedule_cs[0];
   assertThrows(
     () =>
@@ -31,7 +32,7 @@ Deno.test("Form 8864 refuses mismatched producer, EIN and income inclusion", () 
             ...directAgriBiodieselSource,
             producer_ein: "111111111",
           },
-        },
+        }, 2025,
       ),
     Error,
     "differs from the prepared return",
@@ -48,7 +49,7 @@ Deno.test("Form 8864 refuses mismatched producer, EIN and income inclusion", () 
               line_d_ein: "111111111",
             }],
           },
-        },
+        }, 2025,
       ),
     Error,
     "same EIN",
@@ -65,28 +66,28 @@ Deno.test("Form 8864 refuses mismatched producer, EIN and income inclusion", () 
               line_6_other_income: 499,
             }],
           },
-        },
+        }, 2025,
       ),
     Error,
     "line 6 other-income inclusion",
   );
 });
 
-Deno.test("Form 8864 direct credit joins Form 3800 and signed AMT income exclusion", () => {
+test("Form 8864 direct credit joins Form 3800 and signed AMT income exclusion", () => {
   assertEquals(
     reconcileForm8864DocumentSource(
       directAgriBiodieselSource,
-      directAgriBiodieselPending,
+      directAgriBiodieselPending, 2025,
     ).lines.line11,
     500,
   );
   assertForm6251Form8864Source(
     directAgriBiodieselPending.form6251,
-    directAgriBiodieselPending,
+    directAgriBiodieselPending, 2025,
   );
 });
 
-Deno.test("Form 8864 rejects an altered credit or missing AMT exclusion", () => {
+test("Form 8864 rejects an altered credit or missing AMT exclusion", () => {
   assertThrows(
     () =>
       reconcileForm8864DocumentSource(directAgriBiodieselSource, {
@@ -98,7 +99,7 @@ Deno.test("Form 8864 rejects an altered credit or missing AMT exclusion", () => 
             credit_amount: 499,
           },
         },
-      }),
+      }, 2025),
     Error,
     "source credit differs",
   );
@@ -107,7 +108,7 @@ Deno.test("Form 8864 rejects an altered credit or missing AMT exclusion", () => 
       reconcileForm8864DocumentSource(directAgriBiodieselSource, {
         ...directAgriBiodieselPending,
         form6251: { line3_form8864_income_exclusion: -499 },
-      }),
+      }, 2025),
     Error,
     "AMT line 3 exclusion",
   );
@@ -115,7 +116,7 @@ Deno.test("Form 8864 rejects an altered credit or missing AMT exclusion", () => 
     () =>
       assertForm6251Form8864Source(
         { line3_form8864_income_exclusion: -499 },
-        directAgriBiodieselPending,
+        directAgriBiodieselPending, 2025,
       ),
     Error,
     "line 3 differs",

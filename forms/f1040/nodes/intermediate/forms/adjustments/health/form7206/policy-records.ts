@@ -17,7 +17,7 @@ export const issuedPremiumRecordsSchema = z.array(
     payer_ssn: z.string().regex(/^\d{9}$/),
     covered_person: z.enum(["taxpayer", "spouse"]),
     paid_premium: z.number().nonnegative(),
-    paid_on: z.string().regex(/^2025-\d{2}-\d{2}$/),
+    paid_on: z.string().date(),
     policy_source_reference: z.string().trim().min(1),
     payment_source_reference: z.string().trim().min(1),
   }).strict(),
@@ -31,14 +31,45 @@ export type PremiumRecordMonth = {
   payment_source_reference: string;
 };
 
+/** Premiums for the year's coverage are paid during the return's tax year. */
+export function assertPremiumRecordsInYear(
+  plans: readonly { readonly issued_premium_records?: unknown }[],
+  taxYear: number,
+): void {
+  for (const plan of plans) {
+    const records = issuedPremiumRecordsSchema.safeParse(
+      plan.issued_premium_records,
+    );
+    if (
+      records.success &&
+      records.data.some((record) => !record.paid_on.startsWith(`${taxYear}-`))
+    ) {
+      throw new Error(
+        `Health plan issued premium records must be paid in ${taxYear}`,
+      );
+    }
+  }
+}
+
 /** Reconcile reviewed structured records; this does not authenticate external documents. */
 export function reconcileHealthPolicyRecords(plan: {
   issued_policy_record?: unknown;
   issued_premium_records?: unknown;
   premium_months: readonly PremiumRecordMonth[];
 }, ownerTin: string): void {
-  const policy = issuedPolicyRecordSchema.parse(plan.issued_policy_record);
-  const records = issuedPremiumRecordsSchema.parse(plan.issued_premium_records);
+  const policyResult = issuedPolicyRecordSchema.safeParse(
+    plan.issued_policy_record,
+  );
+  const recordsResult = issuedPremiumRecordsSchema.safeParse(
+    plan.issued_premium_records,
+  );
+  if (!policyResult.success || !recordsResult.success) {
+    throw new Error(
+      "Health plan needs its issued policy record and 12 issued monthly premium records",
+    );
+  }
+  const policy = policyResult.data;
+  const records = recordsResult.data;
   const ssn = ownerTin.replaceAll("-", "");
   const payments = new Set<string>();
   if (

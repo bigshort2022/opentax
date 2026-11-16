@@ -19,6 +19,7 @@ import {
   ForeignTaxKind,
   form_1116,
   IncomeCategory,
+  QualifiedPayeeStatement,
 } from "../../../../intermediate/forms/credits/foreign/form_1116/index.ts";
 import { rate_28_gain_worksheet } from "../../../../intermediate/worksheets/taxes/calculation/rate_28_gain_worksheet/index.ts";
 import { agi_aggregator } from "../../../../intermediate/aggregation/general/return-assembly/agi_aggregator/index.ts";
@@ -30,6 +31,7 @@ import { form4952 } from "../../../../intermediate/forms/deductions/investments/
 import { f1040 } from "../../../../outputs/general/return-assembly/f1040/index.ts";
 import type { NodeContext } from "../../../../../../../core/types/node-context.ts";
 import { CONFIG_BY_YEAR } from "../../../../config/index.ts";
+import { assertDatesInTaxYear, ISO_DATE } from "../../../../utils.ts";
 
 const nomineeDistributionSchema = z.object({
   box1a: z.number().nonnegative(),
@@ -74,7 +76,7 @@ export const itemSchema = z.object({
   // investment property and are excluded from Form 4952 manual "other" facts.
   investment_property_for_form4952: z.boolean().optional(),
   qualified_dividend_filing_review: z.object({
-    ex_dividend_date: z.string().regex(/^2025-\d{2}-\d{2}$/).refine(
+    ex_dividend_date: z.string().regex(ISO_DATE).refine(
       realCalendarDate,
       "Expected a real calendar date",
     ),
@@ -105,6 +107,9 @@ export const itemSchema = z.object({
   foreign_source_dividends_usd: z.number().nonnegative().optional(),
   foreign_source_qualified_dividends_usd: z.number().nonnegative().optional(),
   foreign_tax_irs_country_code: ty2025IrsCountryCodeSchema.optional(),
+  // Election to claim the box 7 foreign tax directly on Schedule 3 line 1
+  // without Form 1116 (Form 1116 instructions, 2025).
+  foreign_tax_without_form1116: z.literal(true).optional(),
   box9: z.number().nonnegative().optional(),
   box10: z.number().nonnegative().optional(),
   box12: z.number().nonnegative().optional(),
@@ -123,7 +128,7 @@ export const itemSchema = z.object({
   box16: z.number().nonnegative().optional(),
   holdingPeriodDays: z.number().nonnegative().optional(),
   foreign_tax_holding_review: z.object({
-    ex_dividend_date: z.string().regex(/^2025-\d{2}-\d{2}$/),
+    ex_dividend_date: z.string().regex(ISO_DATE),
     qualifying_held_days_in_31_day_window: z.number().int().min(16).max(31),
     diminished_risk_days_excluded: z.number().int().min(0).max(31),
     no_related_payment_obligation_confirmed: z.literal(true),
@@ -132,7 +137,7 @@ export const itemSchema = z.object({
     reviewed_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   }).strict().optional(),
   section199a_holding_review: z.object({
-    ex_dividend_date: z.string().regex(/^2025-\d{2}-\d{2}$/),
+    ex_dividend_date: z.string().regex(ISO_DATE),
     qualified_held_days_in_91_day_window: z.number().int().min(0).max(91),
     diminished_risk_days_excluded: z.number().int().nonnegative(),
     no_related_payment_obligation_confirmed: z.literal(true),
@@ -433,6 +438,15 @@ class F1099divNode extends TaxNode<typeof inputSchema> {
 
     for (const item of div1099s) {
       validateDivItem(item);
+      assertDatesInTaxYear(
+        ctx.taxYear,
+        [
+          item.qualified_dividend_filing_review?.ex_dividend_date,
+          item.foreign_tax_holding_review?.ex_dividend_date,
+          item.section199a_holding_review?.ex_dividend_date,
+        ],
+        `1099-DIV holding reviews need a ${ctx.taxYear} ex-dividend date`,
+      );
     }
 
     const shouldRouteScheduleB = needsScheduleB(
@@ -621,15 +635,17 @@ class F1099divNode extends TaxNode<typeof inputSchema> {
     }
 
     // §199A dividends — only items meeting holding period qualify
-    const totalBox5 = div1099s
-      .filter((item) =>
-        item.holdingPeriodDays === undefined ||
-        item.holdingPeriodDays >= HOLDING_PERIOD_199A_DAYS
-      )
-      .reduce((sum, item) => sum + (item.box5 ?? 0), 0);
+    const qualifying199a = div1099s.filter((item) =>
+      (item.box5 ?? 0) > 0 &&
+      (item.holdingPeriodDays === undefined ||
+        item.holdingPeriodDays >= HOLDING_PERIOD_199A_DAYS)
+    );
+    const totalBox5 = qualifying199a.reduce(
+      (sum, item) => sum + (item.box5 ?? 0),
+      0,
+    );
     if (totalBox5 > 0) {
-      const reitSources = div1099s
-        .filter((item) => (item.box5 ?? 0) > 0)
+      const reitSources = qualifying199a
         .map((item) => ({
           payer_name: item.payerName ?? "",
           source_document_reference: item.source_document_reference ?? "",
@@ -693,9 +709,23 @@ class F1099divNode extends TaxNode<typeof inputSchema> {
         throw new Error("1099-DIV foreign tax needs the holding period");
       }
     }
-    const eligibleItems = taxedItems.filter((item) =>
+    const creditableItems = taxedItems.filter((item) =>
       item.holdingPeriodDays! >= HOLDING_PERIOD_FOREIGN_DAYS
     );
+    const electedItems = creditableItems.filter((item) =>
+      item.foreign_tax_without_form1116 === true
+    );
+    const eligibleItems = creditableItems.filter((item) =>
+      item.foreign_tax_without_form1116 !== true
+    );
+    if (electedItems.length > 0) {
+      outputs.push(this.outputNodes.output(form_1116, {
+        election_foreign_tax_items: electedItems.map((item) => ({
+          foreign_tax_paid: item.box7!,
+          payee_statement: QualifiedPayeeStatement.Form1099Div,
+        })),
+      }));
+    }
     for (const item of eligibleItems) {
       const review = item.foreign_tax_holding_review;
       if (

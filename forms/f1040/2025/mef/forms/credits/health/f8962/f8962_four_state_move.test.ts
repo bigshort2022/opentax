@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import { FilingStatus } from "../../../../../../mef/header.ts";
 import { general } from "../../../../../../nodes/inputs/general/filing/general/index.ts";
@@ -104,15 +105,15 @@ const pending = {
   general: {
     filing_status: SourceFilingStatus.Single,
     address_state: "TX",
-    ptc_residence_states_2025: ["AK", "HI", "CA", "TX"],
-    ptc_residence_months_2025: residenceMonths,
+    ptc_tax_year_residence_states: ["AK", "HI", "CA", "TX"],
+    ptc_tax_year_residence_months: residenceMonths,
   },
   f1095a: { f1095as: policies },
   schedule2: { line1a_excess_advance_premium: 1_596 },
   f1040: { line11_agi: 75_300, line17_additional_taxes: 1_596 },
 };
 
-Deno.test("Form 8962 four-state interstate move uses Alaska FPL and four sourced policies through return, MeF, and PDF", () => {
+test("Form 8962 four-state interstate move uses Alaska FPL and four sourced policies through return, MeF, and PDF", () => {
   const residence = general.compute(
     { taxYear: 2025, formType: "f1040" },
     general.inputSchema.parse(pending.general),
@@ -157,7 +158,7 @@ Deno.test("Form 8962 four-state interstate move uses Alaska FPL and four sourced
   assertEquals(form8962Pdf.instances?.(pdf, filer, pending)?.length, 1);
 });
 
-Deno.test("Form 8962 four-state move rejects unreviewed arrival, policy-state conflict, and return drift", () => {
+test("Form 8962 four-state move rejects unreviewed arrival, policy-state conflict, and return drift", () => {
   assertThrows(
     () =>
       form8962.build(fields, {

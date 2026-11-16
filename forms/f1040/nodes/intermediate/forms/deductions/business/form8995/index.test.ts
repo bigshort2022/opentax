@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import { form8995 } from "./index.ts";
 import { FilingStatus } from "../../../../../types.ts";
@@ -10,7 +11,7 @@ function findOutput(result: ReturnType<typeof compute>, nodeType: string) {
   return result.outputs.find((o) => o.nodeType === nodeType);
 }
 
-Deno.test("calc: one confirmed Schedule C business rounds fractional 20% to the filed line 15", () => {
+test("calc: one confirmed Schedule C business rounds fractional 20% to the filed line 15", () => {
   const result = compute({
     qbi_from_schedule_c: 301,
     filing_status: FilingStatus.Single,
@@ -55,7 +56,7 @@ Deno.test("calc: one confirmed Schedule C business rounds fractional 20% to the 
 
 // ── Input validation ─────────────────────────────────────────────────────────
 
-Deno.test("validation: a net QBI loss cannot disappear without a carryforward filing route", () => {
+test("validation: a net QBI loss cannot disappear without a carryforward filing route", () => {
   // i8995, Line 1: "Enter on line 1(c) the net QBI or (loss) for the trade, business,
   // or aggregation reported in the corresponding row." The loss must carry forward.
   assertThrows(
@@ -65,19 +66,19 @@ Deno.test("validation: a net QBI loss cannot disappear without a carryforward fi
   );
 });
 
-Deno.test("validation: rejects negative line6_sec199a_dividends", () => {
+test("validation: rejects negative line6_sec199a_dividends", () => {
   assertThrows(() =>
     compute({ line6_sec199a_dividends: -500, taxable_income: 50000 })
   );
 });
 
-Deno.test("validation: rejects negative taxable_income", () => {
+test("validation: rejects negative taxable_income", () => {
   assertThrows(() =>
     compute({ qbi_from_schedule_c: 10000, taxable_income: -1 })
   );
 });
 
-Deno.test("validation: rejects negative net_capital_gain", () => {
+test("validation: rejects negative net_capital_gain", () => {
   assertThrows(() =>
     compute({
       qbi_from_schedule_c: 10000,
@@ -87,14 +88,14 @@ Deno.test("validation: rejects negative net_capital_gain", () => {
   );
 });
 
-Deno.test("validation: accepts all-absent inputs — no outputs", () => {
+test("validation: accepts all-absent inputs — no outputs", () => {
   const result = compute({});
   assertEquals(result.outputs.length, 0);
 });
 
 // ── Per-field calculation — QBI component ────────────────────────────────────
 
-Deno.test("calc: qbi_from_schedule_c only — 20% rate applied, no income limit", () => {
+test("calc: qbi_from_schedule_c only — 20% rate applied, no income limit", () => {
   // Line 2 = 10000, Line 5 = 2000, Line 10 = 2000
   // Line 13 = 20% × (50000 - 0) = 10000 → deduction = min(2000, 10000) = 2000
   const result = compute({ qbi_from_schedule_c: 10000, taxable_income: 50000 });
@@ -102,14 +103,14 @@ Deno.test("calc: qbi_from_schedule_c only — 20% rate applied, no income limit"
   assertEquals(out?.fields.line13_qbi_deduction, 2000);
 });
 
-Deno.test("calc: qbi from schedule_e only — 20% rate applied", () => {
+test("calc: qbi from schedule_e only — 20% rate applied", () => {
   // Line 2 = 20000, Line 5 = 4000; taxable_income = 100000 → limit = 20000
   const result = compute({ qbi: 20000, taxable_income: 100000 });
   const out = findOutput(result, "f1040");
   assertEquals(out?.fields.line13_qbi_deduction, 4000);
 });
 
-Deno.test("calc: both qbi_from_schedule_c and qbi — aggregated on Line 2", () => {
+test("calc: both qbi_from_schedule_c and qbi — aggregated on Line 2", () => {
   // Line 2 = 10000 + 5000 = 15000; Line 5 = 3000; limit = 20% × 80000 = 16000
   const result = compute({
     qbi_from_schedule_c: 10000,
@@ -120,19 +121,19 @@ Deno.test("calc: both qbi_from_schedule_c and qbi — aggregated on Line 2", () 
   assertEquals(out?.fields.line13_qbi_deduction, 3000);
 });
 
-Deno.test("calc: zero qbi — no f1040 output", () => {
+test("calc: zero qbi — no f1040 output", () => {
   const result = compute({ qbi_from_schedule_c: 0, taxable_income: 50000 });
   assertEquals(findOutput(result, "f1040"), undefined);
 });
 
-Deno.test("calc: absent qbi fields — no f1040 output", () => {
+test("calc: absent qbi fields — no f1040 output", () => {
   const result = compute({ taxable_income: 50000 });
   assertEquals(findOutput(result, "f1040"), undefined);
 });
 
 // ── Deductions attributable to the trade or business (Line 1c) ───────────────
 
-Deno.test("calc: QBI is reduced by the deductible part of self-employment tax", () => {
+test("calc: QBI is reduced by the deductible part of self-employment tax", () => {
   // i8995, Determining Your Qualified Business Income: the items attributable to the
   // trade or business include the "deductible part of self-employment tax".
   // Line 2 = 100000 − 7000 = 93000; Line 5 = 18600; limit = 20% × 200000 = 40000
@@ -145,7 +146,7 @@ Deno.test("calc: QBI is reduced by the deductible part of self-employment tax", 
   assertEquals(out?.fields.line13_qbi_deduction, 18600);
 });
 
-Deno.test("calc: QBI is reduced by the self-employed health insurance deduction", () => {
+test("calc: QBI is reduced by the self-employed health insurance deduction", () => {
   // Same i8995 sentence names the "self-employment health insurance deduction".
   // Line 2 = 100000 − 4000 = 96000; Line 5 = 19200; limit = 20% × 200000 = 40000
   const result = compute({
@@ -157,7 +158,7 @@ Deno.test("calc: QBI is reduced by the self-employed health insurance deduction"
   assertEquals(out?.fields.line13_qbi_deduction, 19200);
 });
 
-Deno.test("calc: QBI is reduced by contributions to a qualified retirement plan", () => {
+test("calc: QBI is reduced by contributions to a qualified retirement plan", () => {
   // Same i8995 sentence names "contributions to qualified retirement plans".
   // Line 2 = 100000 − 10000 = 90000; Line 5 = 18000; limit = 20% × 200000 = 40000
   const result = compute({
@@ -169,7 +170,7 @@ Deno.test("calc: QBI is reduced by contributions to a qualified retirement plan"
   assertEquals(out?.fields.line13_qbi_deduction, 18000);
 });
 
-Deno.test("calc: all three attributable deductions stack on Line 1(c)", () => {
+test("calc: all three attributable deductions stack on Line 1(c)", () => {
   // Line 2 = 100000 − 7000 − 4000 − 10000 = 79000; Line 5 = 15800
   const result = compute({
     qbi_from_schedule_c: 100000,
@@ -182,7 +183,7 @@ Deno.test("calc: all three attributable deductions stack on Line 1(c)", () => {
   assertEquals(out?.fields.line13_qbi_deduction, 15800);
 });
 
-Deno.test("calc: attributable deduction creating net QBI loss needs carryforward route", () => {
+test("calc: attributable deduction creating net QBI loss needs carryforward route", () => {
   assertThrows(
     () =>
       compute({
@@ -195,7 +196,7 @@ Deno.test("calc: attributable deduction creating net QBI loss needs carryforward
   );
 });
 
-Deno.test("calc: net Schedule C loss and REIT deduction still need QBI carryforward filing", () => {
+test("calc: net Schedule C loss and REIT deduction still need QBI carryforward filing", () => {
   // i8995, Line 4: a qualified business net loss allows no QBI deduction "unless you have
   // qualified REIT dividends or qualified PTP income".
   // Line 4 = −20000 → Line 5 = 0; Line 8 = 5000 → Line 9 = 1000
@@ -213,7 +214,7 @@ Deno.test("calc: net Schedule C loss and REIT deduction still need QBI carryforw
 
 // ── Per-field calculation — REIT/PTP component ───────────────────────────────
 
-Deno.test("calc: line6_sec199a_dividends only — 20% applied", () => {
+test("calc: line6_sec199a_dividends only — 20% applied", () => {
   // Line 6 = 5000, Line 8 = 5000, Line 9 = 1000; Line 10 = 1000; limit = 20% × 50000 = 10000
   const result = compute({
     line6_sec199a_dividends: 5000,
@@ -223,7 +224,22 @@ Deno.test("calc: line6_sec199a_dividends only — 20% applied", () => {
   assertEquals(out?.fields.line13_qbi_deduction, 1000);
 });
 
-Deno.test("calc: both QBI and REIT dividends — components summed on Line 10", () => {
+// 2025 Form 8995 line 15 is a whole-dollar amount (Rounding Off to Whole
+// Dollars); 20% × 3,917 = 783.40 files as 783 on Form 1040 line 13.
+test("calc: QBI deduction is rounded to whole dollars", () => {
+  const result = compute({
+    line6_sec199a_dividends: 3917,
+    taxable_income: 50000,
+  });
+  const out = findOutput(result, "f1040");
+  assertEquals(out?.fields.line13_qbi_deduction, 783);
+  assertEquals(
+    findOutput(result, "standard_deduction")?.fields.qbi_deduction,
+    783,
+  );
+});
+
+test("calc: both QBI and REIT dividends — components summed on Line 10", () => {
   // Line 5 = 2000 (QBI), Line 9 = 1000 (REIT) → Line 10 = 3000; limit = 20% × 100000 = 20000
   const result = compute({
     qbi_from_schedule_c: 10000,
@@ -234,7 +250,7 @@ Deno.test("calc: both QBI and REIT dividends — components summed on Line 10", 
   assertEquals(out?.fields.line13_qbi_deduction, 3000);
 });
 
-Deno.test("calc: zero line6_sec199a_dividends — REIT component is zero", () => {
+test("calc: zero line6_sec199a_dividends — REIT component is zero", () => {
   const result = compute({
     qbi_from_schedule_c: 10000,
     line6_sec199a_dividends: 0,
@@ -246,7 +262,7 @@ Deno.test("calc: zero line6_sec199a_dividends — REIT component is zero", () =>
 
 // ── QBI loss carryforward ─────────────────────────────────────────────────────
 
-Deno.test("calc: qbi_loss_carryforward reduces current QBI", () => {
+test("calc: qbi_loss_carryforward reduces current QBI", () => {
   // qbi_from_schedule_c = 10000, qbi_loss_carryforward = -3000 → net = 7000; 20% = 1400
   const result = compute({
     qbi_from_schedule_c: 10000,
@@ -257,21 +273,38 @@ Deno.test("calc: qbi_loss_carryforward reduces current QBI", () => {
   assertEquals(out?.fields.line13_qbi_deduction, 1400);
 });
 
-Deno.test("calc: prior loss larger than current QBI needs sourced remaining carryforward", () => {
-  // qbi = 5000, carryforward = -8000 → net = -3000; the remaining loss cannot disappear.
-  assertThrows(
-    () =>
-      compute({
-        qbi_from_schedule_c: 5000,
-        qbi_loss_carryforward: -8000,
-        taxable_income: 100000,
-      }),
-    Error,
-    "sourced carryforward filing route",
-  );
+test("calc: prior-year QBI loss carryforward nets on line 3 below the threshold", () => {
+  // i8995 Line 3: the prior-year Form 8995 line 16 loss. 150,000 - 58,738 =
+  // 91,262; 20% = 18,252.4. Taxable income 218,500 is under the MFJ threshold.
+  const result = compute({
+    qbi: 150_000,
+    qbi_loss_carryforward: -58_738,
+    filing_status: FilingStatus.MFJ,
+    taxable_income: 218_500,
+  });
+  const form = findOutput(result, "form8995");
+  assertEquals(findOutput(result, "f1040")?.fields.line13_qbi_deduction, 18_252);
+  assertEquals(form?.fields.line2, 150_000);
+  assertEquals(form?.fields.line3, -58_738);
+  assertEquals(form?.fields.line4, 91_262);
+  assertEquals(form?.fields.line16, 0);
+  assertEquals(result.carryforwards, {});
 });
 
-Deno.test("calc: positive qbi_loss_carryforward throws (must be zero or negative)", () => {
+test("calc: prior loss larger than current QBI carries the rest to next year", () => {
+  // qbi = 5000, carryforward = -8000 → line 16 (3,000) carries forward.
+  const result = compute({
+    qbi_from_schedule_c: 5000,
+    qbi_loss_carryforward: -8000,
+    taxable_income: 100000,
+  });
+  assertEquals(findOutput(result, "f1040"), undefined);
+  assertEquals(findOutput(result, "form8995")?.fields.line4, 0);
+  assertEquals(findOutput(result, "form8995")?.fields.line16, 3_000);
+  assertEquals(result.carryforwards, { qbi_loss_carryforward: 3_000 });
+});
+
+test("calc: positive qbi_loss_carryforward throws (must be zero or negative)", () => {
   assertThrows(() =>
     compute({
       qbi_from_schedule_c: 10000,
@@ -283,7 +316,7 @@ Deno.test("calc: positive qbi_loss_carryforward throws (must be zero or negative
 
 // ── REIT/PTP loss carryforward ────────────────────────────────────────────────
 
-Deno.test("calc: reit_loss_carryforward reduces current REIT dividends", () => {
+test("calc: reit_loss_carryforward reduces current REIT dividends", () => {
   // line6 = 10000, reit_loss_carryforward = -2000 → net = 8000; 20% = 1600
   const result = compute({
     line6_sec199a_dividends: 10000,
@@ -294,32 +327,26 @@ Deno.test("calc: reit_loss_carryforward reduces current REIT dividends", () => {
   assertEquals(out?.fields.line13_qbi_deduction, 1600);
 });
 
-Deno.test("calc: negative REIT/PTP line 8 rejects until line 17 can be filed", () => {
+test("calc: negative REIT/PTP line 8 carries line 17 to next year", () => {
   // Line 6 $3,000 less a $5,000 prior loss leaves $2,000 for next year.
-  assertThrows(
-    () =>
-      compute({
-        line6_sec199a_dividends: 3_000,
-        reit_loss_carryforward: -5_000,
-        taxable_income: 100_000,
-      }),
-    Error,
-    "sourced line 17 carryforward",
-  );
-  assertThrows(
-    () =>
-      compute({
-        reit_loss_carryforward: -2_000,
-        taxable_income: 100_000,
-      }),
-    Error,
-    "sourced line 17 carryforward",
-  );
+  const partial = compute({
+    line6_sec199a_dividends: 3_000,
+    reit_loss_carryforward: -5_000,
+    taxable_income: 100_000,
+  });
+  assertEquals(findOutput(partial, "form8995")?.fields.line8, 0);
+  assertEquals(findOutput(partial, "form8995")?.fields.line17, 2_000);
+  assertEquals(partial.carryforwards, { reit_ptp_loss_carryforward: 2_000 });
+  const unused = compute({
+    reit_loss_carryforward: -2_000,
+    taxable_income: 100_000,
+  });
+  assertEquals(unused.carryforwards, { reit_ptp_loss_carryforward: 2_000 });
 });
 
 // ── Income limitation (Lines 11–13) ──────────────────────────────────────────
 
-Deno.test("threshold: income limit (20% × TI) caps the deduction below 20% of QBI", () => {
+test("threshold: income limit (20% × TI) caps the deduction below 20% of QBI", () => {
   // QBI = 100000 → 20% = 20000; taxable_income = 50000, net_capital_gain = 0
   // limit = 20% × 50000 = 10000 → deduction = min(20000, 10000) = 10000
   const result = compute({
@@ -330,7 +357,7 @@ Deno.test("threshold: income limit (20% × TI) caps the deduction below 20% of Q
   assertEquals(out?.fields.line13_qbi_deduction, 10000);
 });
 
-Deno.test("threshold: net capital gain reduces income limitation base", () => {
+test("threshold: net capital gain reduces income limitation base", () => {
   // QBI = 50000 → 20% = 10000; taxable_income = 60000, net_capital_gain = 20000
   // income_limit_base = 60000 - 20000 = 40000; limit = 20% × 40000 = 8000
   // deduction = min(10000, 8000) = 8000
@@ -343,7 +370,7 @@ Deno.test("threshold: net capital gain reduces income limitation base", () => {
   assertEquals(out?.fields.line13_qbi_deduction, 8000);
 });
 
-Deno.test("threshold: net capital gain accumulates from several upstream nodes", () => {
+test("threshold: net capital gain accumulates from several upstream nodes", () => {
   // i8995, Line 12: Form 1040 line 3a (qualified dividends) PLUS net capital gain, so the
   // qualified-dividend and Schedule D portions are deposited separately and summed here.
   // base = 150000 − (30000 + 20000) = 100000; limit = 20000; QBI component = 40000
@@ -356,7 +383,7 @@ Deno.test("threshold: net capital gain accumulates from several upstream nodes",
   assertEquals(out?.fields.line13_qbi_deduction, 20000);
 });
 
-Deno.test("threshold: when taxable_income equals net_capital_gain — income limit is zero, no deduction", () => {
+test("threshold: when taxable_income equals net_capital_gain — income limit is zero, no deduction", () => {
   // All income is capital gains → income_limit_base = 0 → limit = 0 → deduction = 0
   const result = compute({
     qbi_from_schedule_c: 20000,
@@ -366,7 +393,7 @@ Deno.test("threshold: when taxable_income equals net_capital_gain — income lim
   assertEquals(findOutput(result, "f1040"), undefined);
 });
 
-Deno.test("threshold: income limit exactly equals 20% of QBI — deduction equals QBI component", () => {
+test("threshold: income limit exactly equals 20% of QBI — deduction equals QBI component", () => {
   // QBI = 50000 → 20% = 10000; taxable_income = 50000, no cap gain → limit = 10000
   // deduction = min(10000, 10000) = 10000
   const result = compute({
@@ -377,7 +404,7 @@ Deno.test("threshold: income limit exactly equals 20% of QBI — deduction equal
   assertEquals(out?.fields.line13_qbi_deduction, 10000);
 });
 
-Deno.test("threshold: zero taxable_income — no deduction allowed", () => {
+test("threshold: zero taxable_income — no deduction allowed", () => {
   const result = compute({
     qbi_from_schedule_c: 20000,
     taxable_income: 0,
@@ -387,7 +414,7 @@ Deno.test("threshold: zero taxable_income — no deduction allowed", () => {
 
 // ── Hard validation rules ─────────────────────────────────────────────────────
 
-Deno.test("validation hard pass: all valid fields — produces f1040 output", () => {
+test("validation hard pass: all valid fields — produces f1040 output", () => {
   // qbi_from_schedule_c=50000 + qbi=10000 = 60000 net QBI; reit=5000
   // 20% × 60000 = 12000 QBI component; 20% × 5000 = 1000 REIT component → total = 13000
   // income_limit_base = 200000 - 10000 = 190000; limit = 20% × 190000 = 38000
@@ -409,19 +436,19 @@ Deno.test("validation hard pass: all valid fields — produces f1040 output", ()
 
 // ── Output routing ────────────────────────────────────────────────────────────
 
-Deno.test("routing: positive QBI → routes to f1040 with line13_qbi_deduction", () => {
+test("routing: positive QBI → routes to f1040 with line13_qbi_deduction", () => {
   // 20% × 10000 = 2000; limit = 20% × 50000 = 10000 → deduction = 2000
   const result = compute({ qbi_from_schedule_c: 10000, taxable_income: 50000 });
   const out = findOutput(result, "f1040");
   assertEquals(out?.fields.line13_qbi_deduction, 2000);
 });
 
-Deno.test("routing: no QBI and no REIT dividends → no f1040 output", () => {
+test("routing: no QBI and no REIT dividends → no f1040 output", () => {
   const result = compute({ taxable_income: 50000 });
   assertEquals(findOutput(result, "f1040"), undefined);
 });
 
-Deno.test("routing: only REIT dividends → routes to f1040", () => {
+test("routing: only REIT dividends → routes to f1040", () => {
   const result = compute({
     line6_sec199a_dividends: 10000,
     taxable_income: 100000,
@@ -431,7 +458,7 @@ Deno.test("routing: only REIT dividends → routes to f1040", () => {
   assertEquals(out?.fields.line13_qbi_deduction, 2000);
 });
 
-Deno.test("routing: w2_wages and unadjusted_basis accepted but not routed separately", () => {
+test("routing: w2_wages and unadjusted_basis accepted but not routed separately", () => {
   // These fields are informational for Form 8995-A; Form 8995 accepts but ignores them
   const result = compute({
     qbi_from_schedule_c: 10000,
@@ -448,14 +475,14 @@ Deno.test("routing: w2_wages and unadjusted_basis accepted but not routed separa
 
 // ── Edge cases ────────────────────────────────────────────────────────────────
 
-Deno.test("edge: net QBI loss (no carryforward field) — single Schedule C loss", () => {
+test("edge: net QBI loss (no carryforward field) — single Schedule C loss", () => {
   // qbi_from_schedule_c can be 0 (losses come as separate carryforward field)
   // A zero QBI produces no output
   const result = compute({ qbi_from_schedule_c: 0, taxable_income: 50000 });
   assertEquals(findOutput(result, "f1040"), undefined);
 });
 
-Deno.test("edge: very large QBI — deduction capped at income limit", () => {
+test("edge: very large QBI — deduction capped at income limit", () => {
   // QBI = 1,000,000 → 20% = 200,000; taxable_income = 300,000; limit = 60,000
   const result = compute({
     qbi_from_schedule_c: 1_000_000,
@@ -465,7 +492,7 @@ Deno.test("edge: very large QBI — deduction capped at income limit", () => {
   assertEquals(out?.fields.line13_qbi_deduction, 60_000);
 });
 
-Deno.test("edge: net_capital_gain exceeds taxable_income — income limit base clamped to zero", () => {
+test("edge: net_capital_gain exceeds taxable_income — income limit base clamped to zero", () => {
   // income_limit_base = max(0, 20000 - 30000) = 0 → deduction = 0
   const result = compute({
     qbi_from_schedule_c: 10000,
@@ -475,19 +502,20 @@ Deno.test("edge: net_capital_gain exceeds taxable_income — income limit base c
   assertEquals(findOutput(result, "f1040"), undefined);
 });
 
-Deno.test("edge: fractional cents — deduction computed to full precision (no premature rounding)", () => {
-  // QBI = 10001, 20% = 2000.2; taxable_income = 100000, limit = 20000 → deduction = 2000.2
+test("edge: fractional cents — only the filed line 15 is rounded", () => {
+  // QBI = 10001, 20% = 2000.2; taxable_income = 100000, limit = 20000 →
+  // line 15 = 2000.2, filed in whole dollars as 2000.
   const result = compute({
     qbi_from_schedule_c: 10001,
     taxable_income: 100000,
   });
   const out = findOutput(result, "f1040");
-  assertEquals(out?.fields.line13_qbi_deduction, 2000.2);
+  assertEquals(out?.fields.line13_qbi_deduction, 2000);
 });
 
 // ── Smoke test ────────────────────────────────────────────────────────────────
 
-Deno.test("smoke: full scenario — Schedule C + Schedule E + REIT dividends + carryforward", () => {
+test("smoke: full scenario — Schedule C + Schedule E + REIT dividends + carryforward", () => {
   // schedule_c QBI = 30000
   // schedule_e QBI = 20000, w2_wages = 40000, unadjusted_basis = 200000
   // REIT dividends = 10000
@@ -523,7 +551,7 @@ Deno.test("smoke: full scenario — Schedule C + Schedule E + REIT dividends + c
   assertEquals(findOutput(result, "form8995")?.fields.qbi_deduction, 10600);
 });
 
-Deno.test("above-threshold Schedule C QBI is handed to Form 8995-A after business deductions", () => {
+test("above-threshold Schedule C QBI is handed to Form 8995-A after business deductions", () => {
   const result = compute({
     filing_status: FilingStatus.Single,
     agi: 229_330.4625,
@@ -541,7 +569,7 @@ Deno.test("above-threshold Schedule C QBI is handed to Form 8995-A after busines
   assertEquals(advanced?.fields.unadjusted_basis, 0);
 });
 
-Deno.test("equal capital contributions finalize a retained scalar even when the income limit zeros QBI", () => {
+test("equal capital contributions finalize a retained scalar even when the income limit zeros QBI", () => {
   const result = compute({
     qbi_from_schedule_c: 10000,
     taxable_income: 1000,
@@ -553,4 +581,26 @@ Deno.test("equal capital contributions finalize a retained scalar even when the 
   });
   assertEquals(findOutput(result, "f1040"), undefined);
   assertEquals(findOutput(result, "form8995")?.fields.net_capital_gain, 2000);
+});
+
+test("an unclaimed QBI deduction files no Form 8995 lines", () => {
+  const result = compute({
+    qbi_from_schedule_c: 10000,
+    taxable_income: 50000,
+    qbi_deduction_not_claimed: true,
+  });
+  assertEquals(result.outputs, []);
+});
+
+test("an unclaimed QBI deduction cannot drop a loss carryforward", () => {
+  assertThrows(
+    () =>
+      compute({
+        qbi_from_schedule_c: -1000,
+        taxable_income: 50000,
+        qbi_deduction_not_claimed: true,
+      }),
+    Error,
+    "cannot drop a QBI or REIT/PTP loss carryforward",
+  );
 });

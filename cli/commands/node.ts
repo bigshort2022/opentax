@@ -15,14 +15,28 @@ export function nodeListCommand(): void {
   const types = Object.keys(defaultDef.registry).sort();
   console.log(`Registered Nodes (${types.length})\n`);
 
-  const COL_WIDTH = 28;
-  const COLS = 4;
-  for (let i = 0; i < types.length; i += COLS) {
-    const row = types.slice(i, i + COLS);
-    const line = row.map((t) => t.padEnd(COL_WIDTH)).join("").trimEnd();
-    console.log(`  ${line}`);
-  }
+  for (const line of nodeListLines(types)) console.log(`  ${line}`);
   console.log("");
+
+  const keyed = defaultDef.inputNodes.flatMap((entry) =>
+    entry.inputKey ? [entry.inputKey] : []
+  ).sort();
+  console.log(`Keyed Inputs (${keyed.length}) — form add --node_type <key>\n`);
+  for (const line of nodeListLines(keyed)) console.log(`  ${line}`);
+  console.log("");
+}
+
+/** Four columns sized to the longest label, so every label keeps a separator. */
+export function nodeListLines(types: readonly string[]): string[] {
+  const COLS = 4;
+  const width = Math.max(0, ...types.map((t) => t.length)) + 2;
+  const lines: string[] = [];
+  for (let i = 0; i < types.length; i += COLS) {
+    lines.push(
+      types.slice(i, i + COLS).map((t) => t.padEnd(width)).join("").trimEnd(),
+    );
+  }
+  return lines;
 }
 
 /**
@@ -31,7 +45,7 @@ export function nodeListCommand(): void {
  */
 export function nodeInspectCommand(args: NodeInspectArgs): void {
   const node = defaultDef.registry[args.nodeType];
-  if (!node) throw new Error(`Unknown node type: ${args.nodeType}`);
+  if (!node) return publicInputInspect(args);
 
   if (args.json) {
     const schemaLines = zodToLines(node.inputSchema, undefined, 0);
@@ -71,5 +85,31 @@ export function nodeInspectCommand(args: NodeInspectArgs): void {
       console.log("  " + outputs.slice(i, i + COLS).join("  "));
     }
   }
+  console.log("");
+}
+
+/** A keyed public input (form add --node_type <key>) that feeds another node. */
+function publicInputInspect(args: NodeInspectArgs): void {
+  const entry = defaultDef.inputNodes.find((candidate) =>
+    candidate.inputKey === args.nodeType
+  );
+  if (!entry) throw new Error(`Unknown node type: ${args.nodeType}`);
+  const schema = entry.isArray ? entry.itemSchema : entry.inputSchema;
+  const target = entry.node.nodeType;
+  if (args.json) {
+    console.log(JSON.stringify(
+      {
+        nodeType: args.nodeType,
+        feedsNode: target,
+        schema: zodToLines(schema, undefined, 0),
+      },
+      null,
+      2,
+    ));
+    return;
+  }
+  console.log(`Input: ${args.nodeType} (feeds ${target})\n`);
+  console.log("Input Schema:");
+  for (const line of zodToLines(schema, undefined, 1)) console.log(line);
   console.log("");
 }

@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertThrows } from "@std/assert";
 import { assertForm4972AmtJoin } from "./form4972_amt_reconciliation.ts";
 import { ordinaryTax2025 } from "../../../../../nodes/intermediate/worksheets/taxes/calculation/tax_table_2025.ts";
@@ -23,39 +24,39 @@ const filed = {
   },
 };
 
-Deno.test("Form 4972 special tax is excluded exactly once from Form 6251 line 10", () => {
-  assertForm4972AmtJoin(500, filed);
+test("Form 4972 special tax is excluded exactly once from Form 6251 line 10", () => {
+  assertForm4972AmtJoin(500, filed, { taxYear: 2025, formType: "f1040" });
 });
 
-Deno.test("Form 4972 AMT join rejects altered Form 1040 and Form 6251 sources", () => {
-  assertThrows(() => assertForm4972AmtJoin(501, filed));
+test("Form 4972 AMT join rejects altered Form 1040 and Form 6251 sources", () => {
+  assertThrows(() => assertForm4972AmtJoin(501, filed, { taxYear: 2025, formType: "f1040" }));
   assertThrows(() =>
     assertForm4972AmtJoin(500, {
       ...filed,
       f1040: { ...filed.f1040, line16_income_tax: 499 },
-    })
+    }, { taxYear: 2025, formType: "f1040" })
   );
   assertThrows(() =>
     assertForm4972AmtJoin(500, {
       ...filed,
       form6251: { ...filed.form6251, form4972_tax: 0 },
-    })
+    }, { taxYear: 2025, formType: "f1040" })
   );
   assertThrows(() =>
     assertForm4972AmtJoin(500, {
       ...filed,
       form6251: { ...filed.form6251, regular_tax: 4_400 },
-    })
+    }, { taxYear: 2025, formType: "f1040" })
   );
   assertThrows(() =>
     assertForm4972AmtJoin(500, {
       ...filed,
       form6251: { ...filed.form6251, schedule3_line1_foreign_tax_credit: 0 },
-    })
+    }, { taxYear: 2025, formType: "f1040" })
   );
 });
 
-Deno.test("Form 4972 special tax remains exact with Schedule J refigured AMT tax", () => {
+test("Form 4972 special tax remains exact with Schedule J refigured AMT tax", () => {
   const scheduleJ = {
     line1: 50_000,
     line2a: 15_000,
@@ -101,7 +102,7 @@ Deno.test("Form 4972 special tax remains exact with Schedule J refigured AMT tax
       regular_tax: ordinaryTax2025(50_000, FilingStatus.Single),
     },
   };
-  assertForm4972AmtJoin(500, joint);
+  assertForm4972AmtJoin(500, joint, { taxYear: 2025, formType: "f1040" });
   assertThrows(() =>
     assertForm4972AmtJoin(500, {
       ...joint,
@@ -109,24 +110,24 @@ Deno.test("Form 4972 special tax remains exact with Schedule J refigured AMT tax
         ...joint.form6251,
         regular_tax: joint.form6251.regular_tax + 500,
       },
-    })
+    }, { taxYear: 2025, formType: "f1040" })
   );
   assertThrows(() =>
     assertForm4972AmtJoin(500, {
       ...joint,
       schedule_j: { ...scheduleJ, line23: 5_709 },
-    })
+    }, { taxYear: 2025, formType: "f1040" })
   );
   assertThrows(() =>
     assertForm4972AmtJoin(500, {
       ...joint,
       f1040: { ...joint.f1040, filing_status: FilingStatus.MFJ },
-    })
+    }, { taxYear: 2025, formType: "f1040" })
   );
   assertThrows(() =>
     assertForm4972AmtJoin(500, {
       ...joint,
       f1040: { ...joint.f1040, line15_taxable_income: 50_001 },
-    })
+    }, { taxYear: 2025, formType: "f1040" })
   );
 });

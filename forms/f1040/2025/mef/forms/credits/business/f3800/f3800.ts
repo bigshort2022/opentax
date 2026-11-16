@@ -1,3 +1,4 @@
+import { mefTaxYear } from "../../../../support/year-config.ts";
 import {
   assertCurrentProductionAllocationSource,
   reconcileCurrentProductionAllocation,
@@ -477,7 +478,21 @@ function sourceForm8835(
   }
   const source = f8835InputSchema.parse(raw);
   const expected: Form8835CreditEntry[] = source.f8835s.map((item) => {
-    const lines = calculateForm8835(item);
+    const lines = calculateForm8835(item, mefTaxYear(context));
+    const purchase = item.purchase_source;
+    if (purchase) {
+      return {
+        form3800_line: lines.form3800Line,
+        credit_amount: 0,
+        transfer_out_amount: 0,
+        transfer_in_amount: purchase.purchased_credit_amount,
+        transferor_tin: purchase.transferor_tin,
+        registration_number: purchase.registration_number,
+        subject_to_passive_activity_limit:
+          item.subject_to_passive_activity_limit,
+        transfer_election_statement_file_name: purchase.statement_file_name,
+      };
+    }
     return {
       form3800_line: lines.form3800Line,
       credit_amount: lines.line15,
@@ -506,6 +521,9 @@ function sourceForm8835(
           entry.transfer_out_amount,
           sourceEntry.transfer_out_amount,
         ) ||
+        (entry.transfer_in_amount ?? 0) !==
+          (sourceEntry.transfer_in_amount ?? 0) ||
+        entry.transferor_tin !== sourceEntry.transferor_tin ||
         entry.registration_number !== sourceEntry.registration_number ||
         entry.subject_to_passive_activity_limit !==
           sourceEntry.subject_to_passive_activity_limit ||
@@ -714,7 +732,8 @@ function form8835FacilityAllocations(
       facility.form3800_line === line ? [index] : []
     );
     const available = indexes.map((index) =>
-      facilities[index].credit_amount - facilities[index].transfer_out_amount
+      facilities[index].credit_amount - facilities[index].transfer_out_amount +
+      (facilities[index].transfer_in_amount ?? 0)
     );
     const totalAvailable = available.reduce((sum, credit) => sum + credit, 0);
     if (
@@ -863,6 +882,7 @@ export function prepareForm3800DocumentParts(
     ? reconcileForm8864DocumentSource(
       context.pending?.f8864,
       context.pending ?? {},
+      mefTaxYear(context),
     )
     : undefined;
   if (

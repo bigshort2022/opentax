@@ -12,6 +12,8 @@ import { form8582 } from "../../../../intermediate/forms/income/business/form858
 import {
   k1PassiveIncomeSourceSchema,
   passiveK1Activities,
+  passiveK1LossActivities,
+  passiveK1LossTotal,
 } from "../k1_passive_source.ts";
 import {
   ownedDebtFamily,
@@ -54,7 +56,6 @@ import {
   reconcileCashCapitalAndNewNote,
   reconcileNewFormalNotes,
   reviewedForm7203DebtEvidenceSchema,
-  sumPrincipalRepayments,
   totalCurrentDebtAdvances,
 } from "../../../../intermediate/forms/income/business/form7203/debt-note.ts";
 import { form4797 } from "../../../../intermediate/forms/income/business/form4797/index.ts";
@@ -434,10 +435,14 @@ function schedule1Output(items: K1SCorpItems): NodeOutput[] {
     ];
   }
   const activities = passiveK1Activities(items, "k1_s_corp");
+  const lossActivities = passiveK1LossActivities(items, "k1_s_corp");
   const passiveIncome = activities.reduce(
     (sum, row) => sum + row.current_net,
     0,
   );
+  // A passive box 1-3 loss is held back for Form 8582 (2025 Instructions
+  // for Form 8582, Worksheet 3), which posts the allowed part.
+  const passiveLoss = passiveK1LossTotal(lossActivities);
   const total = items.reduce(
     (sum, item) =>
       sum +
@@ -446,23 +451,25 @@ function schedule1Output(items: K1SCorpItems): NodeOutput[] {
       (item.box3_other_rental ?? 0) +
       (item.box6_royalties ?? 0),
     0,
-  );
-  if (total === 0) return [];
+  ) + passiveLoss;
+  if (total === 0 && passiveLoss === 0) return [];
   return [
-    output(schedule1, { line5_schedule_e: total }),
+    ...(total !== 0 ? [output(schedule1, { line5_schedule_e: total })] : []),
     output(agi_aggregator, {
       line5_schedule_e: total,
       eic_passive_k1_income: reviewedK1PassiveIncome(items),
       ...(passiveIncome > 0
         ? { pal_current_income: passiveIncome, pal_rental_income: 0 }
         : {}),
+      ...(passiveLoss > 0 ? { pal_current_loss: passiveLoss } : {}),
     }),
-    ...(activities.length
+    ...(activities.length || lossActivities.length
       ? [output(form8582, {
         current_income: passiveIncome,
         rental_current_income: 0,
+        ...(passiveLoss > 0 ? { current_loss: passiveLoss } : {}),
         has_other_passive: true,
-        activities,
+        activities: [...activities, ...lossActivities],
       })]
       : []),
   ];
@@ -544,7 +551,10 @@ function resolveUbia(item: K1SCorpItem): number {
   return (item.ubia_qualified_property ?? 0) + (item.box17_ubia ?? 0);
 }
 
-function form8995Output(items: K1SCorpItems): NodeOutput[] {
+function form8995Output(
+  items: K1SCorpItems,
+  taxYear: number,
+): NodeOutput[] {
   if (items.length === 1 && items[0].first_year_passive_loss_source) {
     return [
       output(form8995, {
@@ -559,7 +569,7 @@ function form8995Output(items: K1SCorpItems): NodeOutput[] {
         "RPE aggregation needs its complete single-issuer current K1 inventory; other issuer combinations need their source route",
       );
     }
-    const group = currentSCorpRpeAggregation(rpe[0])!;
+    const group = currentSCorpRpeAggregation(taxYear, rpe[0])!;
     return [output(form8995, {
       qbi: group.qbi,
       w2_wages: group.wages,
@@ -980,7 +990,7 @@ class K1SCorpNode extends TaxNode<typeof inputSchema> {
     disabledAccessLimit,
   ]);
 
-  compute(_ctx: NodeContext, input: z.infer<typeof inputSchema>): NodeResult {
+  compute(ctx: NodeContext, input: z.infer<typeof inputSchema>): NodeResult {
     const { k1_s_corps } = inputSchema.parse(input);
 
     for (const item of k1_s_corps) {
@@ -1017,6 +1027,7 @@ class K1SCorpNode extends TaxNode<typeof inputSchema> {
         const { note } = reconcileNewFormalNotes(
           item.form7203_debt_evidence,
           item,
+          ctx.taxYear,
         );
         const ledger = item.form7203_stock_loss_ledger;
         if (
@@ -1034,7 +1045,7 @@ class K1SCorpNode extends TaxNode<typeof inputSchema> {
           );
         }
         if (ledger.cash_capital_contribution) {
-          reconcileCashCapitalAndNewNote(ledger, note);
+          reconcileCashCapitalAndNewNote(ledger, note, ctx.taxYear);
           if (
             note.current_box1_ordinary_loss <=
               ledger.beginning_stock_basis +
@@ -1148,7 +1159,7 @@ class K1SCorpNode extends TaxNode<typeof inputSchema> {
       ...scheduleBDividendOutputs(k1_s_corps),
       ...f1040QualDivOutput(k1_s_corps),
       ...scheduleDOutput(k1_s_corps),
-      ...form8995Output(k1_s_corps),
+      ...form8995Output(k1_s_corps, ctx.taxYear),
       ...form1116Outputs(k1_s_corps),
       ...form7203Outputs(k1_s_corps),
       ...form4797Outputs(k1_s_corps),

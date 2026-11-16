@@ -1,9 +1,7 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { reviewedRothOwnerInventory } from "../../../../../nodes/intermediate/forms/income/retirement/form8606/roth-inventory.ts";
-import {
-  calculateOwnerForms,
-  inputSchema as form5329InputSchema,
-} from "../../../../../nodes/intermediate/forms/taxes/retirement/form5329/index.ts";
-import { form5329 } from "../../../../mef/forms/taxes/retirement/f5329.ts";
 import { createHash } from "node:crypto";
 import { printSchema } from "../../../../../nodes/intermediate/forms/income/retirement/form8606/index.ts";
 import { assertEquals, assertRejects, assertThrows } from "@std/assert";
@@ -16,8 +14,8 @@ import {
 import { buildPdfBytes, type PdfPageOrigin } from "../../../../pdf/builder.ts";
 import { PDFDocument } from "pdf-lib";
 const root = ".state/research/form4852-roth-history-checkbox-corrected";
-Deno.test("actual prior Roth payment and filed-form history derives remaining owner basis and current8606/5329/1040", async () => {
-  await Deno.mkdir(root, { recursive: true });
+test("actual prior Roth payment and filed-form history derives remaining owner basis and current8606/5329/1040", async () => {
+  await fs.mkdir(root, { recursive: true });
   for (const [n, row] of rothHistoryCases.entries()) {
     const source = await rothHistoryReturnSource(row, 601 + n);
     const result = f1040_2025.executeReturn(source.inputs);
@@ -57,12 +55,12 @@ Deno.test("actual prior Roth payment and filed-form history derives remaining ow
       (row.base === 4) ? 5 : 3,
     );
     assertEquals(prepared.bundle.xml.includes("<IRASEPSIMPLEInd>"), false);
-    await Deno.writeTextFile(`${root}/${row.id}.xml`, prepared.bundle.xml);
-    const xsd = await new Deno.Command("xmllint", {
+    await fs.writeFile(`${root}/${row.id}.xml`, prepared.bundle.xml);
+    const xsd = await new sys.Command("xmllint", {
       args: [
         "--noout",
         "--schema",
-        ".state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+        "irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
         `${root}/${row.id}.xml`,
       ],
     }).output();
@@ -75,12 +73,12 @@ Deno.test("actual prior Roth payment and filed-form history derives remaining ow
       prepared.bundle,
       origins,
     );
-    await Deno.writeFile(`${root}/${row.id}.pdf`, pdf);
-    await Deno.writeTextFile(
+    await fs.writeFile(`${root}/${row.id}.pdf`, pdf);
+    await fs.writeFile(
       `${root}/${row.id}.origins.json`,
       JSON.stringify(origins, null, 2),
     );
-    await Deno.writeTextFile(
+    await fs.writeFile(
       `${root}/${row.id}.source.json`,
       JSON.stringify(
         { inputs: source.inputs, filer: source.filer, pending },
@@ -88,18 +86,18 @@ Deno.test("actual prior Roth payment and filed-form history derives remaining ow
         2,
       ),
     );
-    await Deno.mkdir(`${root}/${row.id}-retained`, { recursive: true });
+    await fs.mkdir(`${root}/${row.id}-retained`, { recursive: true });
     const documents = [];
     for (const [index, document] of source.retained.documents.entries()) {
       const path = `${row.id}-retained/document-${index + 1}.bin`;
-      await Deno.writeFile(`${root}/${path}`, document.bytes);
+      await fs.writeFile(`${root}/${path}`, document.bytes);
       documents.push({
         document_reference: document.document_reference,
         path,
         sha256: createHash("sha256").update(document.bytes).digest("hex"),
       });
     }
-    await Deno.writeTextFile(
+    await fs.writeFile(
       `${root}/${row.id}.documents.json`,
       JSON.stringify(documents, null, 2),
     );
@@ -145,7 +143,7 @@ Deno.test("actual prior Roth payment and filed-form history derives remaining ow
   }
 });
 
-Deno.test("retained Roth consumed history rejects prior source, filed basis, recapture and rehashed PDF conflicts", async () => {
+test("retained Roth consumed history rejects prior source, filed basis, recapture and rehashed PDF conflicts", async () => {
   const source = await rothHistoryReturnSource(
     rothHistoryCases.find((row) =>
       row.id === "prior-taxable-conversion-consumed"

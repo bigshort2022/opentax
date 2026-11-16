@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import { FilingStatus } from "../../../../../types.ts";
 import {
@@ -6,7 +7,7 @@ import {
 } from "./preferential_tax.ts";
 
 const qualifiedDividends = (
-  year: 2022 | 2023 | 2024,
+  year: number,
 ): ScheduleJBaseYearPreferentialFacts => ({
   method: "qualified_dividends",
   year,
@@ -19,7 +20,7 @@ const qualifiedDividends = (
   electedFarmNetCapitalGain: 0,
 });
 
-Deno.test("Schedule J base-year qualified-dividend worksheets use year-specific 0% ceilings and rates", () => {
+test("Schedule J base-year qualified-dividend worksheets use year-specific 0% ceilings and rates", () => {
   assertEquals(
     calculateScheduleJBaseYearPreferentialTax(qualifiedDividends(2022)),
     5_843,
@@ -34,7 +35,7 @@ Deno.test("Schedule J base-year qualified-dividend worksheets use year-specific 
   );
 });
 
-Deno.test("Schedule J QDCG worksheet taxes Form 4952 elected dividends at ordinary rates", () => {
+test("Schedule J QDCG worksheet taxes Form 4952 elected dividends at ordinary rates", () => {
   assertEquals(
     calculateScheduleJBaseYearPreferentialTax({
       ...qualifiedDividends(2024),
@@ -44,7 +45,7 @@ Deno.test("Schedule J QDCG worksheet taxes Form 4952 elected dividends at ordina
   );
 });
 
-Deno.test("Schedule J base-year QDCG cannot silently absorb elected capital gain or Form 2555", () => {
+test("Schedule J base-year QDCG cannot silently absorb elected capital gain or Form 2555", () => {
   assertThrows(
     () =>
       calculateScheduleJBaseYearPreferentialTax(
@@ -86,14 +87,14 @@ const scheduleD2024: ScheduleJBaseYearPreferentialFacts = {
   allocatedElectedUnrecaptured1250Gain: 0,
 };
 
-Deno.test("2024 Schedule D worksheet computes section 1250 gain and ordinary tax", () => {
+test("2024 Schedule D worksheet computes section 1250 gain and ordinary tax", () => {
   assertEquals(
     calculateScheduleJBaseYearPreferentialTax(scheduleD2024),
     16_353,
   );
 });
 
-Deno.test("2024 Schedule D worksheet allocates elected gain onto the prior-year gain lines", () => {
+test("2024 Schedule D worksheet allocates elected gain onto the prior-year gain lines", () => {
   assertEquals(
     calculateScheduleJBaseYearPreferentialTax({
       ...scheduleD2024,
@@ -107,7 +108,7 @@ Deno.test("2024 Schedule D worksheet allocates elected gain onto the prior-year 
   );
 });
 
-Deno.test("2022 and 2023 Schedule D routes close on conflicting official worksheet line references", () => {
+test("2022 and 2023 Schedule D routes close on conflicting official worksheet line references", () => {
   for (const year of [2022, 2023] as const) {
     assertThrows(
       () =>
@@ -116,4 +117,25 @@ Deno.test("2022 and 2023 Schedule D routes close on conflicting official workshe
       "conflict",
     );
   }
+});
+
+// A 2026 return's line 16 base year. 2025 Form 1040 instructions, Qualified
+// Dividends and Capital Gain Tax Worksheet line 6 ($48,350) and line 13
+// ($533,400), with the 2025 rates on lines 22 and 24: $1,650 at 15% plus
+// $4,561.50 on $40,000 is $4,809, below $5,914 on $50,000.
+test("Schedule J 2025 base-year qualified-dividend worksheet uses the 2025 amounts", () => {
+  assertEquals(
+    calculateScheduleJBaseYearPreferentialTax(qualifiedDividends(2025)),
+    4_809,
+  );
+});
+
+// 2025 Schedule D instructions, Schedule D Tax Worksheet lines 15 ($48,350),
+// 19 ($197,300) and 26 ($533,400): $10,000 at 15% plus $14,714 on $90,000 at
+// the 2025 rates is $16,214, below $16,914 on $100,000.
+test("2025 Schedule D worksheet computes a 2026 return's line 16 base-year tax", () => {
+  assertEquals(
+    calculateScheduleJBaseYearPreferentialTax({ ...scheduleD2024, year: 2025 }),
+    16_214,
+  );
 });

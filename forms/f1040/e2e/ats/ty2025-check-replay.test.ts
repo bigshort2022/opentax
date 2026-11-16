@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { atsSourceReconciliation } from "./ty2025-source-reconciliation.ts";
 import { buildAtsCheckLedger } from "./ty2025-check-ledger.ts";
 import { assertEquals, assertThrows } from "@std/assert";
@@ -11,7 +12,7 @@ import {
 } from "./ty2025-check-replay.ts";
 import { TY2025_ATS_CASES } from "./ty2025_cases.ts";
 
-Deno.test("ATS check replay never treats an absent amount as a calculated zero", () => {
+test("ATS check replay never treats an absent amount as a calculated zero", () => {
   const check = {
     path: "f1040.line24_total_tax",
     expected: 0,
@@ -33,7 +34,7 @@ Deno.test("ATS check replay never treats an absent amount as a calculated zero",
   );
 });
 
-Deno.test("ATS public-entry matrix retains missing prerequisites and printed conflicts across all eight scenarios", async () => {
+test("ATS public-entry matrix retains missing prerequisites and printed conflicts across all eight scenarios", async () => {
   const report = await replayAtsChecks();
   assertEquals(
     report.scenarios.map((s) => s.id),
@@ -61,14 +62,23 @@ Deno.test("ATS public-entry matrix retains missing prerequisites and printed con
     ledger.sourceReconciliations.filter((s) =>
       s.preparationResult === PreparationResult.PartialPrepared
     ).map((s) => s.scenario),
-    ["1040-04", "1040-05", "1040-13"],
+    [
+      "1040-01",
+      "1040-02",
+      "1040-03",
+      "1040-04",
+      "1040-05",
+      "1040-08",
+      "1040-12",
+      "1040-13",
+    ],
   );
   const retirement = ledger.sourceReconciliations.find((s) =>
     s.scenario === "1040-08"
   )!;
   assertEquals(
-    retirement.firstPreparationReason.includes("box 2 recipient"),
-    true,
+    retirement.preparationResult,
+    PreparationResult.PartialPrepared,
   );
   assertEquals(retirement.notes.some((n) => n.includes("QCD")), true);
   assertEquals(retirement.notes.some((n) => n.includes("1099-DIV")), true);
@@ -76,46 +86,45 @@ Deno.test("ATS public-entry matrix retains missing prerequisites and printed con
   assertEquals(ledger.byKind, {
     calculation: {
       count: 90,
-      counts: { different: 23, match: 61, "not-produced": 6 },
+      counts: { different: 19, match: 69, "not-produced": 2 },
     },
     "document-copy": {
       count: 56,
-      counts: { missing: 12, "not-evaluated": 34, present: 10 },
+      counts: { present: 56 },
     },
     "binary-attachment": {
       count: 2,
-      counts: { missing: 1, "not-evaluated": 1 },
+      counts: { "present-in-verified-manifest": 2 },
     },
     "native-retirement-value": {
       count: 30,
-      counts: { "not-evaluated": 30 },
+      counts: { match: 30 },
     },
     "native-w2-value": {
       count: 80,
-      counts: { match: 30, "not-evaluated": 50 },
+      counts: { match: 80 },
     },
     "native-value": {
       count: 85,
       counts: {
-        different: 10,
-        match: 24,
+        different: 17,
+        match: 66,
         "missing-field": 2,
-        "not-evaluated": 49,
       },
     },
   });
-  assertEquals(ledger.calculationAnchor.matching, 56);
-  assertEquals(ledger.calculationAnchor.evaluated, 79);
-  assertEquals(ledger.calculationAnchor.notProduced, 6);
+  assertEquals(ledger.calculationAnchor.matching, 64);
+  assertEquals(ledger.calculationAnchor.evaluated, 83);
+  assertEquals(ledger.calculationAnchor.notProduced, 2);
   assertEquals(ledger.calculationAnchor.provisional, 5);
-  assertEquals(ledger.calculationAnchor.percent, 100 * 56 / 79);
+  assertEquals(ledger.calculationAnchor.percent, 100 * 64 / 83);
   assertEquals(ledger.attachmentRequirementsNotInventoried.length, 0);
   // Distinct W2 copy identities survive; blocked copies are not labeled missing.
   assertEquals(
     ledger.rows.filter((r) => r.id.startsWith("1040-01:document:W-2:")).map((
       r,
     ) => r.result),
-    ["not-evaluated", "not-evaluated"],
+    ["present", "present"],
   );
 
   const native13 = report.scenarios.find((s) => s.id === "1040-13")!
@@ -145,14 +154,38 @@ Deno.test("ATS public-entry matrix retains missing prerequisites and printed con
   assertEquals(native13.unmappedTargetPaths, [
     "f1040.line12a_standard_deduction",
   ]);
+  // Scenario 12 differences are its documented 15,000 deduction and omitted
+  // Form 8995 answer-key conflicts.
+  const native12 = report.scenarios.find((s) => s.id === "1040-12")!
+    .preparation.nativeValueCoverage;
+  assertEquals(
+    native12.rows.filter((r) => r.result === "different").map((
+      r,
+    ) => [r.path, r.expected, r.actual]),
+    [
+      ["f1040.line14_deductions_qbi_total", 15000, 20072],
+      ["f1040.line18_total_tax_before_credits", 18634, 17436],
+      ["f1040.line22_tax_after_credits", 18634, 17436],
+      ["f1040.line15_taxable_income", 107445, 102373],
+      ["f1040.line16_income_tax", 18634, 17436],
+      ["f1040.line24_total_tax", 22072, 20874],
+      ["f1040.line37_amount_owed", 7628, 6430],
+    ],
+  );
   const transfer = report.scenarios.find((s) => s.id === "1040-04")!;
-  assertEquals(transfer.preparation.attachments, []);
+  const statement = {
+    description: "Transfer Election Statement",
+    fileName: "Transfer Election Statement.pdf",
+    byteLength: 792,
+    sha256: "5dd494c2ff29f13af108af76f27e6e2c3936b0ff5de009ed38b2abb080f5f523",
+  };
+  assertEquals(transfer.preparation.attachments, [statement]);
   assertEquals(transfer.attachmentCoverage.knownRequiredCount, 1);
-  assertEquals(transfer.attachmentCoverage.allKnownRequiredPresent, false);
+  assertEquals(transfer.attachmentCoverage.allKnownRequiredPresent, true);
   assertEquals(transfer.attachmentCoverage.rows, [{
     description: "Transfer Election Statement",
-    result: "missing",
-    observed: [],
+    result: "present-in-verified-manifest",
+    observed: [statement],
   }]);
   for (const scenario of report.scenarios) {
     const coverage = scenario.attachmentCoverage;
@@ -163,7 +196,20 @@ Deno.test("ATS public-entry matrix retains missing prerequisites and printed con
       /^[a-f0-9]{64}$/.test(coverage.coverSheetReview!.sourceSha256),
       true,
     );
-    if (!["1040-04", "1040-05", "1040-13"].includes(scenario.id)) {
+    if (
+      ![
+        "1040-01",
+        "1040-02",
+        "1040-03",
+        "1040-04",
+        "1040-05",
+        "1040-08",
+        "1040-12",
+        "1040-13",
+      ].includes(
+        scenario.id,
+      )
+    ) {
       assertEquals(coverage.allKnownRequiredPresent, null);
     }
   }
@@ -171,8 +217,14 @@ Deno.test("ATS public-entry matrix retains missing prerequisites and printed con
     report.scenarios.find((s) => s.id === "1040-02")!.attachmentCoverage.rows,
     [{
       description: "Nonresident Spouse Choice Statement",
-      result: "not-evaluated",
-      observed: null,
+      result: "present-in-verified-manifest",
+      observed: [{
+        description: "Nonresident Spouse Choice Statement",
+        fileName: "NonresidentSpouseChoiceStatement.pdf",
+        byteLength: 1044,
+        sha256:
+          "9d8f56b1ba14a8b03818617a389123e88edda9761032a82adfa9183b7803e22f",
+      }],
     }],
   );
   const documents = report.scenarios.map((s) => ({
@@ -182,13 +234,13 @@ Deno.test("ATS public-entry matrix retains missing prerequisites and printed con
     present: s.documentCoverage.allRequiredCopiesPresent,
   }));
   assertEquals(documents, [
-    { id: "1040-01", observed: 0, required: 7, present: false },
-    { id: "1040-02", observed: 0, required: 7, present: false },
-    { id: "1040-03", observed: 0, required: 9, present: false },
-    { id: "1040-04", observed: 2, required: 7, present: false },
-    { id: "1040-05", observed: 2, required: 9, present: false },
-    { id: "1040-08", observed: 0, required: 3, present: false },
-    { id: "1040-12", observed: 0, required: 8, present: false },
+    { id: "1040-01", observed: 7, required: 7, present: true },
+    { id: "1040-02", observed: 7, required: 7, present: true },
+    { id: "1040-03", observed: 9, required: 9, present: true },
+    { id: "1040-04", observed: 7, required: 7, present: true },
+    { id: "1040-05", observed: 9, required: 9, present: true },
+    { id: "1040-08", observed: 3, required: 3, present: true },
+    { id: "1040-12", observed: 8, required: 8, present: true },
     { id: "1040-13", observed: 6, required: 6, present: true },
   ]);
   assertEquals(
@@ -196,7 +248,7 @@ Deno.test("ATS public-entry matrix retains missing prerequisites and printed con
       .documentCoverage.rows.filter((r) => r.missingCopies).map((r) =>
         r.sourceForm
       ),
-    ["Schedule 3", "3800", "8835", "8936", "8936 Schedule A"],
+    [],
   );
 
   assertEquals(
@@ -205,41 +257,54 @@ Deno.test("ATS public-entry matrix retains missing prerequisites and printed con
   );
   assertEquals(
     report.scenarios.find((s) => s.id === "1040-04")!.preparation.documentRoots,
-    ["IRS1040", "IRSW2"],
-  );
-  assertEquals(
-    report.scenarios.find((s) => s.id === "1040-01")!.preparation.result,
-    PreparationResult.NativeBlocked,
-  );
-  for (const id of ["1040-02", "1040-03"]) {
-    const scenario = report.scenarios.find((s) => s.id === id)!;
-    assertEquals(scenario.diagnostics, []);
-    if (id === "1040-02") {
-      assertEquals(
-        scenario.checks.every((c) => c.result === CheckResult.Match),
-        true,
-      );
-    }
-    assertEquals(scenario.preparation.result, PreparationResult.NativeBlocked);
-  }
-  assertEquals(report.counts, { match: 61, different: 23, "not-produced": 6 });
-  const farm = report.scenarios.find((s) => s.id === "1040-03")!;
-  assertEquals(
-    farm.checks.filter((c) => c.result !== CheckResult.Match).map(
-      (c) => [c.path, c.expected, c.actual, c.result],
-    ),
     [
-      ["schedule1.line1_state_refund", 3110, null, CheckResult.NotProduced],
-      ["f1040.line8_additional_income", 17422, 14312, CheckResult.Different],
-      ["f1040.line9_total_income", 72235, 69125, CheckResult.Different],
+      "IRS1040",
+      "IRS1040Schedule3",
+      "IRS3800",
+      "IRS6251",
+      "IRS8835",
+      "IRS8936",
+      "IRS8936ScheduleA",
+      "IRSW2",
+      "BinaryAttachment",
     ],
   );
+  for (const id of ["1040-01", "1040-02"]) {
+    const scenario = report.scenarios.find((s) => s.id === id)!;
+    assertEquals(scenario.diagnostics, []);
+    assertEquals(
+      scenario.checks.every((c) => c.result === CheckResult.Match),
+      true,
+    );
+    assertEquals(
+      scenario.preparation.result,
+      PreparationResult.PartialPrepared,
+    );
+  }
+  assertEquals(report.counts, { match: 69, different: 19, "not-produced": 2 });
+  for (const id of ["1040-03", "1040-08"]) {
+    const scenario = report.scenarios.find((s) => s.id === id)!;
+    assertEquals(scenario.diagnostics, []);
+    assertEquals(
+      scenario.checks.every((c) => c.result === CheckResult.Match),
+      true,
+    );
+  }
   assertEquals(
-    transfer.checks.filter((c) => c.result === CheckResult.NotProduced)
-      .map((c) => [c.path, c.expected]),
+    transfer.checks.map((c) => [c.path, c.expected, c.result]),
     [
-      ["f3800.f8835_credit_entries.0.credit_amount", 13200],
-      ["f3800.f8936_new_vehicle_credit.credit_amount", 130],
+      ["f1040.line1a_wages", 36014, CheckResult.Match],
+      ["f1040.line25a_w2_withheld", 4581, CheckResult.Match],
+      [
+        "f3800.f8835_credit_entries.0.transfer_in_amount",
+        13200,
+        CheckResult.Match,
+      ],
+      [
+        "f3800.f8936_new_vehicle_credit.credit_amount",
+        130,
+        CheckResult.Match,
+      ],
     ],
   );
   // Preserve every printed AMT target, including stale tax limits and absent
@@ -288,7 +353,7 @@ Deno.test("ATS public-entry matrix retains missing prerequisites and printed con
   );
 });
 
-Deno.test("ATS reconciliation requires a reviewed scenario and protects retained notes from report mutation", () => {
+test("ATS reconciliation requires a reviewed scenario and protects retained notes from report mutation", () => {
   assertThrows(
     () => atsSourceReconciliation("1040-99"),
     Error,

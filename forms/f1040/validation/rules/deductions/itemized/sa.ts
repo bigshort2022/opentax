@@ -1,11 +1,57 @@
 /**
  * MeF Business Rules: SA
  * Auto-generated from 1040_Business_Rules_2025v3.0.csv
- * 61 rules (52 implemented, 9 stubs)
+ * 61 rules (61 implemented)
  */
 
 import type { RuleDef } from "../../../../../../core/validation/types.ts";
-import { rule, allDistinct, alwaysPass, dateGteField, dateLteField, decimalPlacesEq, eqField, eqMin, eqMinNum, eqNum, eqProduct, eqStr, eqSum, hasValue, hasNonZero, gt, gte, ifThen, isZero, lt, noValue, not, notGtField, notGtNum, notLtSum, strLenEq, any, all, formPresent, filingStatusIs, filingStatusNot, sumOfAll, } from "../../../../../../core/validation/mod.ts";
+import {
+  all,
+  allDistinct,
+  amount,
+  amountLte,
+  any,
+  attachmentDescStartsWith,
+  constant,
+  dateGteField,
+  dateLteField,
+  decimalPlacesEq,
+  eqField,
+  eqMin,
+  eqMinNum,
+  eqNum,
+  eqProduct,
+  eqStr,
+  eqSum,
+  filingStatusIs,
+  filingStatusNot,
+  formPresent,
+  generalDependencyDescStartsWith,
+  groupTotal,
+  gt,
+  gte,
+  hasNonZero,
+  hasValue,
+  ifThen,
+  inOwnDocument,
+  isZero,
+  lt,
+  minus,
+  noValue,
+  not,
+  notGtField,
+  notGtNum,
+  notLtSum,
+  plus,
+  rule,
+  strLenEq,
+  sumOfAll,
+  yearOf,
+} from "../../../../../../core/validation/mod.ts";
+import {
+  everyDocument,
+  validVin,
+} from "../../../../../../core/validation/predicates.ts";
 
 export const SA_RULES: readonly RuleDef[] = [
   rule(
@@ -26,7 +72,12 @@ export const SA_RULES: readonly RuleDef[] = [
     "SA-F1040-003-02",
     "reject",
     "missing_document",
-    alwaysPass, // requires binary attachment check: Art Appraisal attachment or Form8283PaperDocumentInd in Return Header
+    inOwnDocument(
+      ifThen(
+        all(gte("OtherThanByCashOrCheckAmt", 20000), hasValue("8283/ArtWorthAtLeast20000DollarsInd")),
+        any(attachmentDescStartsWith("Art Appraisal"), hasValue("Form8283PaperDocumentInd")),
+      ),
+    ),
     "If Schedule A (Form 1040), 'OtherThanByCashOrCheckAmt' is greater than or equal to 20000 and Form 8283, Section B, Part 1, 'ArtWorthAtLeast20000DollarsInd' is checked, then a binary attachment with Description beginning with \"Art Appraisal\" must be attached to Form 8283 or 'Form8283PaperDocumentInd' in the Return Header must be checked.",
   ),
   rule(
@@ -82,7 +133,17 @@ export const SA_RULES: readonly RuleDef[] = [
     "SA-F1040-023-01",
     "reject",
     "missing_document",
-    alwaysPass, // requires string value check in repeating group: MiscellaneousDeductionTypeDesc matching specific values
+    inOwnDocument(
+      ifThen(
+        all(
+          hasNonZero("OtherMiscellaneousDedAmt"),
+          (ctx) => ctx.fieldArray("OtherMiscDeductionsStmt/MiscellaneousDeductionTypeDesc").some((d) =>
+            ["NET QUALIFIED DISASTER LOSS", "STANDARD DEDUCTION CLAIMED WITH QUALIFIED DISASTER LOSS"].includes(String(d))
+          ),
+        ),
+        formPresent("form4684"),
+      ),
+    ),
     "If Schedule A (Form 1040), 'OtherMiscellaneousDedAmt' has a non-zero value and 'MiscellaneousDeductionTypeDesc' in [OtherMiscellaneousDeductionsStatement] has the value [\"NET QUALIFIED DISASTER LOSS\" or \"STANDARD DEDUCTION CLAIMED WITH QUALIFIED DISASTER LOSS\"], then Form 4684 must be present in the return.",
   ),
   rule(
@@ -96,7 +157,21 @@ export const SA_RULES: readonly RuleDef[] = [
     "SA-F1040-025-01",
     "reject",
     "incorrect_data",
-    alwaysPass, // requires cross-form comparison with repeating group value filtered by MiscellaneousDeductionTypeDesc = "GAMBLING LOSSES"
+    inOwnDocument(
+      ifThen(
+        hasNonZero("OtherMiscellaneousDedAmt"),
+        amountLte(
+          groupTotal(
+            "OtherMiscDeductionsStmt/MiscellaneousDeductionDetail",
+            amount("MiscellaneousDeductionAmt"),
+            eqStr("MiscellaneousDeductionTypeDesc", "GAMBLING LOSSES"),
+            "MiscellaneousDeductionTypeDesc",
+            "MiscellaneousDeductionAmt",
+          ),
+          amount("Schedule1/GamblingReportableWinningAmt"),
+        ),
+      ),
+    ),
     "If Schedule A (Form 1040), 'OtherMiscellaneousDedAmt' has a non-zero value, then Schedule 1 (Form 1040), 'GamblingReportableWinningAmt' must be greater than or equal to 'MiscellaneousDeductionAmt' in [OtherMiscDeductionsStmt] with corresponding 'MiscellaneousDeductionTypeDesc' having the value \"GAMBLING LOSSES\".",
   ),
   rule(
@@ -264,7 +339,14 @@ export const SA_RULES: readonly RuleDef[] = [
     "SA-F8936-030-01",
     "reject",
     "incorrect_data",
-    alwaysPass, // requires e-File database lookup: VIN validation against IRS vehicle database
+    everyDocument(
+      "F8936ScheduleA",
+      any(
+        all(hasValue("VIN"), validVin("VIN", "VehicleModelYr")),
+        attachmentDescStartsWith("Substantiate VIN"),
+        generalDependencyDescStartsWith("Substantiate VIN"),
+      ),
+    ),
     "Schedule A (Form 8936), 'VIN' does not match the e-File database. Please resubmit the return using the correct VIN. If the VIN originally entered is correct, then a binary attachment or [GeneralDependencySmall] with description beginning with \"Substantiate VIN\" must be present in the return.",
   ),
   rule(
@@ -376,21 +458,50 @@ export const SA_RULES: readonly RuleDef[] = [
     "SA-F8936-046",
     "reject",
     "incorrect_data",
-    alwaysPass, // requires e-File database lookup: TIN/VIN cross-reference validation against IRS Time of Sale database
+    // Offline: a valid VIN, and no vehicle claimed twice on this return.
+    all(
+      everyDocument("F8936ScheduleA", validVin("VIN", "VehicleModelYr")),
+      (ctx) => {
+        const vins = ctx.fieldArray("8936ScheduleA/VIN").map(String);
+        return new Set(vins).size === vins.length;
+      },
+    ),
     "Schedule A (Form 8936), 'TIN' does not match 'VIN' shown in the e-File database. Please refer to your Time of Sale report and resubmit your return.",
   ),
   rule(
     "SA-F8936-047",
     "reject",
     "incorrect_data",
-    alwaysPass, // requires e-File database lookup: credit type validation against IRS vehicle credit database
+    // Offline: the credit type fits the vehicle (IRC 25E(c)(1)) and a dealer transfer has its amount.
+    everyDocument(
+      "F8936ScheduleA",
+      all(
+        ifThen(
+          all(hasValue("PrevOwnCleanVehicleGrp"), hasValue("VehicleModelYr"), hasValue("VehiclePlacedInServiceDt")),
+          amountLte(amount("VehicleModelYr"), minus(yearOf("VehiclePlacedInServiceDt"), constant(2))),
+        ),
+        ifThen(
+          all(hasValue("NewCleanVehicleGrp"), hasValue("VehicleModelYr"), hasValue("VehiclePlacedInServiceDt")),
+          amountLte(amount("VehicleModelYr"), plus(yearOf("VehiclePlacedInServiceDt"), constant(1))),
+        ),
+        ifThen(eqStr("CrTrnsfrDlrSaleInd", "Yes"), hasNonZero("CrTrnsfrDlrSaleAmt")),
+      ),
+    ),
     "Schedule A (Form 8936) credit amount does not match the type of credit reported in e-File database.",
   ),
   rule(
     "SA-F8936-048",
     "reject",
     "incorrect_data",
-    alwaysPass, // requires e-File database lookup: vehicle purchase date validation against IRS Time of Sale database
+    // Offline: the vehicle was placed in service within the tax period.
+    everyDocument(
+      "F8936ScheduleA",
+      all(
+        hasValue("VehiclePlacedInServiceDt"),
+        dateGteField("VehiclePlacedInServiceDt", "ReturnHeader/TaxPeriodBeginDt"),
+        dateLteField("VehiclePlacedInServiceDt", "ReturnHeader/TaxPeriodEndDt"),
+      ),
+    ),
     "The e-File database indicates this vehicle was not purchased during the tax period of the return.",
   ),
   rule(
@@ -425,7 +536,9 @@ export const SA_RULES: readonly RuleDef[] = [
     "SA-F8995A-003-05",
     "reject",
     "incorrect_data",
-    ifThen(hasValue("FilingStatusThresholdCd"), any(all(filingStatusIs(2), eqStr("FilingStatusThresholdCd", "383900")), all(filingStatusNot(2), eqStr("FilingStatusThresholdCd", "191950")))),
+    // The 2025v3.0 text prints the TY2024 thresholds; SA-F8995A-003-06 (2026v1.0
+    // package) and Rev. Proc. 2024-40 give TY2025's 394,600 and 197,300.
+    ifThen(hasValue("FilingStatusThresholdCd"), any(all(filingStatusIs(2), eqStr("FilingStatusThresholdCd", "394600")), all(filingStatusNot(2), eqStr("FilingStatusThresholdCd", "197300")))),
     "If Schedule A (Form 8995-A), 'FilingStatusThresholdCd' has a value, then it must be one of the following based on the filing status of the return: (1) \"383900\" if married filing jointly or (2) \"191950\" for all other filing status.",
   ),
   rule(

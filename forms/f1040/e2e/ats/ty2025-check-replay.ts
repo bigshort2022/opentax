@@ -1,3 +1,4 @@
+import * as fs from "node:fs/promises";
 import { atsSourceReconciliation } from "./ty2025-source-reconciliation.ts";
 import {
   ATS_RETIREMENT_TARGETS,
@@ -11,18 +12,28 @@ import {
 } from "./ty2025-w2-value-coverage.ts";
 import { compareAtsNativeValues } from "./ty2025-native-value-coverage.ts";
 import { compareAtsAttachments } from "./ty2025-attachment-coverage.ts";
+import type { MefPdfAttachment } from "../../2025/mef/form-descriptor.ts";
 import { assertPreparedAttachmentManifest } from "../../2025/mef/attachments/prepared-attachment-manifest.ts";
 import { compareAtsDocuments } from "./ty2025-document-coverage.ts";
 import { z } from "zod";
 import { extractFilerIdentity } from "../../mef/filer.ts";
 import { f1040_2025 } from "../../2025/index.ts";
 import { scenario104001Input } from "./scenario_1040_01_input.ts";
-import { scenario104002Input } from "./scenario_1040_02_input.ts";
+import {
+  scenario104002Attachments,
+  scenario104002Input,
+} from "./scenario_1040_02_input.ts";
 import { scenario104003Input } from "./scenario_1040_03_input.ts";
-import { scenario104004Input } from "./scenario_1040_04_input.ts";
-import { scenario104005PartialInput } from "./scenario_1040_05_input.ts";
+import {
+  scenario104004Attachments,
+  scenario104004Input,
+} from "./scenario_1040_04_input.ts";
+import {
+  scenario104005Input,
+  scenario104005RetainedSourceDocuments,
+} from "./scenario_1040_05_input.ts";
 import { scenario104008Input } from "./scenario_1040_08_input.ts";
-import { scenario104012PartialInput } from "./scenario_1040_12_input.ts";
+import { scenario104012Input } from "./scenario_1040_12_input.ts";
 import { scenario104013CurrentLawInput } from "./scenario_1040_13_input.ts";
 import { TY2025_ATS_CASES } from "./ty2025_cases.ts";
 
@@ -184,10 +195,10 @@ export const ATS_REPLAY_TARGETS = z.array(scenarioSchema).parse([
       ...wage(36014, 4581),
       // One printed solar source; this checks its deposit, not allowed credit.
       target(
-        "f3800.f8835_credit_entries.0.credit_amount",
+        "f3800.f8835_credit_entries.0.transfer_in_amount",
         13200,
         TargetBasis.Printed,
-        "Form3800 line1f; source eligibility and line placement unresolved",
+        "Form3800 line1f column (f); purchased under section 6418",
       ),
       target(
         "f3800.f8936_new_vehicle_credit.credit_amount",
@@ -429,16 +440,25 @@ export const ATS_REPLAY_TARGETS = z.array(scenarioSchema).parse([
     ],
   },
 ]);
-const inputs = {
+export const ATS_SCENARIO_INPUTS = {
   "1040-01": scenario104001Input,
   "1040-02": scenario104002Input,
   "1040-03": scenario104003Input,
   "1040-04": scenario104004Input,
-  "1040-05": scenario104005PartialInput,
+  "1040-05": scenario104005Input,
   "1040-08": scenario104008Input,
-  "1040-12": scenario104012PartialInput,
+  "1040-12": scenario104012Input,
   "1040-13": scenario104013CurrentLawInput,
 } as const;
+const sourceFiles: Readonly<
+  Record<string, () => MefPdfAttachment[] | Promise<MefPdfAttachment[]>>
+> = {
+  "1040-02": scenario104002Attachments,
+  "1040-04": scenario104004Attachments,
+};
+const retainedFiles: Readonly<
+  Record<string, () => Parameters<typeof f1040_2025.prepareReturn>[3]>
+> = { "1040-05": scenario104005RetainedSourceDocuments };
 
 export function compareAtsTarget(
   pending: unknown,
@@ -471,6 +491,7 @@ async function replayPreparation(
   targets: z.infer<typeof targetSchema>[],
   w2Targets: readonly W2Target[],
   retirementTargets: readonly IssuedCopyTarget[],
+  id: string,
 ) {
   if (execution.diagnostics.some((d) => d.severity === "error")) {
     return {
@@ -490,6 +511,8 @@ async function replayPreparation(
     const prepared = await f1040_2025.prepareReturn(
       execution.pending,
       extractFilerIdentity(execution.pending.f1040),
+      await sourceFiles[id]?.() ?? [],
+      retainedFiles[id]?.() ?? [],
     );
     await assertPreparedAttachmentManifest(prepared.bundle);
     return {
@@ -533,21 +556,23 @@ export async function replayAtsChecks() {
   const scenarios = await Promise.all(
     ATS_REPLAY_TARGETS.map(async (scenario) => {
       const source = TY2025_ATS_CASES.find((s) => s.id === scenario.id)!;
-      const factory = inputs[scenario.id as keyof typeof inputs];
+      const factory =
+        ATS_SCENARIO_INPUTS[scenario.id as keyof typeof ATS_SCENARIO_INPUTS];
       if (!source || !factory) {
         throw new Error(`Missing ATS source/input ${scenario.id}`);
       }
-      const execution = f1040_2025.executeReturn(factory());
+      const execution = f1040_2025.executeReturn(await factory());
       const preparation = await replayPreparation(
         execution,
         scenario.targets,
         ATS_W2_TARGETS[scenario.id] ?? [],
         ATS_RETIREMENT_TARGETS[scenario.id] ?? [],
+        scenario.id,
       );
       return {
         id: scenario.id,
         sourceUrl: source.sourceUrl,
-        interpretation: scenario.id === "1040-13"
+        interpretation: ["1040-12", "1040-13"].includes(scenario.id)
           ? "Current-law reconstruction; printed ATS targets preserved"
           : "Partial source fixture",
         requiredSourceDocuments: source.forms,
@@ -603,6 +628,7 @@ export async function replayAtsChecks() {
 }
 if (import.meta.main) {
   const report = JSON.stringify(await replayAtsChecks(), null, 2) + "\n";
-  if (Deno.args[0]) await Deno.writeTextFile(Deno.args[0], report);
-  else console.log(report);
+  if (process.argv.slice(2)[0]) {
+    await fs.writeFile(process.argv.slice(2)[0], report);
+  } else console.log(report);
 }

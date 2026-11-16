@@ -5,6 +5,10 @@ import { TaxNode } from "../../../../../../../core/types/tax-node.ts";
 import { OutputNodes } from "../../../../../../../core/types/output-nodes.ts";
 import { f1040 } from "../../../../outputs/general/return-assembly/f1040/index.ts";
 import type { NodeContext } from "../../../../../../../core/types/node-context.ts";
+import {
+  type EstimatedTaxPayment,
+  EstimatedTaxQuarter,
+} from "../../../../inputs/taxes/underpayment/f2210/calculation.ts";
 
 // Form 1040-ES — Estimated Tax for Individuals
 // Captures quarterly estimated tax payments made during the year.
@@ -13,8 +17,10 @@ import type { NodeContext } from "../../../../../../../core/types/node-context.t
 
 const ssn = z.string().regex(/^\d{3}-?\d{2}-?\d{4}$/);
 const reference = z.string().trim().min(1);
+// Each payment row names its tax year; compute() requires the return's year.
+const taxYear = z.number().int().min(2025);
 const quarterPaymentSchema = z.object({
-  tax_year: z.literal(2025),
+  tax_year: taxYear,
   quarter: z.enum(["q1", "q2", "q3", "q4"]),
   amount: z.number().positive(),
   payer_tin: ssn,
@@ -22,7 +28,7 @@ const quarterPaymentSchema = z.object({
   payment_record_reference: reference,
 }).strict();
 const jointPaymentRowSchema = z.object({
-  tax_year: z.literal(2025),
+  tax_year: taxYear,
   quarter: z.enum(["q1", "q2", "q3", "q4"]),
   joint_payment_amount: z.number().int().positive(),
   taxpayer_allocated_amount: z.number().int().positive(),
@@ -36,12 +42,10 @@ const mfsJointPaymentRowSchema = jointPaymentRowSchema.omit({
 
 const divorcedJointAllocationSchema = z.object({
   allocation_method: z.literal("signed_mutual_agreement"),
-  divorce_date_2025: z.string().date().refine((value) =>
-    value.startsWith("2025-")
-  ),
+  divorce_date: z.string().date(),
   taxpayer_ssn: ssn,
   former_spouse_ssn: ssn,
-  not_remarried_in_2025_verified: z.literal(true),
+  not_remarried_in_tax_year_verified: z.literal(true),
   no_name_change_since_payment_verified: z.literal(true),
   agreement_signed_by_both_verified: z.literal(true),
   signed_agreement_reference: reference,
@@ -60,6 +64,21 @@ const mfsJointAllocationSchema = z.object({
   signed_agreement_pdf_base64: z.string().trim().min(1),
   payments: z.array(mfsJointPaymentRowSchema).min(1).max(4),
 }).strict();
+// TY2025 names the prior return by year; the prior-year form serves any year.
+const appliedCreditReviewSchema = z.union([
+  z.object({
+    accepted_2024_return_reference: reference,
+    irs_account_credit_record_reference: reference,
+    applied_amount: z.number().positive(),
+    joint_2024_former_spouse_ssn: ssn.optional(),
+  }).strict(),
+  z.object({
+    accepted_prior_year_return_reference: reference,
+    irs_account_credit_record_reference: reference,
+    applied_amount: z.number().positive(),
+    joint_prior_year_former_spouse_ssn: ssn.optional(),
+  }).strict(),
+]);
 const jointAllocationSchema = z.union([
   divorcedJointAllocationSchema,
   mfsJointAllocationSchema,
@@ -77,19 +96,19 @@ export const inputSchema = z.object({
   quarter_payment_records: z.array(quarterPaymentSchema).optional(),
   // Actual payment dates — used to determine whether each quarterly payment was
   // timely for underpayment penalty purposes (IRC §6654); ISO 8601 date strings
-  payment_q1_date: z.string().optional()
+  payment_q1_date: z.string().date().optional()
     .describe(
       "Date Q1 estimated payment was made (ISO 8601, e.g. '2025-04-15')",
     ),
-  payment_q2_date: z.string().optional()
+  payment_q2_date: z.string().date().optional()
     .describe(
       "Date Q2 estimated payment was made (ISO 8601, e.g. '2025-06-16')",
     ),
-  payment_q3_date: z.string().optional()
+  payment_q3_date: z.string().date().optional()
     .describe(
       "Date Q3 estimated payment was made (ISO 8601, e.g. '2025-09-15')",
     ),
-  payment_q4_date: z.string().optional()
+  payment_q4_date: z.string().date().optional()
     .describe(
       "Date Q4 estimated payment was made (ISO 8601, e.g. '2026-01-15')",
     ),
@@ -100,10 +119,57 @@ export const inputSchema = z.object({
     .describe(
       "Overpayment from prior year applied to current year estimated tax (Form 1040 line 26)",
     ),
+  // The accepted prior-year return elected the credit and the IRS account
+  // shows it posted to this year. A credit from a joint prior-year return
+  // names the former spouse.
+  prior_year_applied_credit_review: appliedCreditReviewSchema.optional(),
   joint_estimated_payment_allocation: jointAllocationSchema.optional(),
 });
 
-/** Reconcile signed allocations of joint 2025 payments for separate filers. */
+/** The former spouse on a joint prior-year return whose credit is applied. */
+export function appliedCreditFormerSpouseSsn(
+  review: z.infer<typeof appliedCreditReviewSchema>,
+): string | undefined {
+  return "accepted_2024_return_reference" in review
+    ? review.joint_2024_former_spouse_ssn
+    : review.joint_prior_year_former_spouse_ssn;
+}
+
+/** Year-dated rows and answers must match the return being filed. */
+function assertPaymentYear(
+  input: z.infer<typeof inputSchema>,
+  year: number,
+): void {
+  const allocation = input.joint_estimated_payment_allocation;
+  const rows = [
+    ...(input.quarter_payment_records ?? []),
+    ...(allocation?.payments ?? []),
+  ];
+  if (rows.some((row) => row.tax_year !== year)) {
+    throw new Error(
+      `Form 1040 line 26 payment records must be for tax year ${year}`,
+    );
+  }
+  if (
+    allocation !== undefined && "divorce_date" in allocation &&
+    !allocation.divorce_date.startsWith(`${year}-`)
+  ) {
+    throw new Error(
+      `Form 1040 line 26 divorced joint-payment allocation needs a ${year} divorce`,
+    );
+  }
+  if (
+    year !== 2025 &&
+    input.prior_year_applied_credit_review !== undefined &&
+    "accepted_2024_return_reference" in input.prior_year_applied_credit_review
+  ) {
+    throw new Error(
+      `Form 1040 line 26 2024-return facts do not apply to ${year}`,
+    );
+  }
+}
+
+/** Reconcile signed allocations of joint estimated payments for separate filers. */
 export function reviewedJointAllocation(
   input: z.infer<typeof inputSchema>,
 ): z.infer<typeof jointAllocationSchema> | undefined {
@@ -164,8 +230,8 @@ export function reviewedJointAllocation(
     const row = byQuarter.get(quarter);
     if (
       row !== undefined &&
-      (("divorce_date_2025" in review &&
-        row.payment_date > review.divorce_date_2025) ||
+      (("divorce_date" in review &&
+        row.payment_date > review.divorce_date) ||
         (input[`payment_${quarter}_date`] !== undefined &&
           input[`payment_${quarter}_date`] !== row.payment_date))
     ) {
@@ -190,9 +256,10 @@ export function reviewedJointAllocation(
   return review;
 }
 
-/** The 2025 estimated payments and prior-year credit claimed on Form 1040 line 26. */
-export function estimatedPaymentTotal(raw: unknown): number {
+/** The year's estimated payments and prior-year credit on Form 1040 line 26. */
+export function estimatedPaymentTotal(raw: unknown, year: number): number {
   const input = inputSchema.parse(raw);
+  assertPaymentYear(input, year);
   reviewedJointAllocation(input);
   const records = input.quarter_payment_records;
   if (records !== undefined) {
@@ -233,18 +300,67 @@ export function estimatedPaymentTotal(raw: unknown): number {
     (input.applied_from_prior_year ?? 0);
 }
 
+const FORM2210_QUARTER = {
+  q1: EstimatedTaxQuarter.Q1,
+  q2: EstimatedTaxQuarter.Q2,
+  q3: EstimatedTaxQuarter.Q3,
+  q4: EstimatedTaxQuarter.Q4,
+} as const;
+
+/** Form 2210 Part III payments: each quarter's records by payment date. */
+export function datedEstimatedPayments(
+  input: z.infer<typeof inputSchema>,
+): EstimatedTaxPayment[] {
+  const records = input.quarter_payment_records ??
+    input.joint_estimated_payment_allocation?.payments.map((row) => ({
+      quarter: row.quarter,
+      amount: row.taxpayer_allocated_amount,
+      payment_date: row.payment_date,
+    }));
+  const quarters = ["q1", "q2", "q3", "q4"] as const;
+  const quarterly = quarters.flatMap((quarter): EstimatedTaxPayment[] => {
+    const amount = input[`payment_${quarter}`] ?? 0;
+    if (amount <= 0) return [];
+    const rows = (records ?? []).filter((row) =>
+      row.quarter === quarter && row.amount > 0
+    );
+    if (rows.length > 0) {
+      return rows.map((row) => ({
+        quarter: FORM2210_QUARTER[quarter],
+        amount: row.amount,
+        date: row.payment_date,
+      }));
+    }
+    const date = input[`payment_${quarter}_date`];
+    return [{
+      quarter: FORM2210_QUARTER[quarter],
+      amount,
+      ...(date !== undefined ? { date } : {}),
+    }];
+  });
+  // A prior-year overpayment applied to this year is generally treated as
+  // paid on the first installment due date (Form 2210 instructions).
+  const applied = input.applied_from_prior_year ?? 0;
+  return applied > 0
+    ? [{ quarter: EstimatedTaxQuarter.Q1, amount: applied }, ...quarterly]
+    : quarterly;
+}
+
 class F1040esNode extends TaxNode<typeof inputSchema> {
   readonly nodeType = "f1040es";
   readonly inputSchema = inputSchema;
   readonly outputNodes = new OutputNodes([f1040]);
 
-  compute(_ctx: NodeContext, input: z.infer<typeof inputSchema>): NodeResult {
-    const total = estimatedPaymentTotal(input);
+  compute(ctx: NodeContext, input: z.infer<typeof inputSchema>): NodeResult {
+    const total = estimatedPaymentTotal(input, ctx.taxYear);
     if (total === 0) return { outputs: [] };
     return {
       outputs: [{
         nodeType: f1040.nodeType,
-        fields: { line26_estimated_tax: total },
+        fields: {
+          line26_estimated_tax: total,
+          f2210_estimated_payments: datedEstimatedPayments(input),
+        },
       }],
     };
   }

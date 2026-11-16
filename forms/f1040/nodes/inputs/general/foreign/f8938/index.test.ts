@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import {
   deriveF8938Summary,
@@ -60,7 +61,7 @@ function parsed(value: ReturnType<typeof input>) {
   return f8938.inputSchema.parse(value);
 }
 
-Deno.test("f8938: specified individual above US single thresholds has disclosure decision and no tax output", () => {
+test("f8938: specified individual above US single thresholds has disclosure decision and no tax output", () => {
   const value = parsed(input());
   assertEquals(form8938ThresholdDecision(value), {
     yearEndThreshold: 50_000,
@@ -73,7 +74,7 @@ Deno.test("f8938: specified individual above US single thresholds has disclosure
   );
 });
 
-Deno.test("f8938: threshold is strictly greater; no annual return means no 8938 filing", () => {
+test("f8938: threshold is strictly greater; no annual return means no 8938 filing", () => {
   const boundary = parsed(input({
     max_value_all_assets: 75_000,
     year_end_value_all_assets: 50_000,
@@ -98,7 +99,7 @@ Deno.test("f8938: threshold is strictly greater; no annual return means no 8938 
   assertEquals(form8938ThresholdDecision(noReturn).filingRequired, false);
 });
 
-Deno.test("f8938: MFS joint asset counts half for threshold but full value remains in ledger", () => {
+test("f8938: MFS joint asset counts half for threshold but full value remains in ledger", () => {
   const value = parsed(input({
     filing_status: "mfs",
     max_value_all_assets: 80_000,
@@ -124,7 +125,7 @@ Deno.test("f8938: MFS joint asset counts half for threshold but full value remai
   assertEquals(nonSpecifiedSpouse.year_end_value_all_assets, 55_000);
 });
 
-Deno.test("f8938: qualifying abroad status requires tax home and presence evidence", () => {
+test("f8938: qualifying abroad status requires tax home and presence evidence", () => {
   const value = parsed(input({
     residence: {
       location: "qualifying_abroad",
@@ -176,7 +177,7 @@ Deno.test("f8938: qualifying abroad status requires tax home and presence eviden
   );
 });
 
-Deno.test("f8938: excepted Part IV asset still counts toward individual threshold", () => {
+test("f8938: excepted Part IV asset still counts toward individual threshold", () => {
   const value = parsed(input({
     assets: [asset({
       asset_type: ForeignAssetType.ForeignStock,
@@ -190,7 +191,7 @@ Deno.test("f8938: excepted Part IV asset still counts toward individual threshol
   assertEquals(deriveF8938Summary(value).partIV["8621"], 1);
 });
 
-Deno.test("f8938: multi-asset peak is contemporaneous, not the sum of per-asset maxima", () => {
+test("f8938: multi-asset peak is contemporaneous, not the sum of per-asset maxima", () => {
   const value = parsed(input({
     max_value_all_assets: 100_000,
     year_end_value_all_assets: 85_000,
@@ -218,7 +219,7 @@ Deno.test("f8938: multi-asset peak is contemporaneous, not the sum of per-asset 
   assertEquals(deriveF8938Summary(value).partII.otherMaximumValueUsd, 40_000);
 });
 
-Deno.test("f8938: rejects tampered currency, aggregate, ownership and Part IV evidence", () => {
+test("f8938: rejects tampered currency, aggregate, ownership and Part IV evidence", () => {
   for (
     const change of [
       { maximum_value_usd: 70_000 },
@@ -245,7 +246,7 @@ Deno.test("f8938: rejects tampered currency, aggregate, ownership and Part IV ev
     })), Error);
 });
 
-Deno.test("f8938: eligibility requires distinct reviewed status, residence, and filing records", () => {
+test("f8938: eligibility requires distinct reviewed status, residence, and filing records", () => {
   const evidence = form8938UsEligibilityFixture();
   assertThrows(() => parsed(input({ eligibility_evidence: undefined })));
   assertThrows(() =>
@@ -282,6 +283,33 @@ Deno.test("f8938: eligibility requires distinct reviewed status, residence, and 
           subject_ssn: "999999999",
         },
       },
+    }))
+  );
+});
+
+test("f8938: a TY2026 return values assets at 2026 year end with the same thresholds", () => {
+  const value = parsed(input({
+    assets: [asset({
+      exchange_rate_date: "2026-12-31",
+      opened_or_acquired_date: "2026-03-01",
+    })],
+  }));
+  assertEquals(form8938ThresholdDecision(value).yearEndThreshold, 50_000);
+  assertEquals(
+    f8938.compute({ taxYear: 2026, formType: "f1040" }, value).outputs,
+    [],
+  );
+  assertThrows(
+    () => f8938.compute({ taxYear: 2026, formType: "f1040" }, parsed(input())),
+    Error,
+    "Form 8938 assets must be valued at the end of tax year 2026",
+  );
+  assertThrows(() =>
+    parsed(input({
+      assets: [asset({ closed_or_disposed_date: "2025-05-01" }), asset({
+        asset_id: "bank-2026-1",
+        exchange_rate_date: "2026-12-31",
+      })],
     }))
   );
 });

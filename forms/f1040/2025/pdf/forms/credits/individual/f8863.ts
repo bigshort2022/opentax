@@ -223,7 +223,8 @@ function institutionFields(item: F8863Item): Record<string, unknown> {
   return projected;
 }
 
-export const form8863Pdf: PdfFormDescriptor = {
+export function form8863PdfFor(taxYear: number): PdfFormDescriptor {
+  return {
   pendingKey: "f8863",
   pdfUrl: "https://www.irs.gov/pub/irs-prior/f8863--2025.pdf",
   fields,
@@ -238,10 +239,10 @@ export const form8863Pdf: PdfFormDescriptor = {
   instances(raw, filer, allPending) {
     if (Object.keys(raw).length === 0) return [];
     const source = inputSchema.parse(raw);
-    if (!nativeForm8863.build(source, { filer, pending: allPending })) {
+    if (!nativeForm8863.build(source, { filer, pending: allPending, taxYear })) {
       return [];
     }
-    const lines = calculateForm8863Lines(source);
+    const lines = calculateForm8863Lines(source, taxYear);
     if (!lines) return [];
     if (!filer) throw new Error("Form 8863 PDF needs filer identity");
     const [taxpayerA, taxpayerB, taxpayerC] = ssnParts(filer.primarySSN);
@@ -356,4 +357,7 @@ export const form8863Pdf: PdfFormDescriptor = {
       ];
     });
   },
-};
+  };
+}
+
+export const form8863Pdf: PdfFormDescriptor = form8863PdfFor(2025);

@@ -7,6 +7,7 @@ import { f1040 } from "../../../../../outputs/general/return-assembly/f1040/inde
 import { standard_deduction } from "../../../../worksheets/deductions/standard/standard_deduction/index.ts";
 
 import {
+  assertVehicleLoanDatesInYear,
   inputSchema,
   qualifiedBusinessTipQbiSource,
   qualifiedOvertimeDeduction,
@@ -24,8 +25,31 @@ class Schedule1ANode extends TaxNode<typeof inputSchema> {
 
   compute(ctx: NodeContext, rawInput: Schedule1AInput): NodeResult {
     const input = inputSchema.parse(rawInput);
+    assertVehicleLoanDatesInYear(ctx, input);
+    // Forms 4070 and employer statements were the 2025 transition sources
+    // while W-2s had no separate tip accounting (2025 Form 1040 instructions,
+    // Schedule 1-A line 4). From 2026, line 4 takes W-2 box 12 code TP or
+    // Form 4137 line 1 column (c) per employer (draft 2026 Schedule 1-A).
+    const codeTPYear = ctx.taxYear >= 2026;
+    if (
+      codeTPYear &&
+      (input.form4070_reports !== undefined ||
+        input.employer_tip_statements !== undefined)
+    ) {
+      throw new Error(
+        `TY${ctx.taxYear} Schedule 1-A tips come from W-2 box 12 code TP or Form 4137, not Form 4070 reports or employer statements`,
+      );
+    }
+    if (
+      !codeTPYear &&
+      (input.qualified_employee_tips ?? []).some((tip) =>
+        tip.source_type === "w2_code_tp"
+      )
+    ) {
+      throw new Error("Schedule 1-A W-2 code TP tips need tax year 2026 or later");
+    }
     const enhancedSeniorDeduction = seniorDeduction(ctx, input);
-    const vehicleInterestDeduction = vehicleLoanInterestDeduction(input);
+    const vehicleInterestDeduction = vehicleLoanInterestDeduction(ctx, input);
     const deduction = qualifiedTipsDeduction(input) +
       qualifiedOvertimeDeduction(input) +
       vehicleInterestDeduction +

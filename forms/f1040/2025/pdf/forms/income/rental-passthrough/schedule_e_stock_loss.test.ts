@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import { FilingStatus } from "../../../../../mef/header.ts";
 import { scheduleEStockLossPdf } from "./schedule_e_stock_loss.ts";
@@ -25,7 +26,7 @@ const ledger = {
   all_shares_one_stock_block: true,
   no_current_year_stock_transactions: true,
   no_section_1367_1_g_election: true,
-  no_other_2025_stock_basis_changes: true,
+  no_other_current_year_stock_basis_changes: true,
   no_other_schedule_e_activity: true,
   materially_participated_in_s_corporation: true,
   material_participation_workpaper_reference: "2025 participation log",
@@ -50,7 +51,7 @@ const pending = {
   f1040: { line8_additional_income: -3_000 },
 };
 
-Deno.test("stock-only Schedule E PDF maps official TY2025 page 2 row and totals", () => {
+test("stock-only Schedule E PDF maps official TY2025 page 2 row and totals", () => {
   assertEquals(scheduleEStockLossPdf.printedFormKey, "schedule_e");
   const instance = scheduleEStockLossPdf.instances?.(raw, filer, pending)?.[0];
   assertEquals(scheduleEStockLossPdf.pageIndices?.(instance ?? {}), [1]);
@@ -73,7 +74,7 @@ Deno.test("stock-only Schedule E PDF maps official TY2025 page 2 row and totals"
   assertEquals(field("line41"), "topmostSubform[0].Page2[0].f2_78[0]");
 });
 
-Deno.test("stock-only Schedule E PDF rejects another Schedule E activity", () => {
+test("stock-only Schedule E PDF rejects another Schedule E activity", () => {
   assertThrows(
     () =>
       scheduleEStockLossPdf.instances?.(raw, filer, {
@@ -85,6 +86,6 @@ Deno.test("stock-only Schedule E PDF rejects another Schedule E activity", () =>
   );
 });
 
-Deno.test("stock-only Schedule E PDF emits no instance without Form 7203", () => {
+test("stock-only Schedule E PDF emits no instance without Form 7203", () => {
   assertEquals(scheduleEStockLossPdf.instances?.({}, filer, pending), []);
 });

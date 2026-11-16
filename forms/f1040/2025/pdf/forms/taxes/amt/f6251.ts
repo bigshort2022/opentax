@@ -76,7 +76,8 @@ const partIIIFields = fields.filter((entry) =>
   entry.pdfField.includes(".Page2[0].")
 );
 
-export const form6251Pdf: PdfFormDescriptor = {
+export function form6251PdfFor(taxYear: number): PdfFormDescriptor {
+  return {
   pendingKey: "form6251",
   pdfUrl: "https://www.irs.gov/pub/irs-prior/f6251--2025.pdf",
   fields,
@@ -98,7 +99,7 @@ export const form6251Pdf: PdfFormDescriptor = {
     textField("primarySSN", 1, 2),
   ],
   projectFields(fields, allPending) {
-    assertForm6251CharitableSource(fields, allPending);
+    assertForm6251CharitableSource(fields, allPending, taxYear);
     if (Object.keys(fields).length === 0) return {};
     if (
       typeof fields.nol_adjustment === "number" &&
@@ -117,20 +118,20 @@ export const form6251Pdf: PdfFormDescriptor = {
       );
     }
     assertForm6251Line8(fields);
-    assertForm6251Form8949Source(fields, allPending);
+    assertForm6251Form8949Source(fields, allPending, taxYear);
     assertForm6251Form4952Line2c(fields, allPending);
     assertPriorIsoSaleRetention(fields, allPending);
-    assertForm6251CirculationSource(fields, allPending);
+    assertForm6251CirculationSource(fields, allPending, taxYear);
     assertForm6251MiningSource(fields, allPending);
-    assertForm6251Form8864Source(fields, allPending);
+    assertForm6251Form8864Source(fields, allPending, taxYear);
     assertForm6251HouseboatInterestSource(fields, allPending);
     assertForm6251LongTermContractSource(fields, allPending);
     assertForm6251DepletionSource(fields, allPending);
     assertForm6251DepreciationSource(fields);
     assertForm6251TrustSource(fields, allPending);
     assertForm6251PrivateActivityBondSource(fields, allPending);
-    assertForm6251RefundSource(fields, allPending);
-    assertForm6251QualifiedDividendSource(fields, allPending);
+    assertForm6251RefundSource(fields, allPending, taxYear);
+    assertForm6251QualifiedDividendSource(fields, allPending, taxYear);
     const form1040 = allPending.f1040;
     const line14 = form1040?.line14_deductions_qbi_total;
     const agi = form1040?.line11_agi;
@@ -146,7 +147,7 @@ export const form6251Pdf: PdfFormDescriptor = {
     }
     if (senior > 0) {
       const source = schedule1aInputSchema.parse(allPending.schedule1a);
-      if (!schedule1a.build(source, { pending: allPending })) {
+      if (!schedule1a.build(source, { pending: allPending, taxYear })) {
         throw new Error(
           "Form 6251 PDF senior deduction needs a reconciled Schedule 1-A source",
         );
@@ -167,7 +168,7 @@ export const form6251Pdf: PdfFormDescriptor = {
   },
   instances(fields, filer, allPending) {
     assertForm6251MiningSource(fields, allPending);
-    assertForm6251Form8864Source(fields, allPending);
+    assertForm6251Form8864Source(fields, allPending, taxYear);
     assertForm6251LongTermContractSource(fields, allPending);
     assertForm6251Form4952Line2c(fields, allPending, filer?.primarySSN, true);
     assertPriorIsoSaleExport(
@@ -175,6 +176,7 @@ export const form6251Pdf: PdfFormDescriptor = {
       allPending,
       filer?.primarySSN,
       filer?.filingStatus === FilingStatus.Single,
+      taxYear,
     );
     if ((Number(fields.iso_adjustment ?? 0)) > 0) {
       if (!filer) {
@@ -189,6 +191,7 @@ export const form6251Pdf: PdfFormDescriptor = {
         allPending?.f3921,
         Number(fields.iso_adjustment),
         recipients,
+        taxYear,
       );
     }
     const related = [
@@ -212,4 +215,7 @@ export const form6251Pdf: PdfFormDescriptor = {
     (typeof fields.line11_amt === "number" && fields.line11_amt > 0) ||
     fields.must_file_for_credit === true ||
     fields.must_file_for_negative_adjustments === true,
-};
+  };
+}
+
+export const form6251Pdf: PdfFormDescriptor = form6251PdfFor(2025);

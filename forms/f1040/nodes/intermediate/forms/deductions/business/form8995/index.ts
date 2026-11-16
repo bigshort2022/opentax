@@ -1,4 +1,5 @@
 import { assertSstbServiceClassification } from "../../../../../inputs/income/business/schedule_c/sstb-classification.ts";
+import { reviewedSstbRetirementDeduction } from "../../../../../inputs/income/business/schedule_c/sstb-retirement.ts";
 import { passiveSCorpLossBundleSchema } from "../../../../../inputs/income/rental-passthrough/k1_s_corp_passive_loss_source.ts";
 import { passiveSCorpLossQbiLines } from "./passive-s-corp-loss.ts";
 import { ownedSepSourceSchema } from "../../../../../inputs/adjustments/retirement/sep_retirement/owned-source.ts";
@@ -59,7 +60,11 @@ import { output, TaxNode } from "../../../../../../../../core/types/tax-node.ts"
 import { OutputNodes } from "../../../../../../../../core/types/output-nodes.ts";
 import { f1040 } from "../../../../../outputs/general/return-assembly/f1040/index.ts";
 import { standard_deduction } from "../../../../worksheets/deductions/standard/standard_deduction/index.ts";
-import { form8995a, type Form8995AInput } from "../form8995a/index.ts";
+import {
+  form8995a,
+  type Form8995AInput,
+  reitDividendSourceSchema,
+} from "../form8995a/index.ts";
 import { scheduleCQbiBusinessSchema } from "../form8995a/index.ts";
 import {
   allocateSharedSeDeduction,
@@ -72,9 +77,14 @@ import {
   calculateScheduleFAtRiskNet,
   itemSchema as farmItemSchema,
 } from "../../../income/business/schedule_f/model.ts";
-import { calculateScheduleCAtRiskNet } from "../../../../../inputs/income/business/schedule_c/model.ts";
+import {
+  calculateScheduleCAtRiskNet,
+  scheduleCSchedule1Line3,
+} from "../../../../../inputs/income/business/schedule_c/model.ts";
 import type { NodeContext } from "../../../../../../../../core/types/node-context.ts";
 import { CONFIG_BY_YEAR, type F1040Config } from "../../../../../config/index.ts";
+import { withMinimumDeduction } from "./minimum-deduction.ts";
+import { qbiThreshold } from "../form8995a/thresholds.ts";
 
 // ── TY2025 Constants ─────────────────────────────────────────────────────────
 
@@ -133,6 +143,8 @@ export const inputSchema = z.object({
   qbi_from_schedule_f: accumulable(z.number()).optional(),
   // QBI from pass-through rentals/partnerships (Schedule E)
   qbi: accumulable(z.number()).optional(),
+  // Form 8582 suspended part of a current Schedule E loss included in qbi.
+  qbi_suspended_passive_loss: accumulable(z.number().nonnegative()).optional(),
   current_passive_farm_qbi_sources: z.array(currentFarmRentalQbiSourceSchema)
     .min(1).optional(),
   current_passive_k1_income_sources: z.array(
@@ -201,12 +213,23 @@ export const inputSchema = z.object({
       se_tax_deduction: z.number().nonnegative(),
     }).strict(),
   ).optional(),
+  // Form 461 line 16 excess business loss, disallowed this year (section 461(l))
+  excess_business_loss_disallowed: z.number().nonnegative().optional(),
+  excess_business_loss_filing_row: z.object({
+    business_reference: z.string(),
+    business_name: z.string(),
+    tin: z.object({ kind: z.enum(["ein", "ssn"]), value: z.string() }),
+    schedule_c_net_loss: z.number().int().negative(),
+    excess_business_loss_disallowed: z.number().int().positive(),
+    qbi: z.number().int().nonpositive(),
+  }).strict().optional(),
   schedule_c_qbi_businesses: z.array(scheduleCQbiBusinessWithCentsSchema)
     .optional(),
   schedule_f_qbi_businesses: z.array(scheduleFQbiBusinessSchema).optional(),
   single_farm_owner_w2_sources: z.array(ownerW2WageSourceSchema).optional(),
   qbi_no_prior_loss_or_suspended_loss_confirmed: z.literal(true).optional(),
   qbi_not_patron_of_specified_cooperative_confirmed: z.literal(true).optional(),
+  qbi_deduction_not_claimed: z.literal(true).optional(),
   taxpayer_ssn: z.string().regex(/^\d{3}-?\d{2}-?\d{4}$/).optional(),
   spouse_ssn: z.string().regex(/^\d{3}-?\d{2}-?\d{4}$/).optional(),
   // Prior-year REIT/PTP net loss carryforward (must be zero or negative)
@@ -217,6 +240,7 @@ export const inputSchema = z.object({
   additional_deductions: z.number().nonnegative().optional(),
   itemized_deductions: z.number().nonnegative().optional(),
   force_itemized: z.boolean().optional(),
+  force_standard: z.boolean().optional(),
   mfs_spouse_itemizing: z.boolean().optional(),
   qualified_tip_qbi_source: qualifiedTipQbiSourceSchema.optional(),
   // Filing status — used to look up the standard deduction base for income limit
@@ -247,7 +271,8 @@ function businessDeductions(input: Form8995Input): number {
 function totalQbi(input: Form8995Input): number {
   return sumField(input.qbi_from_schedule_c) +
     sumField(input.qbi_from_schedule_f) +
-    sumField(input.qbi) + sumField(input.sstb_qbi) -
+    sumField(input.qbi) + sumField(input.qbi_suspended_passive_loss) +
+    sumField(input.sstb_qbi) -
     businessDeductions(input) -
     reviewedQualifiedTipExclusions(input.qualified_tip_qbi_source).total;
 }
@@ -262,6 +287,11 @@ function qbiComponent(input: Form8995Input): number {
   return net * QBI_RATE;
 }
 
+function reviewedReitSources(sources: unknown) {
+  const reviewed = z.array(reitDividendSourceSchema).min(1).safeParse(sources);
+  return reviewed.success ? { reit_dividend_sources: reviewed.data } : {};
+}
+
 function netReit(input: Form8995Input): number {
   return sumField(input.line6_sec199a_dividends) +
     (input.reit_loss_carryforward ?? 0);
@@ -271,6 +301,38 @@ function reitComponent(input: Form8995Input): number {
   const net = netReit(input);
   if (net <= 0) return 0;
   return net * QBI_RATE;
+}
+
+// Prior-year carryforward lines and the carryforward to next year. i8995,
+// Lines 3, 4, 7, 8, 16 and 17: line 16 is "line 2 combined with line 3" and
+// line 17 is "line 6 combined with line 7"; if either is greater than zero,
+// enter -0-. Losses are shown here as positive carryforward amounts.
+function priorCarryforwardLines(input: Form8995Input) {
+  const line3 = input.qbi_loss_carryforward ?? 0;
+  const line7 = input.reit_loss_carryforward ?? 0;
+  if (line3 === 0 && line7 === 0) return undefined;
+  const line2 = Math.round(totalQbi(input));
+  const line6 = sumField(input.line6_sec199a_dividends);
+  return {
+    line2,
+    line3,
+    line4: Math.max(0, line2 + line3),
+    line6,
+    line7,
+    line8: Math.max(0, line6 + line7),
+    line16: Math.max(0, -(line2 + line3)),
+    line17: Math.max(0, -(line6 + line7)),
+  };
+}
+
+function priorCarryforwards(
+  lines: ReturnType<typeof priorCarryforwardLines>,
+): Record<string, number> {
+  if (lines === undefined) return {};
+  return {
+    ...(lines.line16 > 0 && { qbi_loss_carryforward: lines.line16 }),
+    ...(lines.line17 > 0 && { reit_ptp_loss_carryforward: lines.line17 }),
+  };
 }
 
 function totalBeforeLimit(input: Form8995Input): number {
@@ -307,8 +369,11 @@ function standardDeductionAmount(
 
 function sourceDeductionAmount(input: Form8995Input, cfg: F1040Config): number {
   const itemized = input.itemized_deductions ?? 0;
-  return input.force_itemized === true || input.mfs_spouse_itemizing === true
-    ? itemized
+  if (input.force_itemized === true || input.mfs_spouse_itemizing === true) {
+    return itemized;
+  }
+  return input.force_standard === true
+    ? standardDeductionAmount(input, cfg)
     : Math.max(itemized, standardDeductionAmount(input, cfg));
 }
 
@@ -389,15 +454,6 @@ function taxableIncomeBeforeQbi(
   );
 }
 
-function qbiThreshold(
-  filingStatus: FilingStatus,
-  cfg: F1040Config,
-): number {
-  return filingStatus === FilingStatus.MFJ
-    ? cfg.qbiThresholdMfj
-    : cfg.qbiThresholdSingle;
-}
-
 /** Retained fishing C/F sources have no 8995-A when their deduction is zero
  * above the completed wage/property phase-in. */
 function zeroLimitedMixedScheduleCF(
@@ -450,16 +506,18 @@ function zeroLimitedMixedScheduleCF(
 function advancedFormOutput(
   input: Form8995Input,
   taxableIncome: number,
+  cfg: F1040Config,
+  taxYear: number,
 ): NodeOutput {
   if (input.rpe_aggregation_source) {
-    const group = reviewedRpeAggregation(input.rpe_aggregation_source);
+    const group = reviewedRpeAggregation(input.rpe_aggregation_source, taxYear);
     const joint = input.filing_status === FilingStatus.MFJ;
     const owners = [input.taxpayer_ssn, ...(joint ? [input.spouse_ssn] : [])]
       .map((ssn) => ssn?.replaceAll("-", ""));
     if (
       owners.some((ssn) => !ssn) || new Set(owners).size !== owners.length ||
       !owners.includes(group.source.recipient_tin) ||
-      taxableIncome <= (joint ? 394600 : 197300) ||
+      taxableIncome <= qbiThreshold(input.filing_status!, cfg) ||
       sumField(input.qbi) !== group.qbi ||
       sumField(input.w2_wages) !== group.wages ||
       sumField(input.unadjusted_basis) !== group.ubia ||
@@ -495,32 +553,33 @@ function advancedFormOutput(
       rpe_aggregation_source: group.source,
     });
   }
-  const farmWotc = farmWotcAdvancedFields(input, taxableIncome);
+  const farmWotc = farmWotcAdvancedFields(input, taxableIncome, taxYear);
   if (farmWotc) return output(form8995a, farmWotc);
 
   const c = input.schedule_c_qbi_businesses?.[0];
   const f = input.schedule_f_qbi_businesses?.[0];
   const jointFishing = input.filing_status === FilingStatus.MFJ &&
-    taxableIncome > CONFIG_BY_YEAR[2025].qbiThresholdMfj &&
+    taxableIncome > cfg.qbiThresholdMfj &&
     input.joint_se_source !== undefined;
   if (
     input.schedule_c_qbi_businesses?.length === 1 &&
     input.schedule_f_qbi_businesses?.length === 1 && c && f &&
     c.source_schedule_c.schedule_j_fishing_evidence &&
     (jointFishing ||
-      (taxableIncome > 197_300 && taxableIncome < 247_300 &&
+      (taxableIncome > cfg.qbiThresholdSingle &&
+        taxableIncome < cfg.qbiThresholdSingle + cfg.qbiPhaseInRange / 2 &&
         c.source_schedule_c.qbi_se_tax_allocation_review &&
         farmItemSchema.parse(f.source_schedule_f).qbi_se_tax_allocation_review))
   ) {
     const owned = jointFishing
       ? ownedScheduleSE(
         input.joint_se_source!,
-        CONFIG_BY_YEAR[2025].ssWageBase,
+        cfg.ssWageBase,
       )
       : undefined;
     const reviewed = jointFishing ? undefined : mixedScheduleCFLines(
       input,
-      CONFIG_BY_YEAR[2025],
+      cfg,
     );
     const rows = jointFishing
       ? [c, f].map((business) => {
@@ -612,7 +671,7 @@ function advancedFormOutput(
     }
     const owned = ownedScheduleSE(
       input.joint_se_source,
-      CONFIG_BY_YEAR[2025].ssWageBase,
+      cfg.ssWageBase,
     );
     if (owned.deduction !== sumField(input.se_tax_deduction)) {
       throw new Error(
@@ -633,11 +692,11 @@ function advancedFormOutput(
         w2_wages: b.w2_wages,
         unadjusted_basis: b.ubia,
         se_tax_deduction: half,
-      }, taxableIncome);
+      }, taxableIncome, cfg, taxYear);
       return result.fields as Form8995AInput;
     });
-    const wages = input.agi! - businesses.reduce((sum, b) => sum + b.qbi, 0) +
-      owned.deduction;
+    const wages = input.agi! -
+      scheduleCSchedule1Line3(businesses.map((b) => b.qbi)) + owned.deduction;
     return output(form8995a, {
       ...children[0],
       single_schedule_c_source: undefined,
@@ -655,7 +714,8 @@ function advancedFormOutput(
     });
   }
   const nonSstbQbi = sumField(input.qbi_from_schedule_c) +
-    sumField(input.qbi_from_schedule_f) + sumField(input.qbi) -
+    sumField(input.qbi_from_schedule_f) + sumField(input.qbi) +
+    sumField(input.qbi_suspended_passive_loss) -
     reviewedQualifiedTipExclusions(input.qualified_tip_qbi_source).total;
   const sstbQbi = sumField(input.sstb_qbi);
   if (input.schedule_c_qbi_businesses?.some((business) => business.qbi < 0)) {
@@ -719,7 +779,7 @@ function advancedFormOutput(
       (input.filing_status !== FilingStatus.Single &&
         input.filing_status !== FilingStatus.MFJ) ||
       taxableIncome <=
-        qbiThreshold(input.filing_status!, CONFIG_BY_YEAR[2025]) ||
+        qbiThreshold(input.filing_status!, cfg) ||
       input.qbi_no_prior_loss_or_suspended_loss_confirmed !== true ||
       input.qbi_not_patron_of_specified_cooperative_confirmed !== true ||
       sumField(input.qbi_from_schedule_c) !== business.qbi ||
@@ -817,7 +877,6 @@ function advancedFormOutput(
       business.wotc_wage_reduction !== undefined ||
       sumField(input.qbi_from_schedule_f) !== 0 || sumField(input.qbi) !== 0 ||
       sumField(input.se_health_insurance_deduction) !== 0 ||
-      sumField(input.retirement_plan_deduction) !== 0 ||
       input.qbi_no_prior_loss_or_suspended_loss_confirmed !== true ||
       input.qbi_not_patron_of_specified_cooperative_confirmed !== true ||
       !Number.isSafeInteger(qbiCapitalTotal(input, true)) ||
@@ -828,13 +887,18 @@ function advancedFormOutput(
       (input.reit_loss_carryforward ?? 0) !== 0
     ) {
       throw new Error(
-        "SSTB Schedule C needs one identified taxpayer service business with only its filed half-SE adjustment",
+        "SSTB Schedule C needs one identified taxpayer service business with reviewed attributable adjustments",
       );
     }
     if (review.service_classification_review) {
       assertSstbServiceClassification(business.source_schedule_c);
     }
-    const qbi = business.qbi - sumField(input.se_tax_deduction);
+    const retirementDeduction = reviewedSstbRetirementDeduction(
+      business.source_schedule_c,
+      sumField(input.retirement_plan_deduction),
+    );
+    const qbi = business.qbi - sumField(input.se_tax_deduction) -
+      retirementDeduction;
     sourcedBusiness = {
       sstb_qbi: qbi,
       sstb_filing_details: {
@@ -863,6 +927,9 @@ function advancedFormOutput(
         business,
         owner_ssn: owner,
         se_tax_deduction: sumField(input.se_tax_deduction),
+        ...(retirementDeduction > 0
+          ? { retirement_plan_deduction: retirementDeduction }
+          : {}),
       },
       qbi_no_prior_loss_or_suspended_loss_confirmed: true,
     };
@@ -1012,7 +1079,7 @@ function advancedFormOutput(
       ...(input.single_farm_owner_w2_sources?.length
         ? { owner_w2_wage_sources: input.single_farm_owner_w2_sources }
         : {}),
-    });
+    }, taxYear);
     if (
       farm.qbi !== source.profit ||
       sumField(input.qbi_from_schedule_f) !== source.profit
@@ -1117,6 +1184,8 @@ function advancedFormOutput(
     sstb_w2_wages: sumField(input.sstb_w2_wages),
     sstb_unadjusted_basis: sumField(input.sstb_unadjusted_basis),
     line6_sec199a_dividends: sumField(input.line6_sec199a_dividends),
+    // Only reviewed sources reach 8995-A; without them its line 28 check fails.
+    ...reviewedReitSources(input.reit_dividend_sources),
     qbi_loss_carryforward: input.qbi_loss_carryforward ?? 0,
     reit_loss_carryforward: input.reit_loss_carryforward ?? 0,
     ...(input.schedule_c_qbi_businesses?.some((business) => business.qbi < 0) &&
@@ -1233,6 +1302,17 @@ function multipleScheduleCLines(
       (businesses.length === 1 &&
         input.investment_dividend_totals !== undefined))
   ) return undefined;
+  // A single reviewed SSTB below the threshold uses the ordinary simplified
+  // QBI calculation, including its attributable retirement deduction. Complete
+  // dividend metadata does not turn it into a multiple-business source route;
+  // that route is limited to taxpayer-owned, unadjusted Single-filer sources.
+  if (
+    businesses.length === 1 &&
+    businesses[0].source_schedule_c.qbi_specified_service === true &&
+    businesses[0].source_schedule_c.qbi_sstb_filing_review
+      ?.retirement_plan_deduction_review !== undefined &&
+    businesses[0].source_schedule_c.qbi_se_tax_allocation_review === undefined
+  ) return undefined;
   if (
     input.se_tax_deduction === undefined &&
     businesses.reduce((sum, row) => sum + row.qbi, 0) * .9235 >= 400
@@ -1307,6 +1387,81 @@ function multipleScheduleCLines(
     line14,
     line15: Math.min(line5, line14),
     line16: Math.max(0, -line2),
+    line17: 0,
+  };
+}
+
+/**
+ * One Schedule C loss limited by Form 461. Losses disallowed under section
+ * 461(l) are not QBI until they are allowed (Form 8995 instructions), so line 1
+ * is the Schedule C loss less the excess business loss and its net loss
+ * carries forward on line 16.
+ */
+function excessBusinessLossLines(
+  input: Form8995Input,
+  cfg: F1040Config,
+): (Record<string, unknown> & { line15: number }) | undefined {
+  const disallowed = input.excess_business_loss_disallowed ?? 0;
+  const businesses = input.schedule_c_qbi_businesses;
+  const business = businesses?.[0];
+  if (
+    disallowed <= 0 || businesses?.length !== 1 || !business ||
+    input.schedule_f_qbi_businesses !== undefined ||
+    !Number.isSafeInteger(business.qbi) || !Number.isSafeInteger(disallowed) ||
+    business.qbi + disallowed >= 0 ||
+    sumField(input.qbi_from_schedule_c) + sumField(input.sstb_qbi) !==
+      business.qbi ||
+    sumField(input.qbi_from_schedule_f) !== 0 || sumField(input.qbi) !== 0 ||
+    sumField(input.qbi_suspended_passive_loss) !== 0 ||
+    businessDeductions(input) !== 0 ||
+    sumField(input.line6_sec199a_dividends) !== 0 ||
+    (input.qbi_loss_carryforward ?? 0) !== 0 ||
+    (input.reit_loss_carryforward ?? 0) !== 0 ||
+    input.qualified_tip_qbi_source !== undefined ||
+    input.qbi_no_prior_loss_or_suspended_loss_confirmed !== true ||
+    input.qbi_not_patron_of_specified_cooperative_confirmed !== true ||
+    input.agi === undefined || !input.taxpayer_ssn ||
+    !business.business_reference || !business.business_name
+  ) return undefined;
+  const qbi = business.qbi + disallowed;
+  const line11 = Math.round(
+    Math.max(
+      0,
+      input.agi - sourceDeductionAmount(input, cfg) -
+        (input.additional_deductions ?? 0),
+    ),
+  );
+  const line12 = qbiCapitalTotal(input, true);
+  const line13 = Math.max(0, line11 - line12);
+  return {
+    excess_business_loss_filing_row: {
+      business_reference: business.business_reference,
+      business_name: business.business_name,
+      tin: business.ein
+        ? { kind: "ein" as const, value: business.ein }
+        : {
+          kind: "ssn" as const,
+          value: input.taxpayer_ssn.replace(/\D/g, ""),
+        },
+      schedule_c_net_loss: business.qbi,
+      excess_business_loss_disallowed: disallowed,
+      qbi,
+    },
+    line2: qbi,
+    line3: 0,
+    line4: 0,
+    line5: 0,
+    line6: 0,
+    line7: 0,
+    line8: 0,
+    line9: 0,
+    line10: 0,
+    line11,
+    line12,
+    line13,
+    line14: Math.round(line13 * QBI_RATE),
+    line15: 0,
+    line16: -qbi,
     line17: 0,
   };
 }
@@ -1685,11 +1840,19 @@ class Form8995Node extends TaxNode<typeof inputSchema> {
       return { outputs: [] };
     }
 
-    if (netReit(input) < 0) {
-      throw new Error(
-        "Form 8995 negative REIT/PTP line 8 needs a sourced line 17 carryforward filing route",
-      );
+    if (input.qbi_deduction_not_claimed === true) {
+      if (
+        netQbi(input) < 0 || netReit(input) < 0 ||
+        (input.qbi_loss_carryforward ?? 0) !== 0 ||
+        (input.reit_loss_carryforward ?? 0) !== 0
+      ) {
+        throw new Error(
+          "An unclaimed QBI deduction cannot drop a QBI or REIT/PTP loss carryforward",
+        );
+      }
+      return { outputs: [] };
     }
+
 
     if (
       input.agi === undefined && (input.schedule_c_qbi_businesses?.some(
@@ -1706,6 +1869,30 @@ class Form8995Node extends TaxNode<typeof inputSchema> {
       input.agi === undefined
     ) {
       return { outputs: [] };
+    }
+    const retirementBusinesses = input.schedule_c_qbi_businesses?.filter((row) =>
+      row.source_schedule_c.qbi_sstb_filing_review
+        ?.retirement_plan_deduction_review !== undefined
+    ) ?? [];
+    if (retirementBusinesses.length > 0) {
+      const business = retirementBusinesses[0].source_schedule_c;
+      const owner = (business.proprietor_recipient === "S"
+        ? input.spouse_ssn
+        : input.taxpayer_ssn)?.replaceAll("-", "");
+      if (retirementBusinesses.length !== 1 ||
+        input.schedule_c_qbi_businesses?.length !== 1 || !owner ||
+        business.qbi_sstb_filing_review?.owner_ssn !== owner ||
+        business.qbi_specified_service !== true ||
+        sumField(input.qbi_from_schedule_f) !== 0 ||
+        sumField(input.se_health_insurance_deduction) !== 0) {
+        throw new Error(
+          "SSTB retirement attribution needs one identified proprietor business without other attributable adjustments",
+        );
+      }
+      // Validate explicit ownership even below the Form 8995-A threshold.
+      reviewedSstbRetirementDeduction(
+        business, sumField(input.retirement_plan_deduction),
+      );
     }
     const taxableIncome = taxableIncomeBeforeQbi(input, cfg);
     if (
@@ -1726,7 +1913,7 @@ class Form8995Node extends TaxNode<typeof inputSchema> {
         return { outputs: [] };
       }
       return {
-        outputs: [advancedFormOutput(input, taxableIncome), {
+        outputs: [advancedFormOutput(input, taxableIncome, cfg, ctx.taxYear), {
           nodeType: this.nodeType,
           fields: { net_capital_gain: qbiCapitalTotal(input) },
         }],
@@ -1819,7 +2006,7 @@ class Form8995Node extends TaxNode<typeof inputSchema> {
           sumField(input.line6_sec199a_dividends) !== 0 ||
           (input.qbi_loss_carryforward ?? 0) !== 0 ||
           (input.reit_loss_carryforward ?? 0) !== 0 ||
-          qbiCapitalTotal(input) !== 0
+          !Number.isSafeInteger(qbiCapitalTotal(input, true))
         ) {
           throw new Error(
             "Joint owner QBI needs its actual ordinary source and reviewed no-other-component records",
@@ -1834,14 +2021,16 @@ class Form8995Node extends TaxNode<typeof inputSchema> {
           sumField(input.se_health_insurance_deduction),
           input.joint_owner_health_plans_source,
           input.qualified_tip_qbi_source,
+          qbiCapitalTotal(input, true),
         );
       })()
       : undefined;
     const mixedLines = mixedScheduleCFLines(input, cfg);
+    const excessLossLines = excessBusinessLossLines(input, cfg);
     const multipleLines = ownedSCorp ?? ownedLines ?? mixedLines ??
-      multipleScheduleCLines(input, cfg);
+      excessLossLines ?? multipleScheduleCLines(input, cfg);
     if (
-      netQbi(input) < 0 && multipleLines === undefined &&
+      totalQbi(input) < 0 && multipleLines === undefined &&
       input.current_passive_property_sources === undefined
     ) {
       throw new Error(
@@ -1946,11 +2135,25 @@ class Form8995Node extends TaxNode<typeof inputSchema> {
         ? multipleLines ?? twoSmallScheduleCLines(input, cfg) ??
           oneScheduleCLines(input, cfg)
         : reitOnlyLines(input, cfg));
-    // The bounded filed routes carry whole-dollar line 15 exactly
-    // into Form 1040. Other QBI routes retain their existing calculation.
-    const deduction = simplifiedLines === undefined
-      ? qbiDeduction(input, cfg)
+    // The bounded filed routes carry whole-dollar line 15 exactly into Form
+    // 1040; the general calculation rounds its line 15 the same way.
+    const beforeMinimum = simplifiedLines === undefined
+      ? Math.round(qbiDeduction(input, cfg))
       : simplifiedLines.line15;
+    const deduction = withMinimumDeduction(beforeMinimum, {
+      businesses: (input.schedule_c_qbi_businesses ?? []).map((business) => ({
+        qbi: business.qbi,
+        materiallyParticipates:
+          business.source_schedule_c.line_g_material_participation === true,
+      })),
+      totalQbi: totalQbi(input),
+      otherQbiSources: sumField(input.qbi_from_schedule_f) !== 0 ||
+        sumField(input.qbi) !== 0 ||
+        (input.schedule_f_qbi_businesses?.length ?? 0) > 0,
+    }, cfg);
+    const priorLines = simplifiedLines === undefined
+      ? priorCarryforwardLines(input)
+      : undefined;
     if (
       deduction <= 0 && multipleLines === undefined &&
       currentK1Lines === undefined && currentPropertyLines === undefined &&
@@ -1959,12 +2162,16 @@ class Form8995Node extends TaxNode<typeof inputSchema> {
         simplifiedLines.line1_qbi > 0)
     ) {
       return {
-        outputs: qbiCapitalTotal(input) > 0
+        outputs: qbiCapitalTotal(input) > 0 || priorLines
           ? [{
             nodeType: this.nodeType,
-            fields: { net_capital_gain: qbiCapitalTotal(input) },
+            fields: {
+              net_capital_gain: qbiCapitalTotal(input),
+              ...priorLines,
+            },
           }]
           : [],
+        ...(priorLines && { carryforwards: priorCarryforwards(priorLines) }),
       };
     }
 
@@ -1979,10 +2186,17 @@ class Form8995Node extends TaxNode<typeof inputSchema> {
           qbi_deduction: deduction,
           net_capital_gain: qbiCapitalTotal(input),
           ...simplifiedLines,
+          ...priorLines,
+          ...(deduction > beforeMinimum
+            ? { minimum_deduction: deduction }
+            : {}),
         },
       },
     ];
 
+    if (priorLines) {
+      return { outputs, carryforwards: priorCarryforwards(priorLines) };
+    }
     return {
       outputs,
       ...((currentK1Lines ?? ownedSCorp ?? ownedLines)?.line16 ||

@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { execute } from "../../../../../../../core/runtime/executor.ts";
 import { buildExecutionPlan } from "../../../../../../../core/runtime/planner.ts";
@@ -53,12 +54,12 @@ function standaloneOdcPending() {
   return buildPending(result.pending);
 }
 
-Deno.test("reviewed ODC credit calculates, but unauthenticated notice blocks both exports", async () => {
+test("reviewed ODC credit calculates, but unauthenticated notice blocks both exports", async () => {
   const pending = standaloneOdcPending();
   assertThrows(
     () => nativeForm8862.build(pending.f8862!, { pending }),
     Error,
-    "executor-owned authentication of prior IRS notice issuance and contents",
+    "retained prior IRS notice copy with matching SHA-256",
   );
   assertThrows(
     () =>
@@ -68,16 +69,16 @@ Deno.test("reviewed ODC credit calculates, but unauthenticated notice blocks bot
         f8812: pending.f8812!,
       }),
     Error,
-    "executor-owned authentication of prior IRS notice issuance and contents",
+    "retained prior IRS notice copy with matching SHA-256",
   );
   await assertRejects(
     () => buildMefBundle(pending, { filer: base.filer, attachments: [] }),
     Error,
-    "executor-owned authentication of prior IRS notice issuance and contents",
+    "retained prior IRS notice copy with matching SHA-256",
   );
 });
 
-Deno.test("standalone ODC rejects altered Schedule 8812, dependent TIN, and Form 1040 amounts in both exports", () => {
+test("standalone ODC rejects altered Schedule 8812, dependent TIN, and Form 1040 amounts in both exports", () => {
   const pending = standaloneOdcPending();
   const general = pending.general!;
   const sourceDependents = general.dependents!;

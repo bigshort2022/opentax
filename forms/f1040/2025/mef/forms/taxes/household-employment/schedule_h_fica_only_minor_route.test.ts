@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import {
   inputSchema,
@@ -42,7 +43,7 @@ const source = {
         birth_date_source_reference: "working-minor-birth-record",
         education_status_source_reference: "2025-nonenrollment-record",
         principal_occupation_source_reference: "2025-household-principal-work",
-        not_a_student_during_2025_verified: true,
+        not_a_student_during_tax_year_verified: true,
         household_services_principal_occupation_verified: true,
       },
       ordinary_cash_only: true,
@@ -58,7 +59,7 @@ const source = {
   },
 } as const;
 
-Deno.test("Schedule H FICA-only nonstudent minor joins Schedule 2, native and PDF", () => {
+test("Schedule H FICA-only nonstudent minor joins Schedule 2, native and PDF", () => {
   const filed = inputSchema.parse(source);
   const result = schedule_h.compute(
     { taxYear: 2025, formType: "f1040" },
@@ -93,7 +94,7 @@ Deno.test("Schedule H FICA-only nonstudent minor joins Schedule 2, native and PD
   assertEquals(scheduleHPdf.instances?.(projected, filer, pending)?.length, 1);
 });
 
-Deno.test("Schedule H FICA-only minor rejects unsupported age, student, source, quarter and export changes", () => {
+test("Schedule H FICA-only minor rejects unsupported age, student, source, quarter and export changes", () => {
   const filed = inputSchema.parse(source);
   const pending = {
     schedule_h: filed,
@@ -125,7 +126,7 @@ Deno.test("Schedule H FICA-only minor rejects unsupported age, student, source, 
           birth_date: "2008-05-10",
           birth_date_source_reference: "student-birth-record",
           student_enrollment_source_reference: "student-enrollment",
-          student_during_2025_verified: true,
+          student_during_tax_year_verified: true,
         },
       }),
     )
@@ -178,7 +179,7 @@ Deno.test("Schedule H FICA-only minor rejects unsupported age, student, source, 
   );
 });
 
-Deno.test("Schedule H complete FICA-only cash payroll sums quarter cents exactly", () => {
+test("Schedule H complete FICA-only cash payroll sums quarter cents exactly", () => {
   const raw: any = structuredClone(source);
   const worker = raw.fica_only_payroll.employee_wages[0];
   worker.annual_cash_wages = 2_802.49;

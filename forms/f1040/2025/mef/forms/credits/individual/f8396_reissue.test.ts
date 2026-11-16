@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import {
   calculateForm8396,
@@ -106,7 +107,7 @@ const pending = {
   f8828,
 };
 
-Deno.test("Form 8396 reissued MCC uses the original-loan annual ceiling", () => {
+test("Form 8396 reissued MCC uses the original-loan annual ceiling", () => {
   assertEquals(lines.line1, 5_000);
   assertEquals(lines.line3, 800);
   assertEquals(lines.line9, 800);
@@ -125,7 +126,7 @@ Deno.test("Form 8396 reissued MCC uses the original-loan annual ceiling", () => 
   );
 });
 
-Deno.test("Form 8396 reissue source rejects debt, rate, date and holder tampering", () => {
+test("Form 8396 reissue source rejects debt, rate, date and holder tampering", () => {
   const cases = [
     { replacement_mortgage_amount: 171_000 },
     { replacement_certificate_credit_rate: 0.21 },
@@ -141,19 +142,24 @@ Deno.test("Form 8396 reissue source rejects debt, rate, date and holder tamperin
       false,
     );
   }
+  assertThrows(
+    () => form8396.build(fields, { pending, taxYear: 2024 }),
+    Error,
+    "refinance must precede the 2024 tax year",
+  );
   assertEquals(
     calculateForm8396Line3(form8396SourceSchema.parse({
       ...reissuedMccSource,
       reviewed_reissued_mcc: {
         ...reissue,
-        scheduled_original_loan_interest_2025: 2_000,
+        scheduled_original_loan_year_interest: 2_000,
       },
     })),
     400,
   );
 });
 
-Deno.test("Form 8396 rejects tampered Form 8828 certificate lineage", () => {
+test("Form 8396 rejects tampered Form 8828 certificate lineage", () => {
   const item = f8828.f8828s[0];
   assertThrows(
     () =>

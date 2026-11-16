@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import { FilingStatus } from "../../../../../mef/header.ts";
 import { form8862OverflowRows, form8862Pdf } from "./f8862.ts";
@@ -43,7 +44,7 @@ const noticeReviews = {
   },
 };
 
-Deno.test("Form 8862 PDF maps exact Dec 2025 widget names on all three pages", () => {
+test("Form 8862 PDF maps exact Dec 2025 widget names on all three pages", () => {
   const map = new Map(
     form8862Pdf.fields.map((entry) => [entry.domainKey, entry.pdfField]),
   );
@@ -71,7 +72,7 @@ Deno.test("Form 8862 PDF maps exact Dec 2025 widget names on all three pages", (
   );
 });
 
-Deno.test("Form 8862 PDF projects bounded EITC and CTC claims", () => {
+test("Form 8862 PDF projects bounded EITC and CTC claims", () => {
   const source = {
     claim_eitc: true,
     ...priorEicEvidence,
@@ -111,11 +112,11 @@ Deno.test("Form 8862 PDF projects bounded EITC and CTC claims", () => {
         },
       }),
     Error,
-    "executor-owned authentication of prior IRS notice issuance and contents",
+    "retained prior IRS notice copy with matching SHA-256",
   );
 });
 
-Deno.test("Form 8862 retains numbered continuation rows without exporting CTC", () => {
+test("Form 8862 retains numbered continuation rows without exporting CTC", () => {
   const ctc = {
     claim_ctc: true,
     ctc_disallowed_year: 2023,
@@ -136,7 +137,7 @@ Deno.test("Form 8862 retains numbered continuation rows without exporting CTC", 
   }]);
 });
 
-Deno.test("Form 8862 continuation includes extra ODC and AOTC answers", () => {
+test("Form 8862 continuation includes extra ODC and AOTC answers", () => {
   const rows = form8862OverflowRows({
     other_dependents: Array.from({ length: 5 }, (_, i) => ({
       first_name: `Other${i}`,
@@ -161,7 +162,7 @@ Deno.test("Form 8862 continuation includes extra ODC and AOTC answers", () => {
   }]);
 });
 
-Deno.test("Form 8862 PDF rejects a claim missing from the finalized return", () => {
+test("Form 8862 PDF rejects a claim missing from the finalized return", () => {
   assertThrows(
     () =>
       form8862Pdf.instances?.(
@@ -178,7 +179,7 @@ Deno.test("Form 8862 PDF rejects a claim missing from the finalized return", () 
   );
 });
 
-Deno.test("Form 8862 PDF requires AOTC students to match Form 8863", () => {
+test("Form 8862 PDF requires AOTC students to match Form 8863", () => {
   const aotc = {
     claim_aotc: true,
     aotc_disallowed_year: 2023,
@@ -211,4 +212,50 @@ Deno.test("Form 8862 PDF requires AOTC students to match Form 8863", () => {
     Error,
     "reconcile",
   );
+});
+
+test("Form 8862 PDF renders once the prepared return retains the notice copy", () => {
+  const digest =
+    "1c68e71f4c34a2b3341881b3b5e7ac6fccb7514cbf14dd53e59c7ac7d5109686";
+  const source = {
+    claim_ctc: true,
+    ctc_disallowed_year: 2023,
+    ctc_disallowance_notice_reference: "Synthetic 2023 IRS CTC notice",
+    ctc_children: [{
+      first_name: "Alice",
+      last_name: "Doe",
+      lived_with_over_half_year: true,
+      qualifying_child: true,
+      dependent: true,
+      us_citizen_national_or_resident: true,
+    }],
+  };
+  const pending = {
+    general: {
+      ...noticeReviews,
+      prior_ctc_disallowance_review: {
+        ...noticeReviews.prior_ctc_disallowance_review,
+        notice_copy_sha256: digest,
+      },
+    },
+    f1040: {
+      taxpayer_ssn: "123456789",
+      line19_child_tax_credit: 2200,
+      dependent_details: [{
+        first_name: "Alice",
+        last_name: "Doe",
+        credit_category: "ctc",
+      }],
+    },
+  };
+  assertThrows(
+    () => form8862Pdf.instances?.(source, filer, pending),
+    Error,
+    "retained prior IRS notice copy with matching SHA-256",
+  );
+  const instances = form8862Pdf.instances?.(source, filer, pending, undefined, {
+    "Retained synthetic CTC notice copy": digest,
+  });
+  assertEquals(instances?.length, 1);
+  assertEquals(instances?.[0].ctc_child_0_name, "Alice Doe");
 });

@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import { f8854, inputSchema } from "../../../../../nodes/inputs/general/foreign/f8854/index.ts";
 import { assertAttachmentCoverage } from "../../../../return-processing/attachment-coverage.ts";
@@ -9,7 +10,7 @@ import { form8854InitialPdf } from "./f8854_initial.ts";
 const source = form8854InitialCash;
 const pending = { f8854: source };
 
-Deno.test("initial Form 8854 cash-only source reaches native and matching PDF Sections A-B", () => {
+test("initial Form 8854 cash-only source reaches native and matching PDF Sections A-B", () => {
   const parsed = inputSchema.parse(source);
   assertEquals(
     f8854.compute({ taxYear: 2025, formType: "f1040" }, parsed).outputs,
@@ -25,8 +26,8 @@ Deno.test("initial Form 8854 cash-only source reaches native and matching PDF Se
   const [pdf] = form8854InitialPdf.instances!(source, form8992Filer, pending);
   assertEquals(form8854InitialPdf.pageIndices!(pdf), [0, 1, 2, 3, 4]);
   assertEquals(pdf.initial_statement, true);
-  assertEquals(pdf.prior_tax_2024, 80);
-  assertEquals(pdf.prior_tax_2023, 0);
+  assertEquals(pdf.prior_tax_first_year_before, 80);
+  assertEquals(pdf.prior_tax_second_year_before, 0);
   assertEquals(pdf.cash_fmv, 100_000);
   assertEquals(pdf.cash_basis, 100_000);
   assertEquals(pdf.total_assets_fmv, 100_000);
@@ -45,7 +46,7 @@ Deno.test("initial Form 8854 cash-only source reaches native and matching PDF Se
   );
 });
 
-Deno.test("initial Form 8854 PDF rejects changed prior tax, final return, and assets", () => {
+test("initial Form 8854 PDF rejects changed prior tax, final return, and assets", () => {
   assertThrows(
     () => form8854InitialPdf.instances!(source, form8992Filer),
     Error,

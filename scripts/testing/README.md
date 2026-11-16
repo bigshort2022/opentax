@@ -6,18 +6,46 @@ pull request carries evidence instead of a description. The finish condition is
 in [AGENTS.md](../../AGENTS.md); the rule each check owns is in the table in
 [STRUCTURE.md](../../docs/architecture/STRUCTURE.md).
 
-| Command                                       | Proves                                                   | Fails when                                                                                                                                                                                                                  |
-| --------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `deno task check:structure`                   | nodes are placed, registered and reachable               | a `TaxNode` outside `forms/<form>/nodes/<role>/[<kind>/]<section>/<group>/<name>/`; a registry key that is not the node type; a node class in no registry; a registered node that nothing routes to and the CLI cannot take |
-| `deno task check:cases`                       | benchmark cases fit their node schemas and cite a source | an input `form add` would reject, with the field named; a `source` that cites the engine                                                                                                                                    |
-| `deno task check:oracle [--base origin/main]` | expected values changed only with a citation             | a changed scored value, a removed case, or a new case without a source, that has no matching entry in `benchmark/cases/<form>/<year>/ledger.json`                                                                           |
-| `deno task bench --form f1040 --year 2025`    | the engine matches IRS ground truth                      | a supported line outside the $5 legacy tolerance, an unmapped oracle, a diagnostic, a skipped case                                                                                                                          |
-| `deno task test:unit`                         | the module graph resolves and the typed tests pass       | a graph error, a missing or duplicate test module, a failing test, a runtime change during the run                                                                                                                          |
+| Command                                     | Proves                                                           | Fails when                                                                                                                                                                                                                  |
+| ------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run check:structure`                   | nodes are placed, registered and reachable                       | a `TaxNode` outside `forms/<form>/nodes/<role>/[<kind>/]<section>/<group>/<name>/`; a registry key that is not the node type; a node class in no registry; a registered node that nothing routes to and the CLI cannot take; shared code that pins a tax year beyond `year-pinned-baseline.json` |
+| `bun run check:cases`                       | benchmark cases fit their node schemas and cite a source         | an input `form add` would reject, with the field named; a `source` that cites the engine                                                                                                                                    |
+| `bun run check:oracle [--base origin/main]` | expected values changed only with a citation                     | a changed scored value, a removed case, or a new case without a source, that has no matching entry in `benchmark/cases/<form>/<year>/ledger.json`                                                                           |
+| `bun run bench --form f1040 --year 2025`    | the engine matches IRS ground truth                              | a supported line outside the $5 legacy tolerance, an unmapped oracle, a diagnostic, a skipped case                                                                                                                          |
+| `bun run check:sandbox`                     | the binary can reach the network only through restricted fetch   | a module `cli/main.ts` loads, dependencies included, that imports `child_process`, `net`, `http`, `worker_threads`, `vm`, `bun:ffi` or similar, or calls `Bun.spawn`, `eval` or a non-literal `import()`                    |
+| `bun run test:unit`                         | the module graph resolves, type-checks, and the typed tests pass | an unresolved import, a `tsc` error (strict, no unused locals or parameters), a missing or duplicate test module, a failing test, a runtime change during the run                                                           |
+| `bun run test:forms`                        | the node, MeF, validation and return-processing tests pass       | a failing test not in `scripts/testing/forms-failure-baseline.json`, an expired entry, an entry whose test now passes                                                                                                       |
+| `bun run check:cli`                         | complete sample returns work end to end through the product CLI: create, attach their files, add, get, validate, export MeF and PDF | a failing command, `return get` or MeF AGI differing from the engine, any reject-level rule, an export that needs `--force` or writes no file, or (when `irs/` has the schemas) XML that fails `Return1040.xsd` |
+| `bun run check:irs [--json]`                | which IRS schema and rule packages in `irs/` are present, against `irs/manifest.json` | a file whose SHA-256 differs from the manifest, or code naming an `irs/` location the manifest does not declare; absent packages are reported, not failed                                                          |
+| `bun run check:ats [--json]`                | each TY2025 and TY2026 IRS ATS scenario: reject-level findings, XSD validity (when `irs/` has the schemas) and packet values matched; for TY2026 also its 2026v1.0 schema gaps                                  | a readiness report, not a gate: it exits 0 while scenarios are being completed                                                                                                                                         |
+| `bun run verify:changed [base]`             | the gates a change since `base` (default `origin/main`) can reach pass | any selected gate failing, or a bench case that passes at the merge base and fails now |
+| `bun run bench:cached [bench flags]`        | same as `bench`, replayed when nothing it reads changed           | as `bench`                                                                                                                                                                                                                  |
+| `bun run check:mef [--update]`              | every signed PDF review fixture computes, builds MeF XML and passes the IRS business rules export applies | a calculation, XML or reject-level rule finding not in `scripts/testing/mef-baseline.json`, or a baselined finding that no longer occurs; `--update` rewrites the baseline |
+| `bun run check:ty2026 [--update]`           | the same sample returns run as TY2026 (`check:mef --year 2026`) with every date and year field moved one year later (`sample-year.ts`), signed and received in 2027 | a finding not in `scripts/testing/mef-baseline-2026.json`, a baselined finding that no longer occurs, or a baselined return without its reason; the clean count can only rise |
 
 Every check prints each problem with its fix, takes `--json`, and exits 1 on any
-problem. `.github/workflows/test.yml` runs the first three and `test:unit` on
-every pull request. `bench` runs locally until the baselined cases below are
-fixed, then joins them.
+problem. `.github/workflows/test.yml` runs the first three, `check:sandbox`,
+`test:unit`, `test:forms`, `check:mef`, `check:ty2026` and `check:cli` on every pull request. `bench` runs locally until the baselined
+cases below are fixed, then joins them.
+
+## Changed-only runs
+
+`verify:changed` is the local fast path; CI does not use it. It selects:
+
+- `test:unit --changed` and `test:forms --changed`: tests whose import closure
+  reaches a changed file. A changed data file selects the modules that name it.
+  A deleted module, a data file no module names, or a shared input
+  (`package.json`, `bun.lock`, `tsconfig.json`, the runner itself) selects all.
+  The type check always runs, and the forms baseline is held only to the
+  selected tests.
+- `check:mef`, `check:cli` and bench only when `cli/main.ts` loads a changed
+  file or a benchmark file changed.
+- Bench on this change and on the merge base, each keyed by a hash of every file
+  its results can depend on (the commands bench runs, runtime data, the cases,
+  the lockfile, the Bun version and the date) and stored in
+  `~/.cache/opentax-bench`. A base runs once per `main` commit; a rule-only
+  change replays both. It fails on any case that passes at the base and fails
+  now.
 
 ## Ratchets
 
@@ -25,11 +53,15 @@ Existing debt is allowed with a reason, an expiry date and an approver; new debt
 fails. An expired entry fails, and an entry that no longer matches a problem
 fails until it is removed, so a baseline only shrinks.
 
-| File                                        | Keyed by               | Holds                                               |
-| ------------------------------------------- | ---------------------- | --------------------------------------------------- |
-| `scripts/testing/structure-baseline.json`   | path, node type        | nodes outside the tree, registry and reach problems |
-| `benchmark/cases/baseline.json`             | `<form>/<year>/<case>` | cases whose inputs no longer fit their node schema  |
-| `benchmark/cases/<form>/<year>/ledger.json` | case, line             | every expected-value change, with its publication   |
+| File                                          | Keyed by               | Holds                                               |
+| --------------------------------------------- | ---------------------- | --------------------------------------------------- |
+| `scripts/testing/structure-baseline.json`     | path, node type        | nodes outside the tree, registry and reach problems |
+| `scripts/testing/year-pinned-baseline.json`   | path, pattern, count   | year-pinned shared code: the TY2026 correctness to-do; shrink with `check:structure --shrink-year-baseline` |
+| `benchmark/cases/baseline.json`               | `<form>/<year>/<case>` | cases whose inputs no longer fit their node schema  |
+| `scripts/testing/forms-failure-baseline.json` | test file, test name   | form tests known to fail                            |
+| `scripts/testing/mef-baseline.json`           | sample return id       | known calculation, XML and IRS-rule blockers, and why each is a correct block |
+| `scripts/testing/mef-baseline-2026.json`      | sample return id       | the same samples' TY2026 blockers, each with its reason: a dated 2025 fact, a 2026v1.0 schema gap, a named TY2025-only route or open TY2026 work |
+| `benchmark/cases/<form>/<year>/ledger.json`   | case, line             | every expected-value change, with its publication   |
 
 The ledger is history, not debt: it is append-only and never expires. An entry
 that cites the engine, its output or a reference calculator does not count.
@@ -46,21 +78,29 @@ rule and its enforcer in the STRUCTURE.md table.
 
 ## Test runner
 
-`deno task test:unit` runs the exact core, CLI utility and harness modules after
-checking the graph of every TypeScript module. `test:harness` selects the
-verification contracts and benchmark harness. `test:preflight` checks discovery
-and graph resolution without executing tests. Reports explicitly list excluded
-modules; a selected run does not prove complete filing coverage.
+`bun run test:unit` runs the exact core, CLI utility, network policy and harness
+modules after resolving every runtime import of every TypeScript module and
+type-checking the tree with `tsc`. Tests run under `bun test --isolate`, a fresh
+global and module registry per file, with a 30-minute per-test limit.
+`test:forms` runs every test under `forms/<form>/{nodes,mef,validation}` and
+`forms/<form>/<year>/{mef,return-processing}` in parallel workers; tests marked
+`requires: "irs-cache"` in its baseline must pass when the IRS schemas are
+installed in `irs/` (see `irs/README.md`). The domain, PDF and e2e suites are too slow for every pull
+request and stay in `bun run test`.
+`test:harness` selects the verification contracts and benchmark harness.
+`test:preflight` checks discovery and graph resolution without executing tests.
+Reports explicitly list excluded modules; a selected run does not prove complete
+filing coverage.
 
-`deno task test` runs the complete discovered suite serially, requires xmllint,
-Poppler and the retained TY2025 Return1040 schema, and rejects unavailable
-ignored requirements. Exact module/test exclusions in `skip-policy.json` require
-a documented reason; excluded tests remain unverified, and the report never
-calls a run with exclusions complete coverage. Private reviewed evidence must be
-supplied through the existing named environment inputs for the relevant optional
-filing gates. Missing inputs and ignored cases remain visible in the
-requirements and JUnit reports. A full suite is not IRS acceptance or
-independent tax ground truth.
+`bun run test` runs the complete discovered suite in isolated parallel workers,
+requires xmllint, Poppler and the retained TY2025 Return1040 schema, and rejects
+unavailable ignored requirements. Exact module/test exclusions in
+`skip-policy.json` require a documented reason; excluded tests remain
+unverified, and the report never calls a run with exclusions complete coverage.
+Private reviewed evidence must be supplied through the existing named
+environment inputs for the relevant optional filing gates. Missing inputs and
+ignored cases remain visible in the requirements and JUnit reports. A full suite
+is not IRS acceptance or independent tax ground truth.
 
 Every invocation retains a unique private directory under
 `.state/research/testing/`, including exact selected/excluded modules, module

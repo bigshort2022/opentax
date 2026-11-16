@@ -1,3 +1,5 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
 import {
   assertEquals,
   assertRejects,
@@ -21,7 +23,7 @@ import {
 } from "../../../../../nodes/inputs/credits/business/f8835/index.ts";
 
 for (const c of communityBocCases) {
-  Deno.test(`Form 8835 construction-date energy community complete return: ${c.id}`, async () => {
+  test(`Form 8835 construction-date energy community complete return: ${c.id}`, async () => {
     const { input, attachments, expected } = await communityBocFixture(c);
     const execution = f1040_2025.executeReturn(input);
     assertEquals(execution.diagnostics, []);
@@ -206,16 +208,16 @@ for (const c of communityBocCases) {
     }
     let root: string | undefined;
     try {
-      root = Deno.env.get("FORM8835_COMMUNITY_BOC_EVIDENCE_DIR");
+      root = process.env.FORM8835_COMMUNITY_BOC_EVIDENCE_DIR;
     } catch { /* optional private export */ }
     if (root) {
-      await Deno.mkdir(root, { recursive: true });
-      await Deno.writeFile(`${root}/${c.id}.pdf`, pdf);
-      await Deno.writeTextFile(`${root}/${c.id}.xml`, prepared.bundle.xml);
+      await fs.mkdir(root, { recursive: true });
+      await fs.writeFile(`${root}/${c.id}.pdf`, pdf);
+      await fs.writeFile(`${root}/${c.id}.xml`, prepared.bundle.xml);
       for (const a of attachments) {
-        await Deno.writeFile(`${root}/${c.id}-${a.fileName}`, a.bytes);
+        await fs.writeFile(`${root}/${c.id}-${a.fileName}`, a.bytes);
       }
-      await Deno.writeTextFile(
+      await fs.writeFile(
         `${root}/${c.id}.json`,
         JSON.stringify(
           {
@@ -235,15 +237,15 @@ for (const c of communityBocCases) {
   });
 }
 
-Deno.test("Form 8835 community construction: 2023 start, expired annual status, costs and continuity", async () => {
+test("Form 8835 community construction: 2023 start, expired annual status, costs and continuity", async () => {
   const item = async (i: number) =>
     inputSchema.parse({
       f8835s: (await communityBocFixture(communityBocCases[i])).input.f8835,
     }).f8835s[0];
   const first = await item(0);
-  assertEquals(calculateForm8835(first).line11, 300);
+  assertEquals(calculateForm8835(first, 2025).line11, 300);
   const jan29 = await item(2);
-  assertEquals(calculateForm8835(jan29).line11, 60);
+  assertEquals(calculateForm8835(jan29, 2025).line11, 60);
   const source = jan29.energy_community_source as any;
   source.method = "annual_nameplate_capacity";
   delete source.construction_history;
@@ -252,7 +254,7 @@ Deno.test("Form 8835 community construction: 2023 start, expired annual status, 
   delete source.independent_single_facility_reviewed;
   source.units_and_capacity_as_of_qualification_date_verified = true;
   source.qualification_date = "2025-01-01";
-  assertThrows(() => calculateForm8835(jan29), Error, "does not qualify");
+  assertThrows(() => calculateForm8835(jan29, 2025), Error, "does not qualify");
   const before = await item(2);
   const prior = before.energy_community_source as any;
   prior.qualification_date =
@@ -261,33 +263,33 @@ Deno.test("Form 8835 community construction: 2023 start, expired annual status, 
       .facility_construction_start_date =
       "2022-12-31";
   prior.construction_history.beginning.work_began_on = "2022-12-31";
-  assertThrows(() => calculateForm8835(before));
+  assertThrows(() => calculateForm8835(before, 2025));
   const costs = await item(4);
   const s = costs.energy_community_source as any;
   s.construction_history.beginning.costs[0].eligible_cost_cents = 50000;
   s.construction_history.beginning.costs[1].eligible_cost_cents = 0;
-  assertThrows(() => calculateForm8835(costs), Error, "first qualifying date");
+  assertThrows(() => calculateForm8835(costs, 2025), Error, "first qualifying date");
   const historical = await item(3);
   (historical.energy_community_source as any).generating_units[0].qualification
     .notice_appendix = "2025-31-3";
-  assertThrows(() => calculateForm8835(historical), Error, "does not qualify");
+  assertThrows(() => calculateForm8835(historical, 2025), Error, "does not qualify");
   const coal = await item(5);
   const closure =
     (coal.energy_community_source as any).generating_units[0].qualification
       .historical_closure_review;
   closure.closure_occurred_on = "2023-06-02";
-  assertThrows(() => calculateForm8835(coal), Error, "does not qualify");
+  assertThrows(() => calculateForm8835(coal, 2025), Error, "does not qualify");
   closure.closure_occurred_on = "2009-12-31";
-  assertThrows(() => calculateForm8835(coal), Error, "does not qualify");
+  assertThrows(() => calculateForm8835(coal, 2025), Error, "does not qualify");
   const history = await item(6);
   const h = (history.energy_community_source as any).construction_history;
   h.continuity.history[1].period_end = "2024-12-31";
-  assertThrows(() => calculateForm8835(history), Error, "does not reach");
+  assertThrows(() => calculateForm8835(history, 2025), Error, "does not reach");
   const inconsistent = await item(0);
   (inconsistent.energy_community_source as any).construction_history.beginning
     .work_description += " Changed reviewed record";
   assertThrows(
-    () => calculateForm8835(inconsistent),
+    () => calculateForm8835(inconsistent, 2025),
     Error,
     "histories differ",
   );

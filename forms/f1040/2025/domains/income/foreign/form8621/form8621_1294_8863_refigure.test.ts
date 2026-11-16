@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { createHash } from "node:crypto";
 import { PDFDocument } from "pdf-lib";
@@ -44,9 +47,9 @@ const holding = {
       year_end_value_usd: 20_000,
     }],
     jointly_owned_with_spouse: false,
-    shares_acquired_during_2025: true,
+    shares_acquired_during_tax_year: true,
     acquisition_date: "2025-01-01",
-    election_status: "qef_new_2025",
+    election_status: "qef_new_election",
     no_outstanding_section1294_election: true,
     issuer_record: cp("education-issuer", "2025 issuer QEF report"),
     qef_annual_statement: {
@@ -81,12 +84,12 @@ function source() {
   return input;
 }
 
-Deno.test("QEF Election B refigures actual education MAGI, phaseout, and credit capacity", async () => {
+test("QEF Election B refigures actual education MAGI, phaseout, and credit capacity", async () => {
   const input = source();
   const result = f1040_2025.executeReturn(input);
   assertEquals(result.diagnostics, []);
   const pending = buildPending(result.pending);
-  assertForm8621QefRefigureSource(pending);
+  assertForm8621QefRefigureSource(pending, { taxYear: 2025, formType: "f1040" });
   const filed = pending.f1040 as Record<string, number>;
   assertEquals(filed.line11_agi, 83_000);
   assertEquals(filed.line18_total_tax_before_credits, 9_715);
@@ -121,24 +124,24 @@ Deno.test("QEF Election B refigures actual education MAGI, phaseout, and credit 
     packet.bundle,
     origins,
   );
-  const out = Deno.env.get("FORM8621_EDUCATION_EVIDENCE_DIR") ??
+  const out = process.env.FORM8621_EDUCATION_EVIDENCE_DIR ??
     ".state/research/form8621-qef-education";
-  await Deno.mkdir(out, { recursive: true });
-  await Deno.writeTextFile(
+  await fs.mkdir(out, { recursive: true });
+  await fs.writeFile(
     `${out}/source-pending.json`,
     JSON.stringify({ input, pending }, null, 2),
   );
-  await Deno.writeTextFile(`${out}/return.xml`, xml);
-  await Deno.writeFile(`${out}/return.pdf`, pdf);
-  await Deno.writeTextFile(
+  await fs.writeFile(`${out}/return.xml`, xml);
+  await fs.writeFile(`${out}/return.pdf`, pdf);
+  await fs.writeFile(
     `${out}/origins.json`,
     JSON.stringify(origins, null, 2),
   );
-  const xsd = await new Deno.Command("xmllint", {
+  const xsd = await new sys.Command("xmllint", {
     args: [
       "--noout",
       "--schema",
-      ".state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+      "irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
       `${out}/return.xml`,
     ],
     stderr: "piped",
@@ -152,7 +155,7 @@ function educationFiler() {
   return education.filer as Parameters<typeof f1040_2025.prepareReturn>[1];
 }
 
-Deno.test("QEF education source and stale worksheet conflicts are rejected", () => {
+test("QEF education source and stale worksheet conflicts are rejected", () => {
   const stale = source();
   (stale.f8863 as Record<string, unknown>[])[0].filer_magi = 81_000;
   assertThrows(() => f1040_2025.executeReturn(stale), Error, "filed MAGI");
@@ -173,7 +176,7 @@ Deno.test("QEF education source and stale worksheet conflicts are rejected", () 
   );
 });
 
-Deno.test("native and PDF education copies reject a changed filed credit", async () => {
+test("native and PDF education copies reject a changed filed credit", async () => {
   const result = f1040_2025.executeReturn(source());
   assertEquals(result.diagnostics, []);
   const pending = structuredClone(buildPending(result.pending));
@@ -190,7 +193,7 @@ Deno.test("native and PDF education copies reject a changed filed credit", async
   );
 });
 
-Deno.test("QEF counterfactual cannot defer a change in Chapter 2A NIIT", () => {
+test("QEF counterfactual cannot defer a change in Chapter 2A NIIT", () => {
   const base = pdfReviewFixtures.find((row) =>
     row.id === "single-high-wage-no-niit"
   )!;
@@ -232,7 +235,7 @@ Deno.test("QEF counterfactual cannot defer a change in Chapter 2A NIIT", () => {
   );
 });
 
-Deno.test("issued Form 1098-T and payments retain an LLC credit-limit refigure", async () => {
+test("issued Form 1098-T and payments retain an LLC credit-limit refigure", async () => {
   const base = pdfReviewFixtures.find((row) =>
     row.id === "single-form8863-lifetime-learning-scholarship"
   )!;
@@ -292,7 +295,7 @@ Deno.test("issued Form 1098-T and payments retain an LLC credit-limit refigure",
   const result = f1040_2025.executeReturn(input);
   assertEquals(result.diagnostics, []);
   const pending = buildPending(result.pending);
-  assertForm8621QefRefigureSource(pending);
+  assertForm8621QefRefigureSource(pending, { taxYear: 2025, formType: "f1040" });
   assertEquals(pending.f1040?.line11_agi, 19_000);
   assertEquals(pending.f1040?.line18_total_tax_before_credits, 328);
   assertEquals(pending.schedule3?.line3_education_credit, 328);
@@ -321,25 +324,25 @@ Deno.test("issued Form 1098-T and payments retain an LLC credit-limit refigure",
     origins,
   );
   const out = `${
-    Deno.env.get("FORM8621_EDUCATION_EVIDENCE_DIR") ??
+    process.env.FORM8621_EDUCATION_EVIDENCE_DIR ??
       ".state/research/form8621-qef-education"
   }/issued`;
-  await Deno.mkdir(out, { recursive: true });
-  await Deno.writeTextFile(
+  await fs.mkdir(out, { recursive: true });
+  await fs.writeFile(
     `${out}/source-pending.json`,
     JSON.stringify({ input, pending }, null, 2),
   );
-  await Deno.writeTextFile(`${out}/return.xml`, packet.bundle.xml);
-  await Deno.writeFile(`${out}/return.pdf`, pdf);
-  await Deno.writeTextFile(
+  await fs.writeFile(`${out}/return.xml`, packet.bundle.xml);
+  await fs.writeFile(`${out}/return.pdf`, pdf);
+  await fs.writeFile(
     `${out}/origins.json`,
     JSON.stringify(origins, null, 2),
   );
-  const xsd = await new Deno.Command("xmllint", {
+  const xsd = await new sys.Command("xmllint", {
     args: [
       "--noout",
       "--schema",
-      ".state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+      "irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
       `${out}/return.xml`,
     ],
     stderr: "piped",
@@ -348,7 +351,7 @@ Deno.test("issued Form 1098-T and payments retain an LLC credit-limit refigure",
   assertEquals((await PDFDocument.load(pdf)).getPageCount(), origins.length);
 });
 
-Deno.test("dependent education and Schedule 8812 worksheets refigure together", async () => {
+test("dependent education and Schedule 8812 worksheets refigure together", async () => {
   const reviewed = claimantFixture("parent-two");
   const input = structuredClone(reviewed.inputs) as Record<string, unknown>;
   for (const student of input.f8863 as Record<string, unknown>[]) {
@@ -365,7 +368,7 @@ Deno.test("dependent education and Schedule 8812 worksheets refigure together", 
   const result = f1040_2025.executeReturn(input);
   assertEquals(result.diagnostics, []);
   const pending = buildPending(result.pending);
-  assertForm8621QefRefigureSource(pending);
+  assertForm8621QefRefigureSource(pending, { taxYear: 2025, formType: "f1040" });
   assertEquals(pending.f1040?.line11_agi, 77_000);
   assertEquals(pending.f1040?.line18_total_tax_before_credits, 8_395);
   assertEquals(pending.schedule3?.line3_education_credit, 3_000);
@@ -396,25 +399,25 @@ Deno.test("dependent education and Schedule 8812 worksheets refigure together", 
     origins,
   );
   const out = `${
-    Deno.env.get("FORM8621_EDUCATION_EVIDENCE_DIR") ??
+    process.env.FORM8621_EDUCATION_EVIDENCE_DIR ??
       ".state/research/form8621-qef-education"
   }/dependent`;
-  await Deno.mkdir(out, { recursive: true });
-  await Deno.writeTextFile(
+  await fs.mkdir(out, { recursive: true });
+  await fs.writeFile(
     `${out}/source-pending.json`,
     JSON.stringify({ input, pending }, null, 2),
   );
-  await Deno.writeTextFile(`${out}/return.xml`, packet.bundle.xml);
-  await Deno.writeFile(`${out}/return.pdf`, pdf);
-  await Deno.writeTextFile(
+  await fs.writeFile(`${out}/return.xml`, packet.bundle.xml);
+  await fs.writeFile(`${out}/return.pdf`, pdf);
+  await fs.writeFile(
     `${out}/origins.json`,
     JSON.stringify(origins, null, 2),
   );
-  const xsd = await new Deno.Command("xmllint", {
+  const xsd = await new sys.Command("xmllint", {
     args: [
       "--noout",
       "--schema",
-      ".state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+      "irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
       `${out}/return.xml`,
     ],
     stderr: "piped",
@@ -430,7 +433,7 @@ Deno.test("dependent education and Schedule 8812 worksheets refigure together", 
   );
 });
 
-Deno.test("QEF Election B replays sourced Form 3800 tax-limited business credit", async () => {
+test("QEF Election B replays sourced Form 3800 tax-limited business credit", async () => {
   const base = pdfReviewFixtures.find((row) =>
     row.id === "single-employer-childcare-facility-and-referral-credit"
   )!;
@@ -438,7 +441,7 @@ Deno.test("QEF Election B replays sourced Form 3800 tax-limited business credit"
   const result = f1040_2025.executeReturn(input);
   assertEquals(result.diagnostics, []);
   const pending = buildPending(result.pending);
-  assertForm8621QefRefigureSource(pending);
+  assertForm8621QefRefigureSource(pending, { taxYear: 2025, formType: "f1040" });
   assertEquals(pending.f1040?.line18_total_tax_before_credits, 18_347);
   assertEquals(pending.schedule3?.line6a_total, 9_533);
   assertEquals(pending.f1040?.form8621_1294_total_tax_before_deferral, 8_814);
@@ -467,24 +470,24 @@ Deno.test("QEF Election B replays sourced Form 3800 tax-limited business credit"
     packet.bundle,
     origins,
   );
-  const out = Deno.env.get("FORM8621_BUSINESS_EVIDENCE_DIR") ??
+  const out = process.env.FORM8621_BUSINESS_EVIDENCE_DIR ??
     ".state/research/form8621-qef-business-credit";
-  await Deno.mkdir(out, { recursive: true });
-  await Deno.writeTextFile(
+  await fs.mkdir(out, { recursive: true });
+  await fs.writeFile(
     `${out}/source-pending.json`,
     JSON.stringify({ input, pending }, null, 2),
   );
-  await Deno.writeTextFile(`${out}/return.xml`, packet.bundle.xml);
-  await Deno.writeFile(`${out}/return.pdf`, pdf);
-  await Deno.writeTextFile(
+  await fs.writeFile(`${out}/return.xml`, packet.bundle.xml);
+  await fs.writeFile(`${out}/return.pdf`, pdf);
+  await fs.writeFile(
     `${out}/origins.json`,
     JSON.stringify(origins, null, 2),
   );
-  const xsd = await new Deno.Command("xmllint", {
+  const xsd = await new sys.Command("xmllint", {
     args: [
       "--noout",
       "--schema",
-      ".state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+      "irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
       `${out}/return.xml`,
     ],
     stderr: "piped",
@@ -493,7 +496,7 @@ Deno.test("QEF Election B replays sourced Form 3800 tax-limited business credit"
   assertEquals((await PDFDocument.load(pdf)).getPageCount(), origins.length);
 });
 
-Deno.test("native and PDF business-credit copies reject a changed allowed credit", async () => {
+test("native and PDF business-credit copies reject a changed allowed credit", async () => {
   const base = pdfReviewFixtures.find((row) =>
     row.id === "single-employer-childcare-facility-and-referral-credit"
   )!;

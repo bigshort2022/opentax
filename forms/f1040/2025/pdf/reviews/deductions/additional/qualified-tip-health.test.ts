@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import {
   assertEquals,
   assertRejects,
@@ -18,7 +21,7 @@ import { buildPdfBytes } from "../../../builder.ts";
 import { tipHealthCases } from "./qualified-tip-health.fixture.ts";
 const root = "/tmp/opentax-qualified-tip-health-evidence";
 const xsd = new URL(
-  "../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+  "../../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
   import.meta.url,
 ).pathname;
 // Independently calculated profit/halfSE/health/tips/QBI/QBI-deduction/AGI/TI/ordinary/total.
@@ -110,7 +113,7 @@ const expected: Record<string, number[]> = {
   ],
 };
 for (const c of tipHealthCases) {
-  Deno.test(`actual tip health ${c.id} source/7206/SE/QBI/native/XSD/filledPDF`, async () => {
+  test(`actual tip health ${c.id} source/7206/SE/QBI/native/XSD/filledPDF`, async () => {
     const inputs = c.inputs(), r = f1040_2025.executeReturn(inputs);
     assertEquals(r.diagnostics, []);
     const p: any = normalizeAllPending(r.pending),
@@ -118,7 +121,7 @@ for (const c of tipHealthCases) {
       q = p.form8995,
       filer = extractFilerIdentity(f)!;
     const e = expected[c.id],
-      [profit, half, health, tips, qbi, ded, agi, ti, tax, total] = e;
+      [profit, half, health, tips, qbi, , , ti, tax] = e;
     assertEquals([
       p.schedule1.line3_schedule_c,
       p.schedule1.line15_se_deduction,
@@ -235,23 +238,23 @@ for (const c of tipHealthCases) {
         `<QualifiedTipsDeductionAmt>${tips}</QualifiedTipsDeductionAmt>`,
       );
     }
-    const tmp = await Deno.makeTempFile({ suffix: ".xml" });
+    const tmp = await sys.makeTempFile({ suffix: ".xml" });
     try {
-      await Deno.writeTextFile(tmp, xml);
-      const check = await new Deno.Command("xmllint", {
+      await fs.writeFile(tmp, xml);
+      const check = await new sys.Command("xmllint", {
         args: ["--noout", "--schema", xsd, tmp],
         stderr: "piped",
       }).output();
       assertEquals(check.code, 0, new TextDecoder().decode(check.stderr));
     } finally {
-      await Deno.remove(tmp);
+      await sys.remove(tmp);
     }
     const pdf = await prepared.renderPdf(), doc = await PDFDocument.load(pdf);
     assertEquals(doc.getForm().getFields().length, 0);
-    const path = await Deno.makeTempFile({ suffix: ".pdf" });
+    const path = await sys.makeTempFile({ suffix: ".pdf" });
     try {
-      await Deno.writeFile(path, pdf);
-      const out = await new Deno.Command("pdftotext", {
+      await fs.writeFile(path, pdf);
+      const out = await new sys.Command("pdftotext", {
         args: [path, "-"],
         stdout: "piped",
       }).output();
@@ -264,16 +267,16 @@ for (const c of tipHealthCases) {
       );
       assertStringIncludes(text, "Self-Employed Health Insurance Deduction");
     } finally {
-      await Deno.remove(path);
+      await sys.remove(path);
     }
-    if (Deno.args.includes("--write-review-artifacts")) {
-      await Deno.mkdir(root, { recursive: true });
-      await Deno.writeTextFile(
+    if (process.argv.slice(2).includes("--write-review-artifacts")) {
+      await fs.mkdir(root, { recursive: true });
+      await fs.writeFile(
         `${root}/${c.id}-source-input.json`,
         JSON.stringify({ inputs, pending: p }, null, 2),
       );
-      await Deno.writeTextFile(`${root}/${c.id}-full-return.xml`, xml);
-      await Deno.writeFile(`${root}/${c.id}-filled-return.pdf`, pdf);
+      await fs.writeFile(`${root}/${c.id}-full-return.xml`, xml);
+      await fs.writeFile(`${root}/${c.id}-filled-return.pdf`, pdf);
     }
     console.log(c.id, doc.getPageCount(), e);
   });
@@ -286,7 +289,7 @@ for (
     "mfj-fully-phased-out",
   ]
 ) {
-  Deno.test(`tip health ${id} rejects changed owned premium/source/income/omission`, async () => {
+  test(`tip health ${id} rejects changed owned premium/source/income/omission`, async () => {
     const c = tipHealthCases.find((c) => c.id === id)!,
       r = f1040_2025.executeReturn(c.inputs());
     assertEquals(r.diagnostics, []);
@@ -356,7 +359,7 @@ for (
   });
 }
 
-Deno.test("actual advanced WOTC fully phased-out business tips omit Schedule1A after source reconciliation", async () => {
+test("actual advanced WOTC fully phased-out business tips omit Schedule1A after source reconciliation", async () => {
   const { advancedTipInputs } = await import(
     "../business/form8995-qualified-tips.fixture.ts"
   );
@@ -397,28 +400,28 @@ Deno.test("actual advanced WOTC fully phased-out business tips omit Schedule1A a
     xml = prepared.bundle.xml;
   assertEquals(xml.includes("IRS1040Schedule1A"), false);
   assertEquals(xml.includes("<IRS8995A "), true);
-  const path = await Deno.makeTempFile({ suffix: ".xml" });
+  const path = await sys.makeTempFile({ suffix: ".xml" });
   try {
-    await Deno.writeTextFile(path, xml);
-    const out = await new Deno.Command("xmllint", {
+    await fs.writeFile(path, xml);
+    const out = await new sys.Command("xmllint", {
       args: ["--noout", "--schema", xsd, path],
       stderr: "piped",
     }).output();
     assertEquals(out.code, 0, new TextDecoder().decode(out.stderr));
   } finally {
-    await Deno.remove(path);
+    await sys.remove(path);
   }
   const pdf = await prepared.renderPdf(), doc = await PDFDocument.load(pdf);
   assertEquals(doc.getForm().getFields().length, 0);
-  if (Deno.args.includes("--write-review-artifacts")) {
+  if (process.argv.slice(2).includes("--write-review-artifacts")) {
     const id = "advanced-wotc-fully-phased-out";
-    await Deno.mkdir(root, { recursive: true });
-    await Deno.writeTextFile(
+    await fs.mkdir(root, { recursive: true });
+    await fs.writeFile(
       `${root}/${id}-source-input.json`,
       JSON.stringify({ inputs, pending: p }, null, 2),
     );
-    await Deno.writeTextFile(`${root}/${id}-full-return.xml`, xml);
-    await Deno.writeFile(`${root}/${id}-filled-return.pdf`, pdf);
+    await fs.writeFile(`${root}/${id}-full-return.xml`, xml);
+    await fs.writeFile(`${root}/${id}-filled-return.pdf`, pdf);
   }
   for (
     const mutate of [

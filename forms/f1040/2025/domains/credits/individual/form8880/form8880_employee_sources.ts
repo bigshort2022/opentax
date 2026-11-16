@@ -48,8 +48,12 @@ export function assertPublicEmployeeContributionSources(
   rawGeneral: unknown,
   rawW2: unknown,
 ): void {
+  // The return graph reports an invalid filing status; only a review needs it here.
+  const { form8880_employee_contribution_review: review } = generalSchema.pick({
+    form8880_employee_contribution_review: true,
+  }).parse(rawGeneral ?? {});
+  if (!review) return;
   const general = generalSchema.parse(rawGeneral ?? {});
-  if (!general.form8880_employee_contribution_review) return;
   if (
     general.filing_status === FilingStatus.MFJ
       ? !general.form8880_joint_distribution_review
@@ -62,7 +66,7 @@ export function assertPublicEmployeeContributionSources(
   }
 
   assertEmployeeContributionW2Sources(
-    general.form8880_employee_contribution_review,
+    review,
     z.array(w2Schema).parse(rawW2 ?? []),
     general.taxpayer_ssn,
     general.spouse_ssn,

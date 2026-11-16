@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import { calculateForm172CurrentDeduction } from "./form172_current_deduction.ts";
 function origin() {
@@ -166,7 +167,7 @@ function current(kind = "regular", base = 20000) {
     annual_review: annual(2025, base),
   };
 }
-Deno.test("Form 172 current deduction derives opening from complete ordinary history", () => {
+test("Form 172 current deduction derives opening from complete ordinary history", () => {
   const h = history([
     annual(2020),
     annual(2021, 50000),
@@ -174,17 +175,17 @@ Deno.test("Form 172 current deduction derives opening from complete ordinary his
     annual(2023),
     annual(2024),
   ], true);
-  const r = calculateForm172CurrentDeduction(origin(), h, current());
+  const r = calculateForm172CurrentDeduction(origin(), h, current(), { taxYear: 2025, formType: "f1040" });
   assertEquals(r.historyOpeningLoss, 44000);
   assertEquals(r.deduction, 16000);
   assertEquals(r.proposedSchedule1Line8a, -16000);
   assertEquals(r.closingLossBeforeExpiration, 28000);
-  assertEquals(r.carryTo2026, 28000);
+  assertEquals(r.carryToNextYear, 28000);
   assertEquals(r.publicForm1040JoinVerified, false);
   assertEquals(r.amtNolReconciled, false);
   assertEquals(r.filingReady, false);
 });
-Deno.test("Form 172 current mixed deduction uses nonfarm first after prior farm carrybacks", () => {
+test("Form 172 current mixed deduction uses nonfarm first after prior farm carrybacks", () => {
   const { o, v } = mixed();
   const h = history([
     annual(2021, 10000),
@@ -195,15 +196,16 @@ Deno.test("Form 172 current mixed deduction uses nonfarm first after prior farm 
     o,
     h,
     current("mixed_farming", 30000),
+    { taxYear: 2025, formType: "f1040" },
     v,
   );
   assertEquals(r.historyOpeningLoss, 36000);
   assertEquals(r.nonfarmingDeduction, 10000);
   assertEquals(r.farmingDeduction, 14000);
   assertEquals(r.deduction, 24000);
-  assertEquals(r.carryTo2026, 12000);
+  assertEquals(r.carryToNextYear, 12000);
 });
-Deno.test("Form 172 current deduction keeps capital absorption distinct from deductible use", () => {
+test("Form 172 current deduction keeps capital absorption distinct from deductible use", () => {
   const h = history([
     annual(2020),
     annual(2021, 50000),
@@ -213,12 +215,12 @@ Deno.test("Form 172 current deduction keeps capital absorption distinct from ded
   ], true);
   const c = current();
   c.annual_review.capital_loss_deduction.amount = 3000;
-  const r = calculateForm172CurrentDeduction(origin(), h, c);
+  const r = calculateForm172CurrentDeduction(origin(), h, c, { taxYear: 2025, formType: "f1040" });
   assertEquals(r.deduction, 16000);
   assertEquals(r.nonfarmingAbsorbed, 19000);
-  assertEquals(r.carryTo2026, 25000);
+  assertEquals(r.carryToNextYear, 25000);
 });
-Deno.test("Form 172 current oldest legacy loss expires after the twentieth forward year", () => {
+test("Form 172 current oldest legacy loss expires after the twentieth forward year", () => {
   const o = legacy();
   o.tax_year = 2005;
   o.reviewed_form1040.tax_year = 2005;
@@ -226,14 +228,14 @@ Deno.test("Form 172 current oldest legacy loss expires after the twentieth forwa
     Array.from({ length: 19 }, (_, i) => annual(2006 + i)),
     true,
   );
-  const r = calculateForm172CurrentDeduction(o, h, current());
+  const r = calculateForm172CurrentDeduction(o, h, current(), { taxYear: 2025, formType: "f1040" });
   assertEquals(r.historyOpeningLoss, 100000);
   assertEquals(r.deduction, 20000);
   assertEquals(r.closingLossBeforeExpiration, 80000);
   assertEquals(r.expiredLoss, 80000);
-  assertEquals(r.carryTo2026, 0);
+  assertEquals(r.carryToNextYear, 0);
 });
-Deno.test("Form 172 current deduction keeps exhausted history explicit without a negative zero", () => {
+test("Form 172 current deduction keeps exhausted history explicit without a negative zero", () => {
   const h = history([
     annual(2020, 100000),
     annual(2021),
@@ -241,12 +243,12 @@ Deno.test("Form 172 current deduction keeps exhausted history explicit without a
     annual(2023),
     annual(2024),
   ], true);
-  const r = calculateForm172CurrentDeduction(origin(), h, current());
+  const r = calculateForm172CurrentDeduction(origin(), h, current(), { taxYear: 2025, formType: "f1040" });
   assertEquals(r.deduction, 0);
   assertEquals(r.proposedSchedule1Line8a, 0);
-  assertEquals(r.carryTo2026, 0);
+  assertEquals(r.carryToNextYear, 0);
 });
-Deno.test("Form 172 current deduction rejects year owner asserted balance and reused-source conflicts", () => {
+test("Form 172 current deduction rejects year owner asserted balance and reused-source conflicts", () => {
   const h = history([
     annual(2020),
     annual(2021),
@@ -268,22 +270,22 @@ Deno.test("Form 172 current deduction rejects year owner asserted balance and re
       calculateForm172CurrentDeduction(origin(), h, {
         ...c,
         annual_review: { ...c.annual_review, ...patch },
-      })
+      }, { taxYear: 2025, formType: "f1040" })
     );
   }
   assertThrows(() =>
     calculateForm172CurrentDeduction(origin(), h, {
       ...c,
       opening_loss: 100000,
-    })
+    }, { taxYear: 2025, formType: "f1040" })
   );
   assertThrows(() =>
-    calculateForm172CurrentDeduction(origin(), h, c, review())
+    calculateForm172CurrentDeduction(origin(), h, c, { taxYear: 2025, formType: "f1040" }, review())
   );
   assertThrows(() =>
     calculateForm172CurrentDeduction(origin(), h, {
       ...c,
       history_kind: "mixed_farming",
-    })
+    }, { taxYear: 2025, formType: "f1040" })
   );
 });

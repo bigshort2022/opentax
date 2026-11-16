@@ -1,18 +1,15 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../scripts/support/sys.ts";
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { fromFileUrl } from "@std/path";
+import { fileURLToPath as fromFileUrl } from "node:url";
 
-Deno.test("CLI force and draft cannot export an empty return with invented identity", async () => {
-  const cwd = await Deno.makeTempDir();
+test("CLI force and draft cannot export an empty return with invented identity", async () => {
+  const cwd = await sys.makeTempDir();
   const main = fromFileUrl(new URL("../main.ts", import.meta.url));
   const run = (...args: string[]) =>
-    new Deno.Command("deno", {
+    new sys.Command(process.execPath, {
       args: [
-        "run",
-        "--frozen",
-        "--cached-only",
-        "--allow-read",
-        "--allow-write",
-        "--allow-net=www.irs.gov",
         main,
         ...args,
       ],
@@ -56,22 +53,16 @@ Deno.test("CLI force and draft cannot export an empty return with invented ident
       "needs the identified taxpayer's SSN",
     );
   } finally {
-    await Deno.remove(cwd, { recursive: true });
+    await sys.remove(cwd, { recursive: true });
   }
 });
 
-Deno.test("CLI exports a signed W-2 return as MeF XML and a filled PDF without force", async () => {
-  const cwd = await Deno.makeTempDir();
+test("CLI exports a signed W-2 return without force once the header authenticates the signer", async () => {
+  const cwd = await sys.makeTempDir();
   const main = fromFileUrl(new URL("../main.ts", import.meta.url));
   const run = (...args: string[]) =>
-    new Deno.Command("deno", {
+    new sys.Command(process.execPath, {
       args: [
-        "run",
-        "--frozen",
-        "--cached-only",
-        "--allow-read",
-        "--allow-write",
-        "--allow-net=www.irs.gov",
         main,
         ...args,
       ],
@@ -89,6 +80,7 @@ Deno.test("CLI exports a signed W-2 return as MeF XML and a filled PDF without f
       taxpayer_last_name: "Taxpayer",
       taxpayer_ssn: "111-22-3333",
       taxpayer_dob: "1985-06-01",
+      taxpayer_prior_year_agi: 28_400,
       digital_assets: false,
       taxpayer_signature_pin: "12345",
       taxpayer_signature_date: "2026-09-29",
@@ -126,6 +118,7 @@ Deno.test("CLI exports a signed W-2 return as MeF XML and a filled PDF without f
       );
       assertEquals(added.code, 0, new TextDecoder().decode(added.stderr));
     }
+    const xmlPath = `${cwd}/return.xml`;
     const mef = await run(
       "return",
       "export",
@@ -133,9 +126,15 @@ Deno.test("CLI exports a signed W-2 return as MeF XML and a filled PDF without f
       returnId,
       "--type",
       "mef",
+      "--output",
+      xmlPath,
     );
     assertEquals(mef.code, 0, new TextDecoder().decode(mef.stderr));
-    const xml = new TextDecoder().decode(mef.stdout);
+    const xml = await fs.readFile(xmlPath, "utf8");
+    assertStringIncludes(
+      xml,
+      "<SelfSelectPINGrp><PrimaryBirthDt>1985-06-01</PrimaryBirthDt><PrimaryPriorYearAGIAmt>28400</PrimaryPriorYearAGIAmt></SelfSelectPINGrp>",
+    );
     assertStringIncludes(xml, "<IRS1040 ");
     assertStringIncludes(xml, "<IRSW2 ");
     assertStringIncludes(
@@ -146,18 +145,17 @@ Deno.test("CLI exports a signed W-2 return as MeF XML and a filled PDF without f
       xml,
       "<PrimarySignatureDt>2026-09-29</PrimarySignatureDt>",
     );
-    assertStringIncludes(xml, "<NameLine1Txt>TAXPAYER&lt;TEST</NameLine1Txt>");
+    // Pub 4164 §12.5: first name, then "<", then last name.
+    assertStringIncludes(xml, "<NameLine1Txt>TEST&lt;TAXPAYER</NameLine1Txt>");
     const schema = fromFileUrl(
       new URL(
-        "../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+        "../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
         import.meta.url,
       ),
     );
-    try {
-      await Deno.stat(schema);
-      const xmlPath = `${cwd}/return.xml`;
-      await Deno.writeTextFile(xmlPath, xml);
-      const validated = await new Deno.Command("xmllint", {
+    // The IRS schema lives in irs/ and is not committed (see irs/README.md).
+    if (await sys.stat(schema).then((i) => i.isFile, () => false)) {
+      const validated = await new sys.Command("xmllint", {
         args: ["--noout", "--schema", schema, xmlPath],
         stdout: "piped",
         stderr: "piped",
@@ -167,8 +165,6 @@ Deno.test("CLI exports a signed W-2 return as MeF XML and a filled PDF without f
         0,
         new TextDecoder().decode(validated.stderr),
       );
-    } catch (error) {
-      throw error;
     }
     const pdfPath = `${cwd}/return.pdf`;
     const pdf = await run(
@@ -178,14 +174,15 @@ Deno.test("CLI exports a signed W-2 return as MeF XML and a filled PDF without f
       returnId,
       "--type",
       "pdf",
+      "--force",
       "--output",
       pdfPath,
     );
     assertEquals(pdf.code, 0, new TextDecoder().decode(pdf.stderr));
-    const bytes = await Deno.readFile(pdfPath);
+    const bytes = await sys.readBytes(pdfPath);
     assertEquals(new TextDecoder().decode(bytes.subarray(0, 5)), "%PDF-");
     assertEquals(bytes.length > 10_000, true);
   } finally {
-    await Deno.remove(cwd, { recursive: true });
+    await sys.remove(cwd, { recursive: true });
   }
 });

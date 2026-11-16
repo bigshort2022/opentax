@@ -32,6 +32,7 @@ import {
 } from "../mef/builder.ts";
 import { assertPreparedAttachmentManifest } from "../mef/attachments/prepared-attachment-manifest.ts";
 import { assertW2GPayerCopyContents } from "../mef/identity/w2g-payer-copy.ts";
+import { assertForm8874CdeStatusEvidence } from "../domains/credits/business/form8874/form8874_cde_status_evidence.ts";
 import {
   preparedSourceSha256,
   sha256Hex,
@@ -71,8 +72,8 @@ import { assertBox11Line10Sources } from "../../nodes/inputs/income/rental-passt
 import { assertForm8915FSourceLinks } from "../../nodes/inputs/income/retirement/f8915f/index.ts";
 import { assertExtensionPaymentSource } from "../domains/payments/settlement/extension-payment-reconciliation.ts";
 import { assert1099RRecipientOwner } from "../domains/income/retirement/f1099r/f1099r-recipient-owner.ts";
-import { assertNecWithholdingRecipient } from "../domains/payments/withholding/f1099n/f1099nec-withholding-owner.ts";
-import { assert1099BRecipientOwner } from "../domains/income/other/f1099b/f1099b-recipient-owner.ts";
+import { assertNecWithholdingRecipient } from "../domains/payments/withholding/f1099nec/f1099nec-withholding-owner.ts";
+import { assert1099BRecipientOwner } from "../domains/income/investments/f1099b/f1099b-recipient-owner.ts";
 import {
   assertCapitalSaleSourceRows,
   assertNoRepeatedBrokerSaleSources,
@@ -80,7 +81,7 @@ import {
 import {
   assertPatrIssuedCopies,
   assertPatrWithholdingRecipient,
-} from "../domains/payments/withholding/f1099p/f1099patr-withholding-owner.ts";
+} from "../domains/payments/withholding/f1099patr/f1099patr-withholding-owner.ts";
 import {
   assertForm4852FilingRoute,
   assertLine1aWageSource,
@@ -121,7 +122,7 @@ import {
   assertFinalBalanceProjection,
   assertQualifiedDividendSubset,
 } from "../return-processing/return-wide-arithmetic.ts";
-import { assertDividendIncomeSources } from "../domains/income/other/f1099d/f1099div-income-reconciliation.ts";
+import { assertDividendIncomeSources } from "../domains/income/investments/f1099div/f1099div-income-reconciliation.ts";
 import {
   assertScheduleBInterestJoin,
   assertScheduleBPreparedProjection,
@@ -133,7 +134,7 @@ import {
 } from "../domains/income/retirement/ssa-benefits-reconciliation.ts";
 import { assertRrb1099rPensionSource } from "../domains/income/retirement/rrb1099r-pension-reconciliation.ts";
 import { assertIra1099rIncomeSource } from "../domains/income/retirement/ira1099r-income-reconciliation.ts";
-import { assertPositiveW2GRecipient } from "../mef/forms/income/other/w2g.ts";
+import { assertPositiveW2GRecipient } from "../mef/forms/income/gambling/w2g.ts";
 import { assertForm1098IssuerCopies } from "../../nodes/inputs/deductions/mortgage/f1098/issuer_copy.ts";
 import {
   hasForm8994Claim,
@@ -143,6 +144,20 @@ import {
   assertPublicForm8839Attachments,
   hasForm8839Claim,
 } from "../../nodes/intermediate/forms/credits/individual/form8839/public_source.ts";
+import { mefTaxYear } from "../mef/support/year-config.ts";
+
+/** The printed form set and return year a packet is rendered for. */
+export interface PdfBuildOptions {
+  readonly descriptors: ReadonlyArray<PdfFormDescriptor>;
+  readonly taxYear: number;
+  /** Recorded as the packet's PDF Subject. */
+  readonly subject?: string;
+}
+
+const DEFAULT_PDF_BUILD: PdfBuildOptions = {
+  descriptors: ALL_PDF_FORMS,
+  taxYear: mefTaxYear(),
+};
 
 /** Diagnostic origin of a page in a prepared filled-PDF review packet. */
 export interface PdfPageOrigin {
@@ -575,6 +590,7 @@ async function buildPdfBytesInternal(
   preparedBundleInput?: MefBundle,
   pageOrigins?: PdfPageOrigin[],
   paperOnly4972 = false,
+  options: PdfBuildOptions = DEFAULT_PDF_BUILD,
 ): Promise<Uint8Array> {
   // Preserve the authenticated disclosure identity and XML throughout awaits.
   const preparedBundle = preparedBundleInput
@@ -585,24 +601,36 @@ async function buildPdfBytesInternal(
   assertDigitalAssetDispositionAnswer(pending);
   await assertForm1098IssuerCopies(pending);
   const normalized = normalizeAllPending(pending);
-  assertEmployeeContributionReturn(normalized);
-  assertScheduleJSourceReturn(pending, executeComposedSourceReturn);
-  assertSingleFarmQbiReturn(normalized);
+  assertEmployeeContributionReturn(normalized, options.taxYear);
+  assertScheduleJSourceReturn(
+    pending,
+    (inputs) =>
+      executeComposedSourceReturn(inputs, {
+        taxYear: options.taxYear,
+        formType: "f1040",
+      }),
+  );
+  assertSingleFarmQbiReturn(normalized, options.taxYear);
   if (normalized.f1040) {
     assertF1040FinalHeader(normalized.f1040, filer);
-    assertLine1hSupportedSource(normalized.f1040, normalized, filer);
+    assertLine1hSupportedSource(
+      normalized.f1040,
+      options.taxYear,
+      normalized,
+      filer,
+    );
   }
   assertGeneral1040HeaderSource(normalized);
-  assertGeneral1040DependentSource(normalized);
+  assertGeneral1040DependentSource(normalized, options.taxYear);
   assertGeneral1040DepositSource(normalized, filer);
   if (filer) assert1098EInterestSource(normalized, filer);
   assertExtensionPaymentSource(normalized, filer);
-  assert1099RRecipientOwner(normalized.f1099r, filer);
-  assertPositiveW2GRecipient(normalized.w2g, filer);
+  assert1099RRecipientOwner(normalized.f1099r, filer, options.taxYear);
+  assertPositiveW2GRecipient(normalized.w2g, filer, options.taxYear);
   assertNecWithholdingRecipient(normalized.f1099nec, filer);
-  assert1099BRecipientOwner(normalized.f1099b, filer);
+  assert1099BRecipientOwner(normalized.f1099b, filer, options.taxYear);
   assertNoRepeatedBrokerSaleSources(normalized.f1099b, normalized.f8949);
-  assertCapitalSaleSourceRows(normalized);
+  assertCapitalSaleSourceRows(normalized, options.taxYear);
   assertPatrIssuedCopies(normalized.f1099patr);
   assertPatrWithholdingRecipient(normalized.f1099patr, filer);
   assertLine1bHouseholdWageSource(normalized);
@@ -610,11 +638,18 @@ async function buildPdfBytesInternal(
     normalized,
     filer,
     preparedBundle?.retainedSourceDocuments !== undefined,
+    options.taxYear,
   );
   await assertForm4852RetainedEvidence(
     normalized,
     filer,
     preparedBundle?.retainedSourceDocuments ?? [],
+    options.taxYear,
+  );
+  await assertForm8874CdeStatusEvidence(
+    normalized,
+    preparedBundle?.retainedSourceDocuments ?? [],
+    options.taxYear,
   );
   reconcileForm8606RothInventories(normalized, filer);
   reconcileForm8606RothActivity(normalized, filer);
@@ -629,20 +664,23 @@ async function buildPdfBytesInternal(
   assertScheduleBPreparedProjection(normalized);
   assertTaxExemptInterestSource(normalized);
   assertBusinessSchedule1Amounts(normalized);
-  assertOwned7203RequiredCopies(normalized);
+  assertOwned7203RequiredCopies(normalized, {
+    taxYear: options.taxYear,
+    formType: "f1040",
+  });
   assertHsaExcessRequiredCopy(normalized);
   assertRequiredLtcSource({ pending: normalized, filer });
   assertLine1iCombatPayElectionSource(normalized);
   assertSchedule2W2Line13Sources(normalized);
   assertSchedule2W2Line17KSource(normalized);
   assertSchedule2Line17HSources(normalized, filer);
-  assertSchedule2Form4137Tax(normalized);
-  assertLine1cForm4137Income(normalized);
-  assertSchedule2Form8919Tax(normalized);
-  assertLine1gForm8919Wages(normalized);
-  assertSchedule2ScheduleHTax(normalized);
+  assertSchedule2Form4137Tax(normalized, options.taxYear);
+  assertLine1cForm4137Income(normalized, options.taxYear);
+  assertSchedule2Form8919Tax(normalized, options.taxYear);
+  assertLine1gForm8919Wages(normalized, options.taxYear);
+  assertSchedule2ScheduleHTax(normalized, options.taxYear);
   assertSchedule2Form8960Tax(normalized);
-  assertSchedule2ScheduleSETax(normalized);
+  assertSchedule2ScheduleSETax(normalized, options.taxYear);
   assertSchedule2Form8828Tax(normalized);
   assertSchedule2Form8936Repayment(normalized);
   assertSchedule3Form8859Credit(normalized);
@@ -653,24 +691,24 @@ async function buildPdfBytesInternal(
   assertF8288WithholdingOwner(normalized.f8288, filer);
   assertSocialSecurityBenefitSource(normalized);
   assertBenefitStatementOwner(normalized, filer);
-  assertRrb1099rPensionSource(normalized, filer);
-  assertIra1099rIncomeSource(normalized);
+  assertRrb1099rPensionSource(normalized, filer, options.taxYear);
+  assertIra1099rIncomeSource(normalized, options.taxYear);
   assertForm8915FSourceLinks(normalized);
   assertKIncomeClassification(normalized);
   if (filer) {
-    assertEitcChildSources(pending, filer);
+    assertEitcChildSources(pending, filer, options.taxYear);
     assertKReportedErrorSources(normalized, filer);
     assertScheduleCReceiptSourceIdentity(normalized, filer);
     assertScheduleCStatutoryW2Sources(normalized, filer);
     assertKWithholdingSourceIdentity(normalized, filer);
-    assertKPersonalSaleSources(pending, filer);
+    assertKPersonalSaleSources(pending, filer, options.taxYear);
     assertSchedule1Box3SourceIdentity(normalized, filer);
     assertSchedule1Box8SourceIdentity(normalized, filer);
     assertSchedule1Form8814Source(normalized);
     assertSchedule1Form8621Source({
       ...normalized,
       form8949: pending.form8949,
-    });
+    }, { taxYear: options.taxYear, formType: "f1040" });
     assertSchedule1NecSourceIdentity(normalized, filer);
     assertSchedule1KSourceIdentity(normalized, filer);
     assertScheduleFFarmSourceIdentity(normalized, filer);
@@ -699,8 +737,18 @@ async function buildPdfBytesInternal(
     throw new Error("PDF source differs from the prepared MeF return");
   }
   if (!preparedBundle) {
-    await assertForm8835TransferStatements(normalized.f8835, filer, []);
-    await assertForm8835DomesticStatements(normalized.f8835, filer, []);
+    await assertForm8835TransferStatements(
+      normalized.f8835,
+      filer,
+      [],
+      options.taxYear,
+    );
+    await assertForm8835DomesticStatements(
+      normalized.f8835,
+      filer,
+      [],
+      options.taxYear,
+    );
     await assertForm8835IncreaseStatements(normalized.f8835, filer, []);
   }
   if (preparedBundle) {
@@ -717,11 +765,13 @@ async function buildPdfBytesInternal(
       normalized.f8835,
       filer,
       preparedBundle.attachments,
+      options.taxYear,
     );
     await assertForm8835DomesticStatements(
       normalized.f8835,
       filer,
       preparedBundle.attachments,
+      options.taxYear,
     );
     await assertForm8835IncreaseStatements(
       normalized.f8835,
@@ -740,6 +790,7 @@ async function buildPdfBytesInternal(
       preparedBundle.pending,
       filer,
       preparedBundle.attachments,
+      options.taxYear,
     );
     if (
       (preparedBundle.form3800Parts === undefined) !==
@@ -870,11 +921,16 @@ async function buildPdfBytesInternal(
       form8949Rows ?? [],
     );
   }
-  assertAttachmentCoverage(normalized, "pdf", preparedBundle?.form8886Packets);
+  assertAttachmentCoverage(
+    normalized,
+    "pdf",
+    preparedBundle?.form8886Packets,
+    options.taxYear,
+  );
   const merged = await PDFDocument.create({ updateMetadata: false });
   const copyCounts = new Map<string, number>();
 
-  for (const registeredDescriptor of ALL_PDF_FORMS) {
+  for (const registeredDescriptor of options.descriptors) {
     const descriptor = paperOnly4972 &&
         registeredDescriptor.pendingKey === "form4972"
       ? form4972PaperPdf
@@ -899,6 +955,7 @@ async function buildPdfBytesInternal(
       filer,
       normalized,
       preparedBundle?.form3800Parts,
+      preparedBundle?.retainedSourceSha256ByReference,
     ) ??
       [projectedFields];
     for (const instance of instances) {
@@ -1057,6 +1114,7 @@ async function buildPdfBytesInternal(
       "No PDF forms were generated — return may have no computed data.",
     );
   }
+  if (options.subject !== undefined) merged.setSubject(options.subject);
 
   return merged.save();
 }
@@ -1067,6 +1125,7 @@ export function buildPdfBytes(
   cacheDir = ".pdf-cache",
   preparedBundle?: MefBundle,
   pageOrigins?: PdfPageOrigin[],
+  options: PdfBuildOptions = DEFAULT_PDF_BUILD,
 ): Promise<Uint8Array> {
   return buildPdfBytesInternal(
     pending,
@@ -1074,6 +1133,8 @@ export function buildPdfBytes(
     cacheDir,
     preparedBundle,
     pageOrigins,
+    false,
+    options,
   );
 }
 

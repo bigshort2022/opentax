@@ -16,6 +16,7 @@ import {
   assertForm8880TaxLimit,
   assertReviewedForm8880Outcome,
 } from "../../../../domains/credits/individual/form8880/form8880_tax_limit.ts";
+import { mefTaxYear } from "../../../support/year-config.ts";
 
 // The calculator self-emits these line values for both PDF and MeF. The
 // v5.4 XSD retains legacy-looking element names for lines 1 and 2; map by
@@ -123,7 +124,11 @@ function buildIRS8880(fields: Input, context?: MefBuildContext): string {
         "Form 8880 zero-credit outcome conflicts with native lines",
       );
     }
-    assertReviewedForm8880Outcome(fields, context?.pending ?? {});
+    assertReviewedForm8880Outcome(
+      fields,
+      context?.pending ?? {},
+      mefTaxYear(context),
+    );
     return "";
   }
   if (!hasPrintLine) {
@@ -200,6 +205,7 @@ function buildIRS8880(fields: Input, context?: MefBuildContext): string {
       source.taxpayer_dob,
       source.taxpayer_student_five_months,
       source.taxpayer_claimed_as_dependent,
+      mefTaxYear(context),
     );
   }
   if ((fields.print_line6b_eligible ?? 0) > 0) {
@@ -208,6 +214,7 @@ function buildIRS8880(fields: Input, context?: MefBuildContext): string {
       source.spouse_dob,
       source.spouse_student_five_months,
       source.spouse_claimed_as_dependent,
+      mefTaxYear(context),
     );
   }
   assertForm8880TaxLimit(
@@ -215,7 +222,11 @@ function buildIRS8880(fields: Input, context?: MefBuildContext): string {
     credit,
     context.pending,
   );
-  assertForm8880FiledCalculation(fields, context.pending);
+  assertForm8880FiledCalculation(
+    fields,
+    context.pending,
+    mefTaxYear(context),
+  );
   const children = FIELD_MAP.map(([key, tag]) => {
     const value = fields[key];
     return value === undefined ? "" : element(tag, value);

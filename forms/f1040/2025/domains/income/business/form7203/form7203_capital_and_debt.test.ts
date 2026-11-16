@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import { f1040_2025 } from "../../../../index.ts";
 import { FilingStatus as InputFilingStatus } from "../../../../../nodes/types.ts";
@@ -29,7 +30,7 @@ const ledger = {
   all_shares_one_stock_block: true,
   no_current_year_stock_transactions: true,
   no_section_1367_1_g_election: true,
-  no_other_2025_stock_basis_changes: true,
+  no_other_current_year_stock_basis_changes: true,
   no_other_schedule_e_activity: true,
   materially_participated_in_s_corporation: true,
   material_participation_workpaper_reference: "2025 participation log",
@@ -39,7 +40,7 @@ const ledger = {
 };
 
 const note = {
-  kind: "new_2025_formal_notes",
+  kind: "new_current_year_formal_notes",
   shareholder_ssn: "123456789",
   corporation_ein: "987654321",
   k1_source_document_reference: "2025 signed S corporation K-1",
@@ -59,9 +60,9 @@ const note = {
   beginning_note_face_amount: 0,
   beginning_note_debt_basis: 0,
   no_other_shareholder_debt_confirmed: true,
-  no_2025_repayments_confirmed: true,
+  no_current_year_repayments_confirmed: true,
   no_prior_reduced_debt_basis_confirmed: true,
-  no_other_2025_basis_changes_confirmed: true,
+  no_other_current_year_basis_changes_confirmed: true,
   no_prior_suspended_losses_confirmed: true,
 };
 
@@ -121,7 +122,7 @@ function filedReturn(k1: Record<string, unknown> = source) {
   return result;
 }
 
-Deno.test("Form 7203 cash capital and separate new note allocate current K-1 loss through return, native and PDF", async () => {
+test("Form 7203 cash capital and separate new note allocate current K-1 loss through return, native and PDF", async () => {
   const result = filedReturn();
   assertEquals(result.diagnostics, []);
   const pending = normalizeAllPending(result.pending);
@@ -162,7 +163,7 @@ Deno.test("Form 7203 cash capital and separate new note allocate current K-1 los
   await prepared.renderPdf();
 });
 
-Deno.test("Form 7203 capital-and-debt route rejects overlapping source and altered pending return", () => {
+test("Form 7203 capital-and-debt route rejects overlapping source and altered pending return", () => {
   const overlap = filedReturn({
     ...source,
     form7203_stock_loss_ledger: {
@@ -200,7 +201,7 @@ Deno.test("Form 7203 capital-and-debt route rejects overlapping source and alter
 
 const repaidNote = {
   ...note,
-  no_2025_repayments_confirmed: false,
+  no_current_year_repayments_confirmed: false,
   principal_repayments: [{
     formal_note_id: note.formal_note_id,
     date: "2025-09-15",
@@ -218,7 +219,7 @@ const repaidSource = {
   form7203_debt_evidence: repaidNote,
 };
 
-Deno.test("Form 7203 cash capital plus a partially repaid new note support one K-1 loss through return, native and PDF", async () => {
+test("Form 7203 cash capital plus a partially repaid new note support one K-1 loss through return, native and PDF", async () => {
   const result = filedReturn(repaidSource);
   assertEquals(result.diagnostics, []);
   const pending = normalizeAllPending(result.pending);
@@ -252,7 +253,7 @@ Deno.test("Form 7203 cash capital plus a partially repaid new note support one K
   await prepared.renderPdf();
 });
 
-Deno.test("Form 7203 sums two dated principal repayments on one fully based note before loss allocation", async () => {
+test("Form 7203 sums two dated principal repayments on one fully based note before loss allocation", async () => {
   const twoRepayments = {
     ...repaidNote,
     principal_repayments: [{
@@ -381,7 +382,7 @@ Deno.test("Form 7203 sums two dated principal repayments on one fully based note
   );
 });
 
-Deno.test("Form 7203 combined capital, note and repayment reject cross-source or return tampering", () => {
+test("Form 7203 combined capital, note and repayment reject cross-source or return tampering", () => {
   const overlap = filedReturn({
     ...repaidSource,
     form7203_debt_evidence: {

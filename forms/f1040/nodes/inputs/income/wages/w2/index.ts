@@ -36,7 +36,7 @@ import { f1040 } from "../../../../outputs/general/return-assembly/f1040/index.t
 import { schedule1 } from "../../../../outputs/general/return-assembly/schedule1/index.ts";
 import { f8812 } from "../../../credits/child/f8812/index.ts";
 import type { NodeContext } from "../../../../../../../core/types/node-context.ts";
-import { CONFIG_BY_YEAR } from "../../../../config/index.ts";
+import { CONFIG_BY_YEAR, configForYear } from "../../../../config/index.ts";
 import {
   isQualifiedTipsOccupationCode,
   schedule1a,
@@ -73,6 +73,8 @@ export enum Box12Code {
   R = "R", // Employer contributions to Archer MSA
   S = "S", // 408(p) SIMPLE salary reduction contributions
   T = "T", // Adoption benefits
+  TP = "TP", // Cash tips reported to the employer (2026 W-2)
+  TT = "TT", // Qualified overtime compensation (2026 W-2)
   V = "V", // Income from exercise of nonstatutory stock options
   W = "W", // Employer contributions to HSA
   Y = "Y", // 409A nonqualified deferred compensation deferrals
@@ -170,11 +172,16 @@ export const w2ItemSchema = z.object({
   box11_nonqual_plans: z.number().nonnegative().optional().describe(
     "Nonqualified plans — included in box 1 wages",
   ),
+  // The part of box 1 (shown in box 11) that is a distribution from a
+  // nonqualified deferred compensation or nongovernmental section 457(b)
+  // plan: Schedule 1 line 8t, not Form 1040 line 1a (2025 Instructions for
+  // Form 1040, line 1a and Schedule 1 line 8t).
+  box11_nqdc_distribution: z.number().nonnegative().optional(),
   box12_entries: z.array(box12EntrySchema).optional().describe(
     "Coded benefit/deferral entries (up to 4 per W-2)",
   ),
   excess_deferral_review: excessDeferralReviewSchema.optional().describe(
-    "Reviewed non-SIMPLE 401(k), age, and W-2 evidence for a 2025 code D excess deferral",
+    "Reviewed non-SIMPLE 401(k), age, and W-2 evidence for a code D excess deferral",
   ),
   box13_statutory_employee: z.boolean().optional().describe(
     "Statutory employee — wages go to Schedule C, not line 1a",
@@ -253,6 +260,9 @@ export const w2ItemSchema = z.object({
   taxpayer_age: z.number().nonnegative().optional().describe(
     "Taxpayer age — used for retirement contribution limit (catch-up)",
   ),
+  // The employee's date of birth from the return's general information;
+  // sets the IRC §414(v) catch-up added to the elective deferral limit.
+  owner_birth_date: z.string().date().optional(),
 }).superRefine((item, ctx) => {
   const review = item.nonstandard_document_review;
   if (
@@ -275,15 +285,37 @@ export const inputSchema = z.object({
   f8958_allocation: form8958InputSchema.optional(),
   patron_filing_review: patronReviewSchema.optional(),
   owner_identity: ownerIdentitySchema.optional(),
-}).transform(({ substitute_w2s, ...input }, ctx) => {
-  const w2s = [...input.w2s, ...(substitute_w2s ?? [])];
+  owner_birth_dates: z.array(
+    z.object({
+      ssn: z.string().regex(/^\d{9}$/),
+      date_of_birth: z.string().date(),
+    }).strict(),
+  ).optional(),
+}).transform(({ substitute_w2s, owner_birth_dates, ...input }, ctx) => {
+  const birthDate = (item: z.infer<typeof w2ItemSchema>) => {
+    const ssn = item.employee_ssn?.replace(/\D/g, "");
+    return item.owner_birth_date ??
+      (ssn
+        ? owner_birth_dates?.find((owner) => owner.ssn === ssn)
+        : owner_birth_dates?.length === 1
+        ? owner_birth_dates[0]
+        : undefined)?.date_of_birth;
+  };
+  const withBirthDate = (item: z.infer<typeof w2ItemSchema>) => {
+    const date = birthDate(item);
+    return date === undefined ? item : { ...item, owner_birth_date: date };
+  };
+  const w2s = [...input.w2s, ...(substitute_w2s ?? [])].map(withBirthDate);
   if (w2s.length === 0) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: "At least one source is required",
     });
   }
-  return { ...input, w2s } as Omit<typeof input, "substitute_w2s"> & {
+  return { ...input, owner_birth_dates, w2s } as
+    & Omit<typeof input, "substitute_w2s">
+    & { owner_birth_dates?: typeof owner_birth_dates }
+    & {
     substitute_w2s?: z.infer<typeof w2ItemSchema>[];
   };
 });
@@ -332,11 +364,24 @@ const ELECTIVE_DEFERRAL_CODES = new Set<Box12Code>([
   Box12Code.EE,
 ]);
 
-/** The one supported 2025 line 1h W-2 excess: traditional, non-SIMPLE code D. */
-export function codeDExcessDeferral(w2s: W2Items): {
+/** The one supported line 1h W-2 excess: traditional, non-SIMPLE code D. */
+export function codeDExcessDeferral(w2s: W2Items, taxYear: number): {
   amount: number;
   owners: string[];
 } {
+  const limits = configForYear(taxYear).retirementLimits["401k"];
+  const baseLimit = limits[49];
+  // 2025 Form 1040 instructions, line 1h: only deferrals over the limit are
+  // income. Code D at or under the base limit across every W-2 has no excess
+  // for anyone, so no owner or plan review is needed.
+  const totalCodeD = w2s.reduce(
+    (sum, item) =>
+      sum +
+      (item.box12_entries ?? []).filter((entry) => entry.code === Box12Code.D)
+        .reduce((subtotal, entry) => subtotal + entry.amount, 0),
+    0,
+  );
+  if (totalCodeD <= baseLimit) return { amount: 0, owners: [] };
   const candidateOwners = new Set<string>();
   for (const item of w2s) {
     if (
@@ -363,7 +408,21 @@ export function codeDExcessDeferral(w2s: W2Items): {
           .reduce((subtotal, entry) => subtotal + entry.amount, 0),
       0,
     );
-    if (codeD <= 23_500) continue;
+    if (codeD <= baseLimit) continue;
+    // IRC §414(v) catch-up: 7,500 at 50 or older, 11,250 at 60-63 for 2025,
+    // by age at the end of the year (Form 1040 instructions, line 1h).
+    const ownerBirthDates = new Set(
+      items.map((item) => item.owner_birth_date).filter(Boolean),
+    );
+    if (ownerBirthDates.size === 1) {
+      const age = taxYear - Number([...ownerBirthDates][0]!.slice(0, 4));
+      const ownerLimit = age >= 60 && age <= 63
+        ? limits[63]
+        : age >= 50
+        ? limits[59]
+        : baseLimit;
+      if (codeD <= ownerLimit) continue;
+    }
     const sourceItems = items.filter((item) =>
       (item.box12_entries ?? []).some((entry) =>
         entry.code === Box12Code.D && entry.amount > 0
@@ -379,7 +438,7 @@ export function codeDExcessDeferral(w2s: W2Items): {
     const birth = date ? new Date(`${date}T00:00:00Z`) : new Date(Number.NaN);
     const reviewedAge = Number.isFinite(birth.getTime()) &&
         birth.toISOString().slice(0, 10) === date
-      ? 2025 - birth.getUTCFullYear()
+      ? taxYear - birth.getUTCFullYear()
       : undefined;
     const reviewedCatchUp = reviewedAge !== undefined && reviewedAge >= 50 &&
       reviewedAge <= 100 &&
@@ -400,7 +459,7 @@ export function codeDExcessDeferral(w2s: W2Items): {
       );
     if (
       reviewedCatchUp && Number.isSafeInteger(codeD) &&
-      codeD <= (reviewedAge >= 60 && reviewedAge <= 63 ? 34_750 : 31_000)
+      codeD <= (reviewedAge >= 60 && reviewedAge <= 63 ? limits[63] : limits[59])
     ) continue;
     if (
       items.some((item) =>
@@ -433,17 +492,17 @@ export function codeDExcessDeferral(w2s: W2Items): {
       dates.some((value) => value !== date) ||
       !Number.isFinite(birth.getTime()) ||
       birth.toISOString().slice(0, 10) !== date ||
-      date! < "1976-01-01" || date! > "2025-12-31" ||
+      date! < `${taxYear - 49}-01-01` || date! > `${taxYear}-12-31` ||
       sourceItems.some((item) =>
         item.taxpayer_age !== undefined &&
-        item.taxpayer_age !== 2025 - birth.getUTCFullYear()
+        item.taxpayer_age !== taxYear - birth.getUTCFullYear()
       )
     ) {
       throw new Error(
         "W-2 line 1h code D excess needs distinct employer W-2s, one under-50 owner, reviewed non-SIMPLE plans, and no competing deferrals",
       );
     }
-    amount += codeD - 23_500;
+    amount += codeD - baseLimit;
     owners.push(owner);
   }
   return { amount, owners };
@@ -472,8 +531,39 @@ function retirementLimit(
   return limits[Infinity];
 }
 
+function codeTTAmount(item: W2Item): number {
+  return (item.box12_entries ?? [])
+    .filter((entry) => entry.code === Box12Code.TT)
+    .reduce((sum, entry) => sum + entry.amount, 0);
+}
+
+function codeTPAmount(item: W2Item): number {
+  return (item.box12_entries ?? [])
+    .filter((entry) => entry.code === Box12Code.TP)
+    .reduce((sum, entry) => sum + entry.amount, 0);
+}
+
+/**
+ * 2026 W-2 box 12 code TP: total cash tips reported to the employer, with the
+ * Treasury Tipped Occupation Code in box 14b (2026 General Instructions for
+ * Forms W-2 and W-3, Code TP). Draft 2026 Schedule 1-A line 4 column (iii)
+ * takes this amount for a qualifying occupation.
+ */
+function claimsCodeTP(item: W2Item): boolean {
+  return codeTPAmount(item) > 0 &&
+    item.box14b_tipped_code !== undefined &&
+    isQualifiedTipsOccupationCode(item.box14b_tipped_code);
+}
+
+/** From 2026 a reviewed overtime claim reads box 12 code TT when it is reported. */
+function claimsCodeTT(item: W2Item, taxYear: number): boolean {
+  return taxYear >= 2026 && item.flsa_overtime_review !== undefined &&
+    codeTTAmount(item) > 0;
+}
+
 function validateItem(
   item: W2Item,
+  taxYear: number,
   ssWageBase: number,
   ssTaxPerEmployer: number,
   retirementLimits: Record<string, Record<number, number>>,
@@ -487,7 +577,10 @@ function validateItem(
     );
     if (
       [statement, aggregate, doubleTime].filter(Boolean).length > 1 ||
-      (doubleTime
+      (claimsCodeTT(item, taxYear)
+        ? premiums.length !== 0 || statement || aggregate || doubleTime ||
+          codeTTAmount(item) > item.box1_wages
+        : doubleTime
         ? premiums.length !== 0 ||
           doubleTime.excess_over_regular_pay > item.box1_wages ||
           doubleTime.excess_over_regular_pay % 2 !== 0 ||
@@ -522,6 +615,24 @@ function validateItem(
       );
     }
   }
+  if (codeTPAmount(item) > 0) {
+    // Code TP first appears on the 2026 Form W-2.
+    const codeTPReported = taxYear >= 2026;
+    if (!codeTPReported) {
+      throw new Error("W-2 box 12 code TP tips need tax year 2026 or later");
+    }
+    if (
+      item.box14b_tipped_code === undefined ||
+      item.qualified_tips_box14_review !== undefined ||
+      !Number.isSafeInteger(codeTPAmount(item)) ||
+      codeTPAmount(item) > item.box1_wages ||
+      item.box13_statutory_employee === true
+    ) {
+      throw new Error(
+        "W-2 box 12 code TP needs a box 14b occupation code and whole-dollar tips included in box 1",
+      );
+    }
+  }
   if (item.qualified_tips_box14_review !== undefined) {
     const review = item.qualified_tips_box14_review;
     const matches = (item.box14_entries ?? []).filter((entry) =>
@@ -549,7 +660,7 @@ function validateItem(
   if (
     item.box14b_tipped_code !== undefined &&
     isQualifiedTipsOccupationCode(item.box14b_tipped_code) &&
-    (item.box7_ss_tips ?? 0) > 0 &&
+    ((item.box7_ss_tips ?? 0) > 0 || codeTPAmount(item) > 0) &&
     !/^\d{9}$/.test(item.employee_ssn?.replaceAll("-", "") ?? "")
   ) {
     throw new Error("W-2 qualified tips need a nine-digit employee SSN");
@@ -557,11 +668,19 @@ function validateItem(
   if (
     item.box14b_tipped_code !== undefined &&
     isQualifiedTipsOccupationCode(item.box14b_tipped_code) &&
-    (item.box7_ss_tips ?? 0) > 0 &&
+    ((item.box7_ss_tips ?? 0) > 0 || codeTPAmount(item) > 0) &&
     (!/^\d{2}-?\d{7}$/.test(item.employer_ein ?? "") ||
       !item.employer_name?.trim())
   ) {
     throw new Error("W-2 qualified tips need employer EIN and name");
+  }
+  if (
+    (item.box11_nqdc_distribution ?? 0) > (item.box11_nonqual_plans ?? 0) ||
+    (item.box11_nqdc_distribution ?? 0) > item.box1_wages
+  ) {
+    throw new Error(
+      "W-2 box 11 NQDC distribution cannot exceed box 11 or box 1",
+    );
   }
   const ssWages = (item.box3_ss_wages ?? 0) + (item.box7_ss_tips ?? 0);
   const rrtaCompensation = box14Amount(item, "RRTA compensation") ?? 0;
@@ -579,12 +698,6 @@ function validateItem(
     throw new Error(
       "W-2 RRTA compensation cannot share FICA social security or Medicare boxes",
     );
-  }
-  if (
-    (item.box6_medicare_withheld ?? 0) > 0 &&
-    (item.box5_medicare_wages ?? 0) === 0
-  ) {
-    throw new Error("W-2 box 6 Medicare withholding needs box 5 wages");
   }
   if (
     (box14Amount(item, "RRTA compensation") ?? 0) === 0 &&
@@ -662,9 +775,21 @@ function withholdingFields(w2s: W2Items): F1040Input {
   };
 }
 
+/** Box 1 wages less a box 11 NQDC or nongovernmental 457 distribution. */
+function lineOneWages(item: W2Item): number {
+  return item.box1_wages - (item.box11_nqdc_distribution ?? 0);
+}
+
+function nqdcDistributionTotal(w2s: W2Items): number {
+  return w2s.reduce(
+    (sum, item) => sum + (item.box11_nqdc_distribution ?? 0),
+    0,
+  );
+}
+
 function wageFields(w2s: W2Items): F1040Input {
   const total = regularItems(w2s).reduce(
-    (sum, item) => sum + item.box1_wages,
+    (sum, item) => sum + lineOneWages(item),
     0,
   );
   return total > 0 ? { line1a_wages: total } : {};
@@ -673,6 +798,7 @@ function wageFields(w2s: W2Items): F1040Input {
 function communityW2Fields(
   w2s: W2Items,
   allocation: NonNullable<z.infer<typeof inputSchema>["f8958_allocation"]>,
+  taxYear: number,
 ): F1040Input {
   const item = w2s[0];
   const wages = allocation.rows.find((row) =>
@@ -684,8 +810,8 @@ function communityW2Fields(
   if (
     w2s.length !== 1 || !item || !wages || !withholding ||
     allocation.rows.length !== 2 ||
-    allocation.community_property_period.from !== "2025-01-01" ||
-    allocation.community_property_period.through !== "2025-12-31" ||
+    allocation.community_property_period.from !== `${taxYear}-01-01` ||
+    allocation.community_property_period.through !== `${taxYear}-12-31` ||
     wages.allocation_basis !== AllocationBasis.CommunityEqual ||
     withholding.allocation_basis !== AllocationBasis.CommunityEqual ||
     wages.source_document_id !== withholding.source_document_id ||
@@ -760,13 +886,22 @@ function excessSsOutput(
         : 0), 0));
     return excess > 0 ? [output(schedule3, { line11_excess_ss: excess })] : [];
   }
-  const totalSsWithheld = w2s.reduce(
-    (sum, item) => sum + (item.box4_ss_withheld ?? 0),
-    0,
-  );
-  const excess = Math.round(totalSsWithheld - ssTaxPerEmployer);
-  if (w2s.length < 2 || excess <= 0) return [];
-  return [output(schedule3, { line11_excess_ss: excess })];
+  // Without every employer EIN, still figure each spouse separately
+  // (Schedule 3 line 11 instructions); W-2s with no employee SSN form one
+  // unidentified group.
+  const owners = new Map<string, { copies: number; withheld: number }>();
+  for (const row of w2s) {
+    const owner = row.employee_ssn?.replace(/\D/g, "") ?? "";
+    const group = owners.get(owner) ?? { copies: 0, withheld: 0 };
+    owners.set(owner, {
+      copies: group.copies + 1,
+      withheld: group.withheld + (row.box4_ss_withheld ?? 0),
+    });
+  }
+  const excess = Math.round([...owners.values()].reduce((sum, owner) =>
+    sum +
+    (owner.copies > 1 ? Math.max(0, owner.withheld - ssTaxPerEmployer) : 0), 0));
+  return excess > 0 ? [output(schedule3, { line11_excess_ss: excess })] : [];
 }
 
 function statutoryOutput(w2s: W2Items): NodeOutput[] {
@@ -794,8 +929,25 @@ function statutoryOutput(w2s: W2Items): NodeOutput[] {
   return [output(schedule_c, { statutory_w2_sources: sources })];
 }
 
+/** Box 6 Medicare tax with no box 5 wage base, as on a pay-stub Form 4852. */
+function missingMedicareWageBase(item: W2Item): boolean {
+  return (item.box6_medicare_withheld ?? 0) > 0 &&
+    (item.box5_medicare_wages ?? 0) === 0;
+}
+
+/** Notes for W-2s kept without the wage bases Form 8959 needs. */
+function missingWageBaseWarnings(w2s: W2Items): string[] {
+  return w2s.filter(missingMedicareWageBase).map((item) =>
+    `W-2${
+      item.employer_name ? ` from ${item.employer_name}` : ""
+    } has box 6 Medicare tax but no box 5 Medicare wages; its wages and withholding are kept, and Form 8959 Additional Medicare Tax leaves it out until box 5 is entered`
+  );
+}
+
 function medicareOutput(w2s: W2Items): NodeOutput[] {
-  const ficaItems = w2s.filter(
+  // Form 8959 lines 1 and 19 pair box 6 with box 5; a W-2 missing box 5
+  // cannot supply either line.
+  const ficaItems = w2s.filter((item) => !missingMedicareWageBase(item)).filter(
     (item) =>
       item.box5_medicare_wages !== undefined ||
       item.box6_medicare_withheld !== undefined ||
@@ -926,11 +1078,13 @@ function scheduleAOutput(w2s: W2Items): NodeOutput[] {
     .flatMap((item) => item.box14_entries ?? [])
     .filter((entry) => entry.is_state_sdi_pfml)
     .reduce((sum, entry) => sum + entry.amount, 0);
-  const line5b = regularItems(w2s).reduce(
+  // A statutory employee's box 1 moves to Schedule C; boxes 17 and 19 remain
+  // personal state and local income tax.
+  const line5b = w2s.reduce(
     (sum, item) => sum + (item.box17_state_withheld ?? 0),
     0,
   );
-  const line5c = regularItems(w2s).reduce(
+  const line5c = w2s.reduce(
     (sum, item) => sum + (item.box19_local_withheld ?? 0),
     0,
   );
@@ -940,7 +1094,7 @@ function scheduleAOutput(w2s: W2Items): NodeOutput[] {
   // All three contribute to Schedule A line 5a (state and local income taxes)
   const stateTaxTotal = line5a + line5b + line5c;
   if (stateTaxTotal === 0) return [];
-  return [output(schedule_a, { line_5a_state_income_tax: stateTaxTotal })];
+  return [output(schedule_a, { w2_state_local_income_tax: stateTaxTotal })];
 }
 
 // Route combined W-2 SS wages (box 3 + box 7 tips) to Schedule SE.
@@ -960,6 +1114,7 @@ function scheduleSEOutput(w2s: W2Items): NodeOutput[] {
 function qualifiedTipsOutput(w2s: W2Items): NodeOutput[] {
   const tips = regularItems(w2s)
     .filter((item) =>
+      claimsCodeTP(item) ||
       item.qualified_tips_box14_review !== undefined ||
       (item.box14b_tipped_code !== undefined &&
         isQualifiedTipsOccupationCode(item.box14b_tipped_code) &&
@@ -967,16 +1122,21 @@ function qualifiedTipsOutput(w2s: W2Items): NodeOutput[] {
     )
     .map((item) => {
       const review = item.qualified_tips_box14_review;
+      const codeTP = claimsCodeTP(item);
       return {
         employee_ssn: item.employee_ssn!,
         employer_ein: item.employer_ein!,
         employer_name: item.employer_name!,
-        amount: review === undefined
+        amount: codeTP
+          ? codeTPAmount(item)
+          : review === undefined
           ? item.box7_ss_tips!
           : box14Amount(item, review.box14_description)!,
         box5_medicare_wages: item.box5_medicare_wages,
         occupation_code: review?.occupation_code ?? item.box14b_tipped_code!,
-        source_type: review === undefined
+        source_type: codeTP
+          ? "w2_code_tp" as const
+          : review === undefined
           ? "w2_box7" as const
           : "w2_box14" as const,
       };
@@ -986,9 +1146,14 @@ function qualifiedTipsOutput(w2s: W2Items): NodeOutput[] {
     : [];
 }
 
-function qualifiedOvertimeOutput(w2s: W2Items): NodeOutput[] {
-  const premiums = regularItems(w2s)
-    .filter((item) => item.flsa_overtime_review !== undefined)
+function qualifiedOvertimeOutput(
+  w2s: W2Items,
+  taxYear: number,
+): NodeOutput[] {
+  const statementPremiums = regularItems(w2s)
+    .filter((item) =>
+      item.flsa_overtime_review !== undefined && !claimsCodeTT(item, taxYear)
+    )
     .map((item) => ({
       employee_ssn: item.employee_ssn!,
       employer_ein: item.employer_ein!,
@@ -1030,9 +1195,30 @@ function qualifiedOvertimeOutput(w2s: W2Items): NodeOutput[] {
         }
         : {}),
     }));
+  const premiums = [...statementPremiums, ...codeTTOvertime(w2s, taxYear)];
   return premiums.length > 0
     ? [output(schedule1a, { qualified_w2_overtime: premiums })]
     : [];
+}
+
+/**
+ * 2026 W-2 box 12 code TT: the employer-reported premium portion of FLSA
+ * overtime (2026 General Instructions for Forms W-2 and W-3, Code TT), which
+ * draft 2026 Schedule 1-A lines 16a-16e take per employer.
+ */
+function codeTTOvertime(w2s: W2Items, taxYear: number) {
+  return regularItems(w2s)
+    .filter((item) => claimsCodeTT(item, taxYear))
+    .map((item) => ({
+      employee_ssn: item.employee_ssn!,
+      employer_ein: item.employer_ein!,
+      amount: codeTTAmount(item),
+      box1_wages: item.box1_wages,
+      covered_nonexempt_employee: true as const,
+      premium_included_in_box1: true as const,
+      source_reference: item.flsa_overtime_review!.source_reference,
+      w2_box12_code_tt: true as const,
+    }));
 }
 
 function box12NodeOutputs(w2s: W2Items): NodeOutput[] {
@@ -1229,6 +1415,7 @@ class W2Node extends TaxNode<typeof inputSchema> {
     for (const item of input.w2s) {
       validateItem(
         item,
+        ctx.taxYear,
         cfg.ssWageBase,
         cfg.ssTaxPerEmployer,
         cfg.retirementLimits,
@@ -1240,6 +1427,7 @@ class W2Node extends TaxNode<typeof inputSchema> {
         JSON.stringify(
           inputSchema.parse({
             w2s: patronW2Sources(input.patron_filing_review),
+            owner_birth_dates: input.owner_birth_dates,
           }).w2s,
         )
     ) {
@@ -1247,12 +1435,10 @@ class W2Node extends TaxNode<typeof inputSchema> {
         "Patron reviewed owner W-2 sources differ from public issued copies",
       );
     }
-    const excessDeferral = ctx.taxYear === 2025
-      ? codeDExcessDeferral(input.w2s)
-      : { amount: 0, owners: [] };
+    const excessDeferral = codeDExcessDeferral(input.w2s, ctx.taxYear);
 
     const incomeTaxFields = input.f8958_allocation
-      ? communityW2Fields(input.w2s, input.f8958_allocation)
+      ? communityW2Fields(input.w2s, input.f8958_allocation, ctx.taxYear)
       : { ...withholdingFields(input.w2s), ...wageFields(input.w2s) };
     const f1040Fields: F1040Input = {
       ...incomeTaxFields,
@@ -1300,7 +1486,7 @@ class W2Node extends TaxNode<typeof inputSchema> {
         : []),
       output(form8919, { w2_sources: form8919W2Sources(input.w2s) }),
       ...qualifiedTipsOutput(input.w2s),
-      ...qualifiedOvertimeOutput(input.w2s),
+      ...qualifiedOvertimeOutput(input.w2s, ctx.taxYear),
       ...box12NodeOutputs(input.w2s),
       this.outputNodes.output(f1040, f1040Fields as AtLeastOne<F1040Input>),
     ];
@@ -1335,6 +1521,13 @@ class W2Node extends TaxNode<typeof inputSchema> {
     if (excessDeferral.amount > 0) {
       agiWageFields.line1h_other_earned = excessDeferral.amount;
     }
+    const nqdc = nqdcDistributionTotal(input.w2s);
+    if (nqdc > 0) {
+      outputs.push(
+        this.outputNodes.output(schedule1, { line8t_nqdc_distribution: nqdc }),
+      );
+      agiWageFields.line8t_nqdc_distribution = nqdc;
+    }
     const entries = regularItems(input.w2s).flatMap((item) =>
       item.box12_entries ?? []
     );
@@ -1354,7 +1547,7 @@ class W2Node extends TaxNode<typeof inputSchema> {
 
     // Route earned income (regular wages) to EITC node and f8812 (for ACTC computation)
     const earnedIncome = regularItems(input.w2s).reduce(
-      (sum, item) => sum + item.box1_wages,
+      (sum, item) => sum + lineOneWages(item),
       0,
     );
     if (earnedIncome > 0) {
@@ -1362,11 +1555,17 @@ class W2Node extends TaxNode<typeof inputSchema> {
         this.outputNodes.output(eitc, { earned_income: earnedIncome }),
       );
       outputs.push(
-        this.outputNodes.output(f8812, { auto_earned_income: earnedIncome }),
+        this.outputNodes.output(f8812, {
+          auto_earned_income: earnedIncome,
+          // W-2 box 12 code Q: Schedule 8812 Earned Income Worksheet line 1b.
+          auto_nontaxable_combat_pay:
+            combatPayFields(input.w2s).line1i_combat_pay ?? 0,
+        }),
       );
     }
 
-    return { outputs };
+    const warnings = missingWageBaseWarnings(input.w2s);
+    return warnings.length > 0 ? { outputs, warnings } : { outputs };
   }
 }
 

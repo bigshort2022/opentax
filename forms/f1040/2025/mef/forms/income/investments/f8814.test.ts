@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import {
   calculateForm8814,
@@ -44,8 +45,8 @@ const reviewed = (item: F8814Item): F8814Item => ({
   },
 });
 
-Deno.test("Form 8814 MeF: line 12, line 14, and line 15 follow 2025 form", () => {
-  const xml = form8814.build({ items: [calculateForm8814(reviewed(child))] }, { filer });
+test("Form 8814 MeF: line 12, line 14, and line 15 follow 2025 form", () => {
+  const xml = form8814.build({ items: [calculateForm8814(reviewed(child), 2025)] }, { filer });
   assertEquals(xml.length, 1);
   assertStringIncludes(
     xml[0],
@@ -62,11 +63,11 @@ Deno.test("Form 8814 MeF: line 12, line 14, and line 15 follow 2025 form", () =>
   assertEquals(xml[0].includes("MultipleForm8814Ind"), false);
 });
 
-Deno.test("Form 8814 MeF: multiple children emit separate documents with line C", () => {
+test("Form 8814 MeF: multiple children emit separate documents with line C", () => {
   const xml = form8814.build({
     items: [
-      calculateForm8814(reviewed(child)),
-      calculateForm8814(reviewed({ ...child, child_ssn: "111223333" })),
+      calculateForm8814(reviewed(child), 2025),
+      calculateForm8814(reviewed({ ...child, child_ssn: "111223333" }), 2025),
     ],
   }, { filer });
   assertEquals(xml.length, 2);
@@ -74,15 +75,15 @@ Deno.test("Form 8814 MeF: multiple children emit separate documents with line C"
   assertStringIncludes(xml[1], "<MultipleForm8814Ind>X</MultipleForm8814Ind>");
 });
 
-Deno.test("Form 8814 MeF requires reviewed child income and electing-parent ownership", () => {
+test("Form 8814 MeF requires reviewed child income and electing-parent ownership", () => {
   assertThrows(
-    () => form8814.build({ items: [calculateForm8814(child)] }, { filer }),
+    () => form8814.build({ items: [calculateForm8814(child, 2025)] }, { filer }),
     Error,
     "reviewed child-income source",
   );
   assertThrows(
     () => form8814.build({
-      items: [calculateForm8814(reviewed({ ...child, interest_income: 3701 }))],
+      items: [calculateForm8814(reviewed({ ...child, interest_income: 3701 }), 2025)],
     }, { filer: { ...filer, primarySSN: "111223333" } }),
     Error,
     "child/parent owner differs",
@@ -96,7 +97,7 @@ Deno.test("Form 8814 MeF requires reviewed child income and electing-parent owne
           ...source.source_review!,
           income: { interest_income: 3699 },
         },
-      })],
+      }, 2025)],
     }, { filer }),
     Error,
     "reviewed child income differs",

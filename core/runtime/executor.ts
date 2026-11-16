@@ -15,9 +15,17 @@ export type ExecutorDiagnosticEntry = {
   readonly message: string;
 };
 
+/** A node's note about an incomplete source; the return still computed. */
+export type ExecutorWarningEntry = {
+  readonly nodeType: string;
+  readonly nodeId: string;
+  readonly message: string;
+};
+
 export type ExecuteResult = {
   readonly pending: Readonly<Record<string, Record<string, unknown>>>;
   readonly diagnostics: readonly ExecutorDiagnosticEntry[];
+  readonly warnings?: readonly ExecutorWarningEntry[];
   readonly carryforwards: Readonly<Record<string, number>>;
   readonly replayInputs?: Readonly<
     Record<string, Readonly<Record<string, unknown>>>
@@ -53,6 +61,8 @@ export async function executeWithSourceDocuments(
  * Rules:
  * - A computed field replaces the same field deposited directly by the start node.
  *   Derived context is authoritative for nodes that are both user inputs and output targets.
+ *   Row collections are the exception: computed rows (e.g. K-1 royalty Schedule E
+ *   properties) append to the rows the user entered instead of replacing them.
  * - If the target field already holds an array, append incoming scalar or concat incoming array.
  * - If the target field does not exist, set directly.
  * - If target is a scalar and incoming is scalar, promote both to an array (accumulation pattern:
@@ -60,6 +70,14 @@ export async function executeWithSourceDocuments(
  * - If target is a scalar and incoming is an array, replace with the array.
  * - A node's self-output is its finalized value and replaces its accumulated input.
  */
+/** An array of object rows, such as Schedule E properties. */
+function isRowCollection(value: unknown): value is unknown[] {
+  return Array.isArray(value) &&
+    value.every((row) =>
+      row !== null && typeof row === "object" && !Array.isArray(row)
+    );
+}
+
 function mergePending(
   pending: Record<string, Record<string, unknown>>,
   directInputFields: Record<string, Set<string>>,
@@ -87,7 +105,9 @@ function mergePending(
     if (isDirectInput) {
       (directInputFields[targetId] ??= new Set()).add(key);
     } else if (directInputFields[targetId]?.delete(key)) {
-      target[key] = incoming;
+      target[key] = isRowCollection(existing) && isRowCollection(incoming)
+        ? [...existing, ...incoming]
+        : incoming;
       continue;
     }
 
@@ -124,6 +144,7 @@ export function execute(
   pending["start"] = { ...inputs };
 
   const diagnostics: ExecutorDiagnosticEntry[] = [];
+  const warnings: ExecutorWarningEntry[] = [];
   const carryforwards: Record<string, number> = {};
   const replayInputs: Record<string, Record<string, unknown>> = {};
 
@@ -136,8 +157,11 @@ export function execute(
 
     if (!parsed.success) {
       // Empty pending slot means no upstream data was deposited — truly optional node, skip silently.
-      // Non-empty pending slot with parse failure means bad data was deposited — emit diagnostic.
-      if (Object.keys(input).length > 0) {
+      // A slot holding only context fields does not put the form on the return, so skip it too.
+      // Any other parse failure means bad data was deposited — emit diagnostic.
+      if (
+        Object.keys(input).some((key) => !node.contextFields.includes(key))
+      ) {
         diagnostics.push({
           severity: "error",
           code: "EXECUTOR_NODE_FAILURE",
@@ -183,6 +207,9 @@ export function execute(
           true,
         );
       }
+      for (const message of result.warnings ?? []) {
+        warnings.push({ nodeType: step.nodeType, nodeId: step.id, message });
+      }
       if (result.carryforwards) {
         Object.assign(carryforwards, result.carryforwards);
       }
@@ -199,9 +226,23 @@ export function execute(
   }
 
   return {
-    pending,
+    pending: withoutContextOnlySlots(pending, registry),
     diagnostics,
     carryforwards,
+    ...(warnings.length > 0 ? { warnings } : {}),
     ...(Object.keys(replayInputs).length > 0 ? { replayInputs } : {}),
   };
+}
+
+function withoutContextOnlySlots(
+  pending: Record<string, Record<string, unknown>>,
+  registry: NodeRegistry,
+): Record<string, Record<string, unknown>> {
+  return Object.fromEntries(
+    Object.entries(pending).filter(([nodeType, fields]) => {
+      const context = registry[nodeType]?.contextFields ?? [];
+      return context.length === 0 ||
+        Object.keys(fields).some((key) => !context.includes(key));
+    }),
+  );
 }

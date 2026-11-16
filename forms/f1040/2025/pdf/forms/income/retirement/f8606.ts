@@ -202,7 +202,8 @@ const fields: ReadonlyArray<PdfFieldEntry> = [
   },
 ];
 
-export const form8606Pdf: PdfFormDescriptor = {
+export function form8606PdfFor(taxYear: number): PdfFormDescriptor {
+  return {
   pendingKey: "form8606",
   pdfUrl: "https://www.irs.gov/pub/irs-prior/f8606--2025.pdf",
   projectFields(raw) {
@@ -228,6 +229,7 @@ export const form8606Pdf: PdfFormDescriptor = {
     form8606.build(raw as Parameters<typeof form8606.build>[0], {
       filer,
       pending: allPending,
+      taxYear,
     });
     const inventory = reconcileForm8606RothInventories(allPending, filer);
     if (inventory) {
@@ -340,7 +342,12 @@ export const form8606Pdf: PdfFormDescriptor = {
         print_owner_ssn: roth.ownerSsn,
       }];
     }
-    const reviewed = reconcileForm8606Distribution(raw, allPending, filer);
+    const reviewed = reconcileForm8606Distribution(
+      raw,
+      allPending,
+      filer,
+      taxYear,
+    );
     const spouseNoActivity = !reviewed &&
       printSchema.parse(raw).filing_details?.owner === "spouse";
     return [{
@@ -358,4 +365,7 @@ export const form8606Pdf: PdfFormDescriptor = {
     }];
   },
   fields,
-};
+  };
+}
+
+export const form8606Pdf: PdfFormDescriptor = form8606PdfFor(2025);

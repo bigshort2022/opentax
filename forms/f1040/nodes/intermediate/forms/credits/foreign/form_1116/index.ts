@@ -11,8 +11,8 @@ import { form6251 } from "../../../taxes/amt/form6251/index.ts";
 import { f1040 } from "../../../../../outputs/general/return-assembly/f1040/index.ts";
 import type { NodeContext } from "../../../../../../../../core/types/node-context.ts";
 import { FilingStatus } from "../../../../../types.ts";
-import { CONFIG_BY_YEAR } from "../../../../../config/index.ts";
-import { ordinaryTax2025 } from "../../../../worksheets/taxes/calculation/tax_table_2025.ts";
+import { preferentialRateSchedule } from "../../../../worksheets/taxes/calculation/year_schedule.ts";
+import { CONFIG_BY_YEAR, type F1040Config } from "../../../../../config/index.ts";
 
 export enum IncomeCategory {
   Passive = "passive",
@@ -34,6 +34,17 @@ export enum ForeignTaxCreditMethod {
   Paid = "paid",
   Accrued = "accrued",
 }
+
+export enum QualifiedPayeeStatement {
+  Form1099Div = "1099-DIV",
+}
+
+// Passive foreign tax from a qualified payee statement whose owner elected
+// to claim the credit without Form 1116.
+export const electionForeignTaxItemSchema = z.object({
+  foreign_tax_paid: z.number().positive(),
+  payee_statement: z.nativeEnum(QualifiedPayeeStatement),
+}).strict();
 
 export const foreignTaxCurrencySchema = z.object({
   currency_code: z.string().regex(/^[A-Z]{3}$/),
@@ -615,6 +626,15 @@ const vehicleInterestAssetMethodSchema = z.object({
 
 export const inputSchema = z.object({
   foreign_tax_items: z.array(foreignTaxItemSchema).optional(),
+  election_foreign_tax_items: z.array(electionForeignTaxItemSchema).min(1)
+    .optional(),
+  // Foreign-source income that cannot qualify for the section 904(j)
+  // election, even when no foreign tax was paid on that source.
+  election_disqualifying_foreign_income: z.array(z.object({
+    income_category: z.nativeEnum(IncomeCategory),
+    foreign_gross_income: z.number().positive(),
+    source_kind: z.literal("foreign_employer_compensation"),
+  }).strict()).optional(),
   foreign_tax_redeterminations: z.array(redeterminationDisclosureSchema).min(1)
     .optional(),
   carryover_reviews: z.array(carryoverReviewSchema).optional(),
@@ -677,21 +697,22 @@ type ForeignTaxItem = z.infer<typeof foreignTaxItemSchema>;
 type Form1116Input = z.infer<typeof inputSchema>;
 type CarryoverReview = z.infer<typeof carryoverReviewSchema>;
 
-/** 2025 i1116 Worksheet for Line 18, QDCGT branch, with zero foreign preference. */
+/** i1116 Worksheet for Line 18, QDCGT branch, with zero foreign preference. */
 export function adjustedQualifiedDividendLine18(
   signedWorldwideIncome: number,
   facts: NonNullable<Form1116Input["regular_tax_preference_facts"]>,
+  taxYear: number,
 ): number {
   const line1 = signedWorldwideIncome;
   const taxable = Math.round(facts.taxable_income);
   const qualifiedDividends = Math.round(facts.qualified_dividends);
   const netCapitalGain = Math.round(facts.net_capital_gain);
-  const cfg = CONFIG_BY_YEAR[2025];
+  const schedule = preferentialRateSchedule(taxYear);
   const line4 = qualifiedDividends + netCapitalGain;
   const qdcgtLine5 = Math.max(0, taxable - line4);
   const qdcgtLine7 = Math.min(
     taxable,
-    cfg.qdcgtZeroCeiling[facts.filing_status],
+    schedule.zeroCeiling[facts.filing_status],
   );
   const qdcgtLine8 = Math.min(qdcgtLine5, qdcgtLine7);
   const qdcgtLine9 = qdcgtLine7 - qdcgtLine8;
@@ -699,16 +720,16 @@ export function adjustedQualifiedDividendLine18(
   const qdcgtLine12 = Math.max(0, qdcgtLine10 - qdcgtLine9);
   const qdcgtLine14 = Math.min(
     taxable,
-    cfg.qdcgtTwentyFloor[facts.filing_status],
+    schedule.twentyFloor[facts.filing_status],
   );
   const qdcgtLine16 = Math.max(0, qdcgtLine14 - (qdcgtLine5 + qdcgtLine9));
   const qdcgtLine17 = Math.min(qdcgtLine12, qdcgtLine16);
   const qdcgtLine20 = Math.max(0, qdcgtLine10 - (qdcgtLine9 + qdcgtLine17));
   const preferentialTax = Math.round(
     qdcgtLine17 * 0.15 + qdcgtLine20 * 0.20 +
-      ordinaryTax2025(qdcgtLine5, facts.filing_status),
+      schedule.ordinaryTax(qdcgtLine5, facts.filing_status),
   );
-  const ordinaryTax = ordinaryTax2025(taxable, facts.filing_status);
+  const ordinaryTax = schedule.ordinaryTax(taxable, facts.filing_status);
   if (qdcgtLine5 <= 0 || preferentialTax >= ordinaryTax) {
     return Math.max(0, line1);
   }
@@ -959,6 +980,46 @@ function allowedAmtCredit(
   );
 }
 
+type ElectionForeignTaxItem = z.infer<typeof electionForeignTaxItemSchema>;
+
+// Form 1116 instructions (2025), Election To Claim the Foreign Tax Credit
+// Without Filing Form 1116: all foreign-source income is passive and reported,
+// with its tax, on qualified payee statements; total creditable foreign tax is
+// at most $300 ($600 married filing jointly). The credit on Schedule 3 line 1
+// is the smaller of the total foreign tax or the regular tax.
+function electionCredit(
+  items: readonly ElectionForeignTaxItem[],
+  input: Form1116Input,
+  cfg: F1040Config,
+): number {
+  if (
+    (input.foreign_tax_items?.length ?? 0) > 0 ||
+    (input.election_disqualifying_foreign_income?.length ?? 0) > 0 ||
+    (input.prior_year_carryovers?.length ?? 0) > 0 ||
+    (input.foreign_tax_redeterminations?.length ?? 0) > 0
+  ) {
+    throw new Error(
+      "Foreign tax credit without Form 1116 needs every foreign tax on a qualified payee statement and no Form 1116 carryover",
+    );
+  }
+  const facts = input.regular_tax_preference_facts;
+  if (!facts || input.us_tax_before_credits === undefined) {
+    throw new Error(
+      "Foreign tax credit without Form 1116 needs the filing status and regular tax",
+    );
+  }
+  const total = items.reduce((sum, item) => sum + item.foreign_tax_paid, 0);
+  const limit = facts.filing_status === FilingStatus.MFJ
+    ? cfg.foreignTaxCreditElectionLimitMfj
+    : cfg.foreignTaxCreditElectionLimitOther;
+  if (total > limit) {
+    throw new Error(
+      `Foreign tax of ${total} exceeds the ${limit} limit for claiming the credit without Form 1116`,
+    );
+  }
+  return Math.min(total, input.us_tax_before_credits);
+}
+
 function reviewedZeroCarryback(
   category: IncomeCategory,
   reviews: readonly CarryoverReview[],
@@ -996,8 +1057,25 @@ class Form1116Node extends TaxNode<typeof inputSchema> {
   readonly inputSchema = inputSchema;
   readonly outputNodes = new OutputNodes([schedule3, form6251, f1040]);
 
-  compute(_ctx: NodeContext, rawInput: Form1116Input): NodeResult {
+  compute(ctx: NodeContext, rawInput: Form1116Input): NodeResult {
     const input = inputSchema.parse(rawInput);
+    if (input.election_foreign_tax_items) {
+      const cfg = CONFIG_BY_YEAR[ctx.taxYear];
+      if (!cfg) throw new Error(`No f1040 config for year ${ctx.taxYear}`);
+      const credit = electionCredit(
+        input.election_foreign_tax_items,
+        input,
+        cfg,
+      );
+      return {
+        outputs: credit > 0
+          ? [
+            output(schedule3, { line1_foreign_tax_1099: credit }),
+            output(form6251, { schedule3_line1_foreign_tax_credit: credit }),
+          ]
+          : [],
+      };
+    }
     if ((input.foreign_tax_redeterminations?.length ?? 0) > 0) {
       throw new Error(scheduleCFilingBlockReason(
         input.foreign_tax_redeterminations,
@@ -1115,6 +1193,7 @@ class Form1116Node extends TaxNode<typeof inputSchema> {
       line18WorldwideTaxableIncome = adjustedQualifiedDividendLine18(
         signedLine18Base,
         rateFacts,
+        ctx.taxYear,
       );
     }
 

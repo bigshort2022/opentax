@@ -1,3 +1,12 @@
+import { test } from "bun:test";
+import * as sys from "../../../../scripts/support/sys.ts";
+import { signed } from "../../../../scripts/testing/mef.ts";
+import { appendInput } from "../../../../cli/store/store.ts";
+import { createReturnCommand } from "../../../../cli/commands/return.ts";
+import {
+  exportMefCommand,
+  ExportRejectedError,
+} from "../../../../cli/commands/export.ts";
 import {
   assertEquals,
   assertNotEquals,
@@ -12,12 +21,13 @@ import { STANDARD_DEDUCTION_BASE_2025 } from "../../nodes/config/2025.ts";
 import { FilingStatus } from "../../nodes/types.ts";
 import { SCENARIO_1040_13_FACTS } from "./ty2025_cases.ts";
 import {
+  SCENARIO_1040_13_ASSUMPTIONS,
   scenario104013CurrentLawInput,
   scenario104013Input,
   SCENARIO_1040_13_RECONCILIATION,
 } from "./scenario_1040_13_input.ts";
 
-Deno.test("ATS 1040 Scenario 13 maps every printed source form into one input", () => {
+test("ATS 1040 Scenario 13 maps every printed source form into one input", () => {
   const input = scenario104013Input();
   const facts = SCENARIO_1040_13_FACTS;
   const general = input.general as Record<string, unknown>;
@@ -45,7 +55,7 @@ Deno.test("ATS 1040 Scenario 13 maps every printed source form into one input", 
   assertEquals(facts.form8911.printedTentativeMinimumTax, 0);
 });
 
-Deno.test("ATS 1040 Scenario 13 preserves the printed return and identifies its $1,500 deduction conflict", () => {
+test("ATS 1040 Scenario 13 preserves the printed return and identifies its $1,500 deduction conflict", () => {
   const { printed, current2025 } = SCENARIO_1040_13_RECONCILIATION;
   assertEquals(printed.form1040Pages, [2, 3]);
   assertEquals(printed.form8911Page, 7);
@@ -84,7 +94,7 @@ Deno.test("ATS 1040 Scenario 13 preserves the printed return and identifies its 
   assertEquals(printed.allowedRefuelingCredit === printed.regularTax, true);
 });
 
-Deno.test("ATS 1040 Scenario 13 routes W-2 facts but stops before a current-law Form 8911 credit", () => {
+test("ATS 1040 Scenario 13 routes W-2 facts but stops before a current-law Form 8911 credit", () => {
   const result = f1040_2025.executeReturn(scenario104013Input());
   const form = result.pending.f1040;
   assertEquals(form?.line1a_wages, 31_620);
@@ -110,7 +120,7 @@ Deno.test("ATS 1040 Scenario 13 routes W-2 facts but stops before a current-law 
   );
 });
 
-Deno.test("ATS 1040 Scenario 13 PDF parent and property reject the printed tax limit on the public current-year return", () => {
+test("ATS 1040 Scenario 13 PDF parent and property reject the printed tax limit on the public current-year return", () => {
   const input = scenario104013Input();
   const result = f1040_2025.executeReturn(input);
   const filer = extractFilerIdentity(result.pending.f1040)!;
@@ -133,7 +143,7 @@ Deno.test("ATS 1040 Scenario 13 PDF parent and property reject the printed tax l
   }
 });
 
-Deno.test("ATS Scenario 13 current-law reconstruction joins all six native documents without replacing printed answers", async () => {
+test("ATS Scenario 13 current-law reconstruction joins all six native documents without replacing printed answers", async () => {
   const input = scenario104013CurrentLawInput();
   const before = JSON.stringify(input);
   const result = f1040_2025.executeReturn(input);
@@ -190,3 +200,135 @@ Deno.test("ATS Scenario 13 current-law reconstruction joins all six native docum
   assertEquals(SCENARIO_1040_13_RECONCILIATION.printed.regularTax, 162);
   assertEquals(JSON.stringify(input), before);
 });
+
+const schema =
+  "irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd";
+let schemaAvailable = false;
+try {
+  schemaAvailable = sys.statSync(schema).isFile;
+} catch { /* local IRS schema is gitignored */ }
+const amount = (value: unknown) =>
+  typeof value === "number" ? value : undefined;
+
+async function exportWithoutForce(inputs: Record<string, unknown>) {
+  const baseDir = await sys.makeTempDir();
+  try {
+    const { returnId } = await createReturnCommand({ year: 2025, baseDir });
+    await appendInput(`${baseDir}/${returnId}`, "start", signed(inputs));
+    try {
+      return {
+        xml: await exportMefCommand({ returnId, baseDir }),
+        rejected: [],
+      };
+    } catch (error) {
+      if (!(error instanceof ExportRejectedError)) throw error;
+      const rejected = [...new Set(error.entries.map((e) => e.ruleNumber))];
+      return {
+        xml: await exportMefCommand({ returnId, baseDir, force: true }),
+        rejected,
+      };
+    }
+  } finally {
+    await sys.remove(baseDir, { recursive: true });
+  }
+}
+
+async function xsdErrors(xml: string) {
+  const validator = new sys.Command("xmllint", {
+    args: ["--noout", "--schema", schema, "-"],
+    stdin: "piped",
+    stdout: "piped",
+    stderr: "piped",
+  }).spawn();
+  const writer = validator.stdin.getWriter();
+  await writer.write(new TextEncoder().encode(xml));
+  await writer.close();
+  const checked = await validator.output();
+  return checked.code === 0 ? "" : new TextDecoder().decode(checked.stderr);
+}
+
+test.skipIf(!schemaAvailable)(
+  "ATS 1040 Scenario 13 current-law return exports without force, validates against the v5.4 XSD and matches the packet",
+  async () => {
+    const input = scenario104013CurrentLawInput();
+    const result = f1040_2025.executeReturn(input);
+    assertEquals(result.diagnostics, []);
+    const { xml, rejected } = await exportWithoutForce(input);
+    assertEquals(rejected, []);
+    assertEquals(await xsdErrors(xml), "");
+    const p = result.pending;
+    const facts = SCENARIO_1040_13_FACTS;
+    const printed = facts.printedForm1040;
+    assertEquals([
+      p.f1040.line1a_wages,
+      p.f1040.line1z_total_wages,
+      p.f1040.line9_total_income,
+      p.f1040.line11_agi,
+      p.f1040.line22_tax_after_credits,
+      p.f1040.line24_total_tax,
+      p.f1040.line25a_w2_withheld,
+      p.f1040.line25d_total_withholding,
+      p.f1040.line33_total_payments,
+      p.f1040.line34_overpayment,
+      p.f1040.line35a_refund,
+    ], [
+      printed.line1aWages,
+      printed.line1aWages,
+      printed.line11AdjustedGrossIncome,
+      printed.line11AdjustedGrossIncome,
+      printed.line24TotalTax,
+      printed.line24TotalTax,
+      printed.line25aW2Withholding,
+      printed.line25aW2Withholding,
+      printed.line25aW2Withholding,
+      printed.line34Overpayment,
+      printed.line35aRefund,
+    ]);
+    const amt = facts.form6251;
+    assertEquals([
+      p.form6251.amti,
+      p.form6251.exemption,
+      p.form6251.taxable_excess,
+      p.form6251.tentative_tax,
+      p.form6251.net_tmt,
+      p.form6251.line11_amt,
+    ], [
+      amt.line4AlternativeMinimumTaxableIncome,
+      amt.line5Exemption,
+      amt.line6ExcessOverExemption,
+      amt.line7TentativeMinimumTaxBeforeCredits,
+      amt.line9TentativeMinimumTax,
+      amt.line11AlternativeMinimumTax,
+    ]);
+    assertStringIncludes(xml, "<RefundAmt>609</RefundAmt>");
+    const parent = form8911Pdf.instances!({}, filerOf(p), p);
+    assertEquals(
+      parent[0].line4,
+      facts.form8911.printedTentativePersonalCredit,
+    );
+    const current: Record<string, number | undefined> = {
+      "1040 line 12e": amount(p.f1040.line12a_standard_deduction),
+      "1040 line 14": amount(p.f1040.line14_deductions_qbi_total),
+      "1040 line 15": amount(p.f1040.line15_taxable_income),
+      "1040 line 16": amount(p.f1040.line16_income_tax),
+      "1040 line 18": amount(p.f1040.line18_total_tax_before_credits),
+      "1040 line 20": amount(p.f1040.line20_nonrefundable_credits),
+      "1040 line 21": amount(p.f1040.line21_credits_total),
+      "Schedule 3 line 6j": amount(p.schedule3.line6j_alt_fuel_vehicle_refueling),
+      "Schedule 3 line 8": amount(p.schedule3.line8_total),
+      "Form 6251 line 1b": amount(p.form6251.regular_tax_income),
+      "Form 6251 line 2a": amount(p.form6251.line2a_taxes_paid),
+      "Form 6251 line 10": amount(p.form6251.regular_tax),
+      "Form 8911 personal credit": amount(parent[0].line10),
+    };
+    for (const conflict of SCENARIO_1040_13_RECONCILIATION.conflicts) {
+      assertEquals(current[conflict.line], conflict.current, conflict.line);
+      assertNotEquals<number>(conflict.printed, conflict.current);
+    }
+    assertEquals(SCENARIO_1040_13_ASSUMPTIONS.length, 3);
+  },
+);
+
+function filerOf(pending: ReturnType<typeof f1040_2025.executeReturn>["pending"]) {
+  return extractFilerIdentity(pending.f1040)!;
+}

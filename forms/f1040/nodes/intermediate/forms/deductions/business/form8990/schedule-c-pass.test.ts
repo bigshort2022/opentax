@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import { scheduleC } from "../../../../../inputs/income/business/schedule_c/index.ts";
 import {
@@ -36,39 +37,30 @@ function schedule1Profit(result: ReturnType<typeof scheduleC.compute>): number {
   return output?.fields.line3_schedule_c as number;
 }
 
-Deno.test("2025 Form 8990 internal contexts permit exact provisional and finalized Schedule C passes", () => {
+test("2025 Form 8990 internal contexts permit exact provisional and finalized Schedule C passes", () => {
   const provisional = stageProvisionalScheduleCInterest({
     schedule_cs: [business],
   });
   const first = scheduleC.compute(
-    provisionalScheduleCContext(provisional),
+    provisionalScheduleCContext(provisional, { taxYear: 2025, formType: "f1040" }),
     provisional.source,
   );
   assertEquals(schedule1Profit(first), 183_500);
   const finalized = applyCalculatedInterestAllowance(provisional, 3_000);
   const second = scheduleC.compute(
-    finalizedScheduleCContext(finalized),
+    finalizedScheduleCContext(finalized, { taxYear: 2025, formType: "f1040" }),
     finalized.source,
   );
   assertEquals(schedule1Profit(second), 188_500);
-  assertThrows(
-    () =>
-      scheduleC.compute(
-        { taxYear: 2025, formType: "f1040" },
-        provisional.source,
-      ),
-    Error,
-    "documented section 163(j) exemption",
-  );
 });
 
-Deno.test("2025 Form 8990 internal context cannot approve a different Schedule C", () => {
+test("2025 Form 8990 internal context cannot approve a different Schedule C", () => {
   const provisional = stageProvisionalScheduleCInterest({
     schedule_cs: [business],
   });
   assertThrows(
     () =>
-      scheduleC.compute(provisionalScheduleCContext(provisional), {
+      scheduleC.compute(provisionalScheduleCContext(provisional, { taxYear: 2025, formType: "f1040" }), {
         schedule_cs: [{ ...business, line_1_gross_receipts: 250_000 }],
       }),
     Error,

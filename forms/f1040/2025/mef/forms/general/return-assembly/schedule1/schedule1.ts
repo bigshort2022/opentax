@@ -16,8 +16,8 @@ import type {
   MefBuildContext,
   MefFormDescriptor,
 } from "../../../../form-descriptor.ts";
-import { schedule1OtherIncomeRows } from "../../../income/other/schedule1/schedule1_other_income_rows.ts";
-import { schedule1ActivityNotForProfitTotal } from "../../../income/other/schedule1/schedule1_nonbusiness_sources.ts";
+import { schedule1OtherIncomeRows } from "./schedule1_other_income_rows.ts";
+import { schedule1ActivityNotForProfitTotal } from "./schedule1_nonbusiness_sources.ts";
 import { inputSchema as trustK1InputSchema } from "../../../../../../nodes/inputs/income/rental-passthrough/k1_trust/index.ts";
 import { assertPersonalPropertyRentalSource } from "../../../../../domains/income/business/personal-property-rental-source.ts";
 import { assertTaxableAlimonySchedule1 } from "../../../../../../nodes/inputs/income/other/alimony_received/index.ts";
@@ -41,6 +41,7 @@ export interface Fields {
   line8n_section951a_inclusion?: number | null;
   line8o_section951aa_inclusion?: number | null;
   line8r_taxable_scholarships?: number | null;
+  line8t_nqdc_distribution?: number | null;
   line8p_excess_business_loss?: number | null;
   line8z_rtaa?: number | null;
   line8z_taxable_grants?: number | null;
@@ -69,6 +70,7 @@ export interface Fields {
   line12_business_expenses?: number | null;
   line13_hsa_deduction?: number | null;
   line14_moving_expenses?: number | null;
+  line14_storage_fees_only?: boolean | null;
   line15_se_deduction?: number | null;
   line16_sep_simple?: number | null;
   line17_se_health_insurance?: number | null;
@@ -108,6 +110,7 @@ export const FIELD_MAP: ReadonlyArray<readonly [keyof Fields, string]> = [
   ["line8p_excess_business_loss", "ExcessBusinessLossAmt"],
   ["line8q_able_taxable_earnings", "TaxableABLEDistributionsAmt"],
   ["line8r_taxable_scholarships", "GrantsOrScholarshipsAmt"],
+  ["line8t_nqdc_distribution", "NonqlfyDeferredCompensationAmt"],
   ["line8z_other", "OtherIncomeTotalAmt"],
   ["line9_total_other_income", "TotalOtherIncomeAmt"],
   ["line10_total_additional_income", "TotalAdditionalIncomeAmt"],
@@ -180,6 +183,12 @@ function buildIRS1040Schedule1(
       return amount > 0 ? element(tag, amount) : "";
     }
     if (typeof value !== "number") return "";
+    if (key === "line14_moving_expenses") {
+      return element(tag, value) +
+        (fields.line14_storage_fees_only === true
+          ? element("ClaimStorageFeesInd", "X")
+          : "");
+    }
     if (key === "line8a_nol_deduction") return element(tag, -value);
     if (key === "line8d_foreign_earned_income_exclusion") {
       const formId = context?.documentIdsByPendingKey?.form2555?.[0];

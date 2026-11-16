@@ -1,3 +1,4 @@
+import { mefTaxYear } from "../../../../mef/support/year-config.ts";
 import {
   archerDistributionLedgerSchema,
   calculateArcherLedger,
@@ -54,7 +55,7 @@ export function reconcileArcherContributions(
         "Paired Archer ledgers must match retained Schedule1 sources",
       );
     }
-    const dist = calculateArcherLedger(source);
+    const dist = calculateArcherLedger(source, mefTaxYear(context));
     const otherTax = z.object({ line17e_archer_msa_tax: z.number().optional() })
       .parse(context?.pending?.schedule2 ?? {});
     if (
@@ -198,7 +199,7 @@ export function reconcileArcherContributions(
     );
   }
   const computed = schedule1Node.compute(
-    { taxYear: 2025, formType: "f1040" },
+    { taxYear: mefTaxYear(context), formType: "f1040" },
     pending.schedule1 ?? {},
   ).outputs[0].fields;
   const claimed = pending.schedule1 as Record<string, unknown> | undefined;

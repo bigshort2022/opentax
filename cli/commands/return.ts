@@ -1,7 +1,9 @@
-import { join } from "@std/path";
+import { join } from "node:path";
 import { catalog } from "../../catalog.ts";
 import { buildEngineInputs, createReturn, loadReturn } from "../store/store.ts";
 import { singletonPublicInputKeys } from "../store/public-input-keys.ts";
+import { resolveSourceBytes } from "./return-source-files.ts";
+import { returnHints } from "./return-hints.ts";
 import { normalizeAllPending } from "../../forms/f1040/2025/return-processing/pending.ts";
 
 function getCatalogEntry(formType: string, year: number) {
@@ -52,7 +54,23 @@ export type GetReturnResult = {
   readonly lines: Record<string, unknown>;
   readonly warnings: readonly string[];
   readonly carryforwards: Readonly<Record<string, number>>;
+  // False when any node failed: its outputs never reached the lines after it,
+  // so the summary can show zeros (tax, credits) for amounts it never computed.
+  readonly complete: boolean;
+  readonly failedNodes: readonly string[];
 };
+
+/** The nodes whose compute or input validation failed, in plan order. */
+function failedNodeTypes(
+  diagnostics: readonly { code: string; nodeType: string }[],
+): string[] {
+  return [
+    ...new Set(
+      diagnostics.filter((d) => d.code === "EXECUTOR_NODE_FAILURE")
+        .map((d) => d.nodeType),
+    ),
+  ];
+}
 
 function num(value: unknown): number {
   if (Array.isArray(value)) return typeof value[0] === "number" ? value[0] : 0;
@@ -159,6 +177,8 @@ function softValidationWarnings(
     );
   }
 
+  warnings.push(...returnHints(pending));
+
   return warnings;
 }
 
@@ -169,15 +189,27 @@ export async function getReturnCommand(
   const { meta, inputs } = await loadReturn(returnPath);
 
   const def = getCatalogEntry(meta.formType ?? "f1040", meta.year);
-  const engineInputs = buildEngineInputs(inputs, singletonPublicInputKeys(def));
+  const engineInputs = await resolveSourceBytes(
+    returnPath,
+    buildEngineInputs(inputs, singletonPublicInputKeys(def)),
+  );
   const result = def.executeReturn(engineInputs);
   const pending = normalizeAllPending(result.pending);
 
   const f1040 = pending["f1040"] ?? {};
 
-  const warnings = softValidationWarnings(pending);
+  const failedNodes = failedNodeTypes(result.diagnostics);
+  const warnings = failedNodes.length === 0 ? [] : [
+    `[SUMMARY_INCOMPLETE] ${failedNodes.length} node(s) failed (${
+      failedNodes.join(", ")
+    }); every line they feed is missing, so the summary and lines are unreliable until the errors below are fixed.`,
+  ];
+  warnings.push(...softValidationWarnings(pending));
   for (const d of result.diagnostics) {
     warnings.push(`[${d.code}] ${d.nodeType}: ${d.message}`);
+  }
+  for (const w of result.warnings ?? []) {
+    warnings.push(`[NODE_WARNING] ${w.nodeType}: ${w.message}`);
   }
 
   return {
@@ -185,8 +217,11 @@ export async function getReturnCommand(
     year: meta.year,
     summary: extractSummary(f1040),
     forms: collectForms(pending),
-    lines: f1040,
+    // A Form 4868 is its own submission; its filed lines are form4868.
+    lines: def.formType === "f4868" ? pending["form4868"] ?? {} : f1040,
     warnings,
     carryforwards: result.carryforwards,
+    complete: failedNodes.length === 0,
+    failedNodes,
   };
 }

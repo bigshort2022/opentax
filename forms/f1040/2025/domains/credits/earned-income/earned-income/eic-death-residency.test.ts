@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import {
   assertEquals,
   assertRejects,
@@ -92,10 +95,10 @@ export function deathResidencyInputs(index: number) {
     },
   };
 }
-Deno.test("death source conserves inclusive lifetime and rejects invalid or conflicting residence", () => {
+test("death source conserves inclusive lifetime and rejects invalid or conflicting residence", () => {
   for (const c of deathResidencyCases) {
-    assertEquals(reviewedEicDeathResidence(facts(c)), true);
-    assertEquals(scheduleEicLine6Months(facts(c)), 12);
+    assertEquals(reviewedEicDeathResidence(facts(c), 2025), true);
+    assertEquals(scheduleEicLine6Months(facts(c), 2025), 12);
   }
   const base = facts(deathResidencyCases[1]);
   for (
@@ -122,18 +125,18 @@ Deno.test("death source conserves inclusive lifetime and rejects invalid or conf
           ...base.eic_death_residency_review,
           ...changes,
         },
-      })
+      }, 2025)
     );
   }
-  assertThrows(() => reviewedEicDeathResidence({ ...base, ssn: undefined }));
+  assertThrows(() => reviewedEicDeathResidence({ ...base, ssn: undefined }, 2025));
   assertThrows(() =>
-    reviewedEicDeathResidence({ ...base, months_lived_with_you_in_us: 2 })
+    reviewedEicDeathResidence({ ...base, months_lived_with_you_in_us: 2 }, 2025)
   );
   assertThrows(() =>
-    reviewedEicDeathResidence({ ...base, eic_birth_residency_review: {} })
+    reviewedEicDeathResidence({ ...base, eic_birth_residency_review: {} }, 2025)
   );
   assertThrows(() =>
-    reviewedEicDeathResidence({ ...base, eic_dated_residency_review: {} })
+    reviewedEicDeathResidence({ ...base, eic_dated_residency_review: {} }, 2025)
   );
   const older = facts(deathResidencyCases[0]);
   assertThrows(() =>
@@ -143,11 +146,11 @@ Deno.test("death source conserves inclusive lifetime and rejects invalid or conf
         ...older.eic_death_residency_review,
         us_home_residence_periods: [period("2025-01-01", "2025-01-29")],
       },
-    })
+    }, 2025)
   );
 });
 for (let index = 0; index < deathResidencyCases.length; index++) {
-  Deno.test(`deceased child complete native/source joins ${deathResidencyCases[index].id}`, async () => {
+  test(`deceased child complete native/source joins ${deathResidencyCases[index].id}`, async () => {
     const result = f1040_2025.executeReturn(deathResidencyInputs(index));
     assertEquals(result.diagnostics, []);
     const pending = buildPending(result.pending),
@@ -171,17 +174,17 @@ for (let index = 0; index < deathResidencyCases.length; index++) {
       xml,
       "<MonthsChildLivedWithYouCnt>12</MonthsChildLivedWithYouCnt>",
     );
-    const path = await Deno.makeTempFile({
+    const path = await sys.makeTempFile({
       prefix: "opentax-eic-death-",
       suffix: ".xml",
     });
-    await Deno.writeTextFile(path, xml);
+    await fs.writeFile(path, xml);
     console.log(`EIC_DEATH_XML ${path}`);
     const schema = new URL(
-      "../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+      "../../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
       import.meta.url,
     ).pathname;
-    const validation = await new Deno.Command("xmllint", {
+    const validation = await new sys.Command("xmllint", {
       args: ["--noout", "--schema", schema, path],
       stdout: "piped",
       stderr: "piped",

@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import { fieldsOf } from "../../../../../../../core/test-utils/output.ts";
 import { f3800 } from "../f3800/index.ts";
@@ -25,6 +26,7 @@ function item(overrides: Record<string, unknown> = {}) {
 function lines(overrides: Record<string, unknown> = {}) {
   return calculateForm8835(
     f8835.inputSchema.parse({ f8835s: [item(overrides)] }).f8835s[0],
+    2025,
   );
 }
 
@@ -75,7 +77,7 @@ const openLoopSource = {
   unrelated_buyer_verified: true as const,
 };
 
-Deno.test("f8835: sourced solar production reaches Form 3800 line 4e", () => {
+test("f8835: sourced solar production reaches Form 3800 line 4e", () => {
   const solar = item({
     energy_type: EnergyType.Solar,
     facility_description: "Solar production facility",
@@ -85,7 +87,7 @@ Deno.test("f8835: sourced solar production reaches Form 3800 line 4e", () => {
     solar_production_source: solarSource,
   });
   const parsed = f8835.inputSchema.parse({ f8835s: [solar] });
-  const row = calculateForm8835(parsed.f8835s[0]);
+  const row = calculateForm8835(parsed.f8835s[0], 2025);
   assertEquals(row.line1, 6_000);
   assertEquals(row.line15, 6_000);
   assertEquals(row.form3800Line, "4e");
@@ -127,7 +129,7 @@ Deno.test("f8835: sourced solar production reaches Form 3800 line 4e", () => {
   );
 });
 
-Deno.test("f8835: sourced closed-loop biomass reaches the first-four-year Form 3800 row", () => {
+test("f8835: sourced closed-loop biomass reaches the first-four-year Form 3800 row", () => {
   const row = lines({
     energy_type: EnergyType.BiomassClosed,
     facility_description: "Closed-loop biomass facility",
@@ -177,7 +179,7 @@ Deno.test("f8835: sourced closed-loop biomass reaches the first-four-year Form 3
   );
 });
 
-Deno.test("f8835: 2025 base rate and fivefold increase are separate lines", () => {
+test("f8835: 2025 base rate and fivefold increase are separate lines", () => {
   assertEquals(lines().line1, 6_000);
   assertEquals(lines().line9, 6_000);
   assertEquals(
@@ -198,7 +200,7 @@ Deno.test("f8835: 2025 base rate and fivefold increase are separate lines", () =
   );
 });
 
-Deno.test("f8835: bonuses apply after the fivefold increase", () => {
+test("f8835: bonuses apply after the fivefold increase", () => {
   const result = lines({
     increased_credit_reason: "under_one_mw",
     maximum_net_output_mw: 0.9,
@@ -211,7 +213,7 @@ Deno.test("f8835: bonuses apply after the fivefold increase", () => {
   assertEquals(result.line15, 36_000);
 });
 
-Deno.test("f8835: bond-financed facility uses the smaller of ratio and 15 percent", () => {
+test("f8835: bond-financed facility uses the smaller of ratio and 15 percent", () => {
   const result = lines({
     tax_exempt_bond_proceeds: 20_000,
     aggregate_capital_additions: 100_000,
@@ -222,7 +224,7 @@ Deno.test("f8835: bond-financed facility uses the smaller of ratio and 15 percen
   assertEquals(result.line15, 5_100);
 });
 
-Deno.test("f8835: bond ratio uses Form 8835's two-decimal filed precision", () => {
+test("f8835: bond ratio uses Form 8835's two-decimal filed precision", () => {
   const result = lines({
     tax_exempt_bond_proceeds: 12_500,
     aggregate_capital_additions: 100_000,
@@ -231,14 +233,14 @@ Deno.test("f8835: bond ratio uses Form 8835's two-decimal filed precision", () =
   assertEquals(result.line5b, 780);
 });
 
-Deno.test("f8835: sold kilowatt-hours must be whole units", () => {
+test("f8835: sold kilowatt-hours must be whole units", () => {
   assertEquals(
     f8835.inputSchema.safeParse({ f8835s: [item({ kwh_sold: 1.5 })] }).success,
     false,
   );
 });
 
-Deno.test("f8835: repeated physical facility cannot double the credit", () => {
+test("f8835: repeated physical facility cannot double the credit", () => {
   const first = item({
     facility_us_address: {
       line1: "10 Plant Rd",
@@ -261,7 +263,7 @@ Deno.test("f8835: repeated physical facility cannot double the credit", () => {
   );
 });
 
-Deno.test("f8835: validates increased-credit evidence and transferred credit", () => {
+test("f8835: validates increased-credit evidence and transferred credit", () => {
   assertThrows(() => lines({ increased_credit_reason: "under_one_mw" }));
   assertThrows(() =>
     lines({
@@ -280,7 +282,7 @@ Deno.test("f8835: validates increased-credit evidence and transferred credit", (
   assertThrows(() => lines({ kwh_sold: 1_000_001 }));
 });
 
-Deno.test("f8835: no-increase claim rejects facts that qualify for fivefold credit", () => {
+test("f8835: no-increase claim rejects facts that qualify for fivefold credit", () => {
   assertThrows(
     () => lines({ facility_construction_start_date: "2022-12-01" }),
     Error,
@@ -312,7 +314,7 @@ Deno.test("f8835: no-increase claim rejects facts that qualify for fivefold cred
   );
 });
 
-Deno.test("f8835: routes first four years to Form 3800 line 4e", () => {
+test("f8835: routes first four years to Form 3800 line 4e", () => {
   assertEquals(lines().form3800Line, "4e");
   assertEquals(
     lines({
@@ -325,7 +327,7 @@ Deno.test("f8835: routes first four years to Form 3800 line 4e", () => {
   );
 });
 
-Deno.test("f8835: rejects periods crossing the Form 3800 four-year boundary", () => {
+test("f8835: rejects periods crossing the Form 3800 four-year boundary", () => {
   assertThrows(() =>
     lines({
       facility_placed_in_service_date: "2021-06-01",
@@ -336,7 +338,7 @@ Deno.test("f8835: rejects periods crossing the Form 3800 four-year boundary", ()
   );
 });
 
-Deno.test("f8835: claims only electricity sold within the facility's 10-year credit period", () => {
+test("f8835: claims only electricity sold within the facility's 10-year credit period", () => {
   const source = {
     facility_placed_in_service_date: "2015-07-01",
     facility_construction_start_date: "2014-06-01",
@@ -364,7 +366,7 @@ Deno.test("f8835: claims only electricity sold within the facility's 10-year cre
   );
 });
 
-Deno.test("f8835: construction start must precede placement in service", () => {
+test("f8835: construction start must precede placement in service", () => {
   assertThrows(
     () =>
       lines({
@@ -376,7 +378,7 @@ Deno.test("f8835: construction start must precede placement in service", () => {
   );
 });
 
-Deno.test("f8835: forwards each facility and transfer election to Form 3800", () => {
+test("f8835: forwards each facility and transfer election to Form 3800", () => {
   const result = f8835.compute({ taxYear: 2025, formType: "f1040" }, {
     f8835s: [
       item({
@@ -418,5 +420,45 @@ Deno.test("f8835: forwards each facility and transfer election to Form 3800", ()
   assertEquals(
     result.outputs.some((output) => output.nodeType === "schedule3"),
     false,
+  );
+});
+
+// FR Doc. 2026-10906 (June 1, 2026): for calendar year 2026, 3.1 cents per kWh
+// for wind, closed-loop biomass and geothermal facilities placed in service
+// before 2022, and 0.6 cents for those placed in service after 2021.
+test("f8835: 2026 sales use the 2026 section 45 credit rates", () => {
+  const preIra = (taxYear: number) =>
+    calculateForm8835(
+      f8835.inputSchema.parse({
+        f8835s: [item({
+          energy_type: EnergyType.Geothermal,
+          facility_placed_in_service_date: "2018-01-01",
+          facility_construction_start_date: "2017-06-01",
+          production_period_start_date: `${taxYear}-01-01`,
+          production_period_end_date: `${taxYear}-12-31`,
+        })],
+      }).f8835s[0],
+      taxYear,
+    );
+  assertEquals(preIra(2025).line1, 30_000);
+  assertEquals(preIra(2026).line1, 31_000);
+  const postIra = calculateForm8835(
+    f8835.inputSchema.parse({
+      f8835s: [item({
+        production_period_start_date: "2026-01-01",
+        production_period_end_date: "2026-12-31",
+      })],
+    }).f8835s[0],
+    2026,
+  );
+  assertEquals(postIra.line1, 6_000);
+  assertThrows(
+    () =>
+      calculateForm8835(
+        f8835.inputSchema.parse({ f8835s: [item()] }).f8835s[0],
+        2026,
+      ),
+    Error,
+    "valid 2026 period",
   );
 });

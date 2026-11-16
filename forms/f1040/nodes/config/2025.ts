@@ -11,7 +11,7 @@
 import { FilingStatus } from "../types.ts";
 
 // ─── Tax Brackets ─────────────────────────────────────────────────────────────
-// Rev. Proc. 2024-40, §3.01; IRC §1(a)–(d)
+// Rev. Proc. 2024-40, §2.01; IRC §1(j)(2)
 
 export type Bracket = {
   over: number;
@@ -65,8 +65,7 @@ export const BRACKETS_MFS_2025: ReadonlyArray<Bracket> = [
 ] as const;
 
 // ─── Standard Deduction ───────────────────────────────────────────────────────
-// Rev. Proc. 2024-40, §3.14; IRC §63(c); P.L. 119-21 (OBBBA) §70001
-// OBBBA increased base deductions by $750 (Single/MFS/HOH-proportional) effective TY2025.
+// IRC §63(c)(7) as amended by P.L. 119-21 §70102; Rev. Proc. 2025-32 §3.01.
 
 /** Base standard deduction by filing status (TY2025, post-OBBBA). */
 export const STANDARD_DEDUCTION_BASE_2025: Record<FilingStatus, number> = {
@@ -80,7 +79,7 @@ export const STANDARD_DEDUCTION_BASE_2025: Record<FilingStatus, number> = {
 /**
  * Additional standard deduction per age/blindness factor (TY2025).
  * Single/HOH: $2,000 per factor; MFJ/MFS/QSS: $1,600 per factor.
- * IRC §63(f); IRS Rev. Proc. 2024-40, §3.14 (updated for TY2025)
+ * IRC §63(f); Rev. Proc. 2024-40, §2.15(3)
  */
 export const STANDARD_DEDUCTION_ADDITIONAL_2025: Record<FilingStatus, number> =
   {
@@ -110,7 +109,7 @@ export const SENIOR_DEDUCTION_PHASEOUT_MFJ_2025 = 150_000;
 export const SENIOR_DEDUCTION_PHASEOUT_RATE_2025 = 0.06;
 
 // ─── QDCGT / Capital Gains Rate Thresholds ────────────────────────────────────
-// Rev. Proc. 2024-40, §3.02; IRC §1(h)
+// Rev. Proc. 2024-40, §2.03; IRC §1(h)
 
 /** Top of 0% LTCG/QD bracket (income at or below this → 0% rate). */
 export const QDCGT_ZERO_CEILING_2025: Record<FilingStatus, number> = {
@@ -125,13 +124,14 @@ export const QDCGT_ZERO_CEILING_2025: Record<FilingStatus, number> = {
 export const QDCGT_TWENTY_FLOOR_2025: Record<FilingStatus, number> = {
   [FilingStatus.Single]: 533_400,
   [FilingStatus.MFJ]: 600_050,
-  [FilingStatus.MFS]: 300_025,
+  // MFS: 2025 Form 1040 instructions, Qualified Dividends and Capital Gain Tax Worksheet line 13.
+  [FilingStatus.MFS]: 300_000,
   [FilingStatus.HOH]: 566_700,
   [FilingStatus.QSS]: 600_050,
 } as const;
 
 // ─── AMT — Form 6251 ──────────────────────────────────────────────────────────
-// IRS Instructions for Form 6251 (2025); IRC §55(d)
+// Rev. Proc. 2024-40, §2.11; 2025 Instructions for Form 6251
 
 /** AMT exemption amounts by filing status (TY2025). */
 export const AMT_EXEMPTION_2025: Record<FilingStatus, number> = {
@@ -176,7 +176,7 @@ export const AMT_BRACKET_ADJUSTMENT_STANDARD_2025 = 4_782;
 export const AMT_BRACKET_ADJUSTMENT_MFS_2025 = 2_391;
 
 // ─── FICA / Social Security ───────────────────────────────────────────────────
-// Rev. Proc. 2024-40, §3.28; IRC §3121(a)(1)
+// 2025 Schedule SE line 7; IRC §3121(a)(1)
 
 /** Social Security wage base (TY2025). */
 export const SS_WAGE_BASE_2025 = 176_100;
@@ -190,7 +190,7 @@ export const SS_MAX_TAX_PER_EMPLOYER_2025 = 10_918.20;
 // ─── Additional Medicare Tax (Form 8959) ─────────────────────────────────────
 // IRC §3101(b)(2); not indexed for inflation
 
-/** Additional Medicare Tax threshold — MFJ/QSS. */
+/** Additional Medicare Tax threshold — MFJ. */
 export const ADDITIONAL_MEDICARE_THRESHOLD_MFJ = 250_000;
 
 /** Additional Medicare Tax threshold — MFS. */
@@ -225,7 +225,7 @@ export const HSA_FAMILY_LIMIT_2025 = 8_550;
 export const HSA_CATCHUP_2025 = 1_000;
 
 // ─── IRA Contribution Limits ──────────────────────────────────────────────────
-// Rev. Proc. 2024-40, §3.19; IRC §219(b)(5)(A)
+// Notice 2024-80; IRC §219(b)(5)(A), §219(g)
 
 /** Traditional/Roth IRA contribution limit under age 50 (TY2025). */
 export const IRA_CONTRIBUTION_LIMIT_2025 = 7_000;
@@ -258,7 +258,7 @@ export const IRA_PHASEOUT_MFS_LOWER_2025 = 0;
 export const IRA_PHASEOUT_MFS_UPPER_2025 = 10_000;
 
 // ─── QBI Deduction Thresholds (Form 8995A) ────────────────────────────────────
-// Rev. Proc. 2024-40, §3.27; IRC §199A(b)(3)(B)(ii)
+// Rev. Proc. 2024-40, §2.27; IRC §199A(e)(2)
 
 /** QBI wage limitation phase-in threshold — Single/MFS/HOH/QSS (TY2025). */
 export const QBI_THRESHOLD_SINGLE_2025 = 197_300;
@@ -296,8 +296,14 @@ export const CTC_PHASE_OUT_THRESHOLD_OTHER_2025 = 200_000;
 /** ACTC earned income floor (minimum earned income for ACTC). */
 export const ACTC_EARNED_INCOME_FLOOR_2025 = 2_500;
 
+/** Form 1116 instructions (2025), Election To Claim the Foreign Tax Credit
+ * Without Filing Form 1116: total creditable foreign taxes of $300 or less
+ * ($600 if married filing jointly). IRC §904(j)(2)(B). */
+export const FTC_ELECTION_LIMIT_MFJ_2025 = 600;
+export const FTC_ELECTION_LIMIT_OTHER_2025 = 300;
+
 // ─── Saver's Credit (Form 8880) ───────────────────────────────────────────────
-// 2025 Form 8880 line 9 table; IRC §25B
+// Notice 2024-80 (§25B(b) limits); IRC §25B
 
 /** Maximum contribution eligible for Saver's Credit per person. */
 export const SAVERS_CREDIT_CONTRIBUTION_CAP_2025 = 2_000;
@@ -324,7 +330,7 @@ export const SAVERS_CREDIT_AGI_MFJ_2025 = {
 } as const;
 
 // ─── EE/I Bond Interest Exclusion (Form 8815) ────────────────────────────────
-// 2025 Form 8815, lines 9-12; IRC §135(b)(2)(A)
+// Rev. Proc. 2024-40, §2.18; IRC §135(b)(2)(A)
 
 /** Form 8815 phase-out start — MFJ. */
 export const SAVINGS_BOND_PHASEOUT_START_MFJ_2025 = 149_250;
@@ -339,16 +345,19 @@ export const SAVINGS_BOND_PHASEOUT_START_SINGLE_2025 = 99_500;
 export const SAVINGS_BOND_PHASEOUT_END_SINGLE_2025 = 114_500;
 
 // ─── Kiddie Tax (Form 8615) ───────────────────────────────────────────────────
-// Rev. Proc. 2024-40, §3.10; IRC §1(g)
+// Rev. Proc. 2024-40 §2.02 ($1,350); 2025 Form 8615 line 2 ($2,700).
 
 /** Net unearned income threshold for kiddie tax (TY2025). */
-export const KIDDIE_TAX_UNEARNED_INCOME_THRESHOLD_2025 = 2_600;
+export const KIDDIE_TAX_UNEARNED_INCOME_THRESHOLD_2025 = 2_700;
 
 /** Standard deduction floor for computing net unearned income (TY2025). */
-export const KIDDIE_TAX_STANDARD_DEDUCTION_FLOOR_2025 = 1_300;
+export const KIDDIE_TAX_STANDARD_DEDUCTION_FLOOR_2025 = 1_350;
+
+/** Form 8814 child income limit, Rev. Proc. 2024-40 §3.02; 2025 Form 8814 line 4. */
+export const FORM8814_CHILD_INCOME_LIMIT_2025 = 13_500;
 
 // ─── FEIE (Form 2555) ─────────────────────────────────────────────────────────
-// Rev. Proc. 2024-40, §3.04; IRC §911(b)(2)
+// Rev. Proc. 2024-40, §2.39; IRC §911(b)(2)
 
 /** Foreign Earned Income Exclusion limit (TY2025). */
 export const FEIE_LIMIT_2025 = 130_000;
@@ -361,7 +370,7 @@ export const FEIE_LIMIT_2025 = 130_000;
 export const FEIE_HOUSING_BASE_2025 = 20_800;
 
 // ─── Section 179 / Depreciation (Form 4562) ──────────────────────────────────
-// P.L. 119-21 ("One Big Beautiful Bill Act"); IRC §179
+// IRC §179(b) as amended by P.L. 119-21 §70306; luxury autos Rev. Proc. 2025-16.
 
 /** Section 179 expensing limit (TY2025, OBBBA). */
 export const SECTION_179_LIMIT_2025 = 2_500_000;
@@ -378,11 +387,11 @@ export const LUXURY_AUTO_YEAR1_WITH_BONUS_2025 = 20_200;
 /** Luxury auto Year 2 limit (TY2025). */
 export const LUXURY_AUTO_YEAR2_2025 = 19_600;
 
-/** Luxury auto Year 3+ limit (TY2025). */
-export const LUXURY_AUTO_YEAR3_PLUS_2025 = 11_900;
+/** Luxury auto third-year limit, Rev. Proc. 2025-16 Tables 1-2 (TY2025). */
+export const LUXURY_AUTO_YEAR3_PLUS_2025 = 11_800;
 
 // ─── Schedule H — Household Employment Taxes ─────────────────────────────────
-// IRC §3510; IRS Publication 926 (2025)
+// 2025 Publication 926; IRC §3121(x)
 
 /** Household employment FICA threshold: wages that trigger FICA (TY2025). */
 export const HOUSEHOLD_FICA_THRESHOLD_2025 = 2_800;
@@ -466,7 +475,7 @@ export const QCD_ANNUAL_LIMIT_2025 = 108_000;
 export const PSO_EXCLUSION_LIMIT_2025 = 3_000;
 
 // ─── Schedule C / Schedule F — Excess Business Loss ──────────────────────────
-// IRC §461(l); Rev. Proc. 2024-40, §3.30
+// IRC §461(l); Rev. Proc. 2024-40, §2.32
 
 /** Excess business loss threshold — Single/MFS/HOH/QSS (TY2025). */
 export const EBL_THRESHOLD_SINGLE_2025 = 313_000;
@@ -475,13 +484,13 @@ export const EBL_THRESHOLD_SINGLE_2025 = 313_000;
 export const EBL_THRESHOLD_MFJ_2025 = 626_000;
 
 // ─── Form 8990 — Interest Expense Limitation ──────────────────────────────────
-// IRC §163(j)(3); Rev. Proc. 2024-40
+// IRC §163(j)(3); Rev. Proc. 2024-40, §2.31
 
 /** Small business gross receipts threshold exempting from §163(j) (TY2025). */
 export const SMALL_BIZ_GROSS_RECEIPTS_2025 = 31_000_000;
 
 // ─── W-2 — Retirement Plan Contribution Limits ───────────────────────────────
-// Rev. Proc. 2024-40 / SECURE 2.0; IRC §402(g), §408(p)
+// Notice 2024-80; IRC §402(g), §408(p), §414(v)
 
 /**
  * Elective deferral limits for 401(k)/403(b)/457(b) by age bracket.
@@ -496,7 +505,7 @@ export const RETIREMENT_LIMITS_2025: Record<string, Record<number, number>> = {
 } as const;
 
 // ─── Form 8853 — Archer MSA / LTC ────────────────────────────────────────────
-// IRC §4974(c)(5); Rev. Proc. 2024-40
+// IRC §7702B(d)(4); Rev. Proc. 2024-40, §2.62
 
 /** LTC per-diem daily limit for non-tax-qualified contracts (TY2025). */
 export const LTC_PER_DIEM_DAILY_LIMIT_2025 = 420;
@@ -550,19 +559,19 @@ export const SEC199A_MFJ_THRESHOLD_2025 = 394_600;
 export const MCC_MAX_CREDIT_HIGH_RATE_2025 = 2_000;
 
 // ─── SEP-IRA / SIMPLE / Solo 401(k) Contribution Limits ──────────────────────
-// Rev. Proc. 2024-40, §3.20; IRC §404(a)(8), §408(k), §408(p)
+// Notice 2024-80; IRC §404(a)(8), §408(k), §408(p)
 
 /** SEP contribution rate — 25% of net SE compensation (Pub 560, ch. 4; IRC §408(k)). */
 export const SEP_CONTRIBUTION_RATE_2025 = 0.25;
 
-/** SEP / Solo 401(k) combined annual addition limit (TY2025, Rev. Proc. 2024-40 §3.20). */
+/** SEP / Solo 401(k) combined annual addition limit (TY2025, Notice 2024-80 §415(c)). */
 export const SEP_MAX_CONTRIBUTION_2025 = 70_000;
 
 /** SIMPLE IRA employer matching rate — 3% of compensation (statutory; IRC §408(p)(2)(A)(iii)). */
 export const SIMPLE_EMPLOYER_MATCH_RATE_2025 = 0.03;
 
 // ─── Student Loan Interest Deduction Phase-out (IRC §221(b)) ─────────────────
-// Rev. Proc. 2024-40, §3.15; IRC §221(b)(2)
+// Rev. Proc. 2024-40, §2.30; IRC §221(b)(2)
 
 /** SLI phase-out start — Single/HOH/QSS (TY2025). */
 export const SLI_PHASE_OUT_START_SINGLE_2025 = 85_000;
@@ -583,12 +592,12 @@ export const SLI_PHASE_OUT_END_MFJ_2025 = 200_000;
 export const F2106_PERFORMING_ARTIST_AGI_LIMIT = 16_000;
 
 // ─── LTC Insurance Premium Deductibility Limits ───────────────────────────────
-// Rev. Proc. 2024-40, §3.34; IRC §213(d)(10); IRC §213(d)(1)(D)
+// Rev. Proc. 2024-40, §2.28; IRC §213(d)(10)
 
 /**
  * Age-based deductible LTC insurance premium limits (TY2025).
  * `maxAge` is the inclusive upper bound for each bracket; Infinity = age 71+.
- * Source: Rev. Proc. 2024-40, §3.34.
+ * Source: Rev. Proc. 2024-40, §2.28.
  */
 export const LTC_PREMIUM_LIMITS_2025: ReadonlyArray<
   { readonly maxAge: number; readonly limit: number }
@@ -602,6 +611,7 @@ export const LTC_PREMIUM_LIMITS_2025: ReadonlyArray<
 
 // ─── Aggregate export (used by CONFIG_BY_YEAR barrel) ─────────────────────────
 import type { F1040Config } from "./types.ts";
+import { housingLimitTable as noticeHousingLimits } from "../intermediate/forms/income/foreign/form2555/housing_limits_2025.ts";
 
 export const config2025: F1040Config = {
   bracketsMfj: BRACKETS_MFJ_2025,
@@ -624,6 +634,10 @@ export const config2025: F1040Config = {
   amtBracketAdjustmentMfs: AMT_BRACKET_ADJUSTMENT_MFS_2025,
   ssWageBase: SS_WAGE_BASE_2025,
   ssTaxPerEmployer: SS_MAX_TAX_PER_EMPLOYER_2025,
+  // 2025 Schedule SE Part II lines 14-15 and instructions.
+  seOptionalMethodMaximum: 7_240,
+  seFarmOptionalGrossIncomeLimit: 10_860,
+  seFarmOptionalNetProfitLimit: 7_840,
   additionalMedicareThresholdMfj: ADDITIONAL_MEDICARE_THRESHOLD_MFJ,
   additionalMedicareThresholdMfs: ADDITIONAL_MEDICARE_THRESHOLD_MFS,
   additionalMedicareThresholdOther: ADDITIONAL_MEDICARE_THRESHOLD_OTHER,
@@ -645,6 +659,7 @@ export const config2025: F1040Config = {
   iraPhaseoutMfsUpper: IRA_PHASEOUT_MFS_UPPER_2025,
   qbiThresholdSingle: QBI_THRESHOLD_SINGLE_2025,
   qbiThresholdMfj: QBI_THRESHOLD_MFJ_2025,
+  qbiThresholdMfs: QBI_THRESHOLD_SINGLE_2025,
   qbiPhaseInRange: QBI_PHASE_IN_RANGE_2025,
   eitcInvestmentIncomeLimit: EITC_INVESTMENT_INCOME_LIMIT_2025,
   ctcPerChild: CTC_PER_CHILD_2025,
@@ -653,6 +668,8 @@ export const config2025: F1040Config = {
   ctcPhaseOutThresholdMfj: CTC_PHASE_OUT_THRESHOLD_MFJ_2025,
   ctcPhaseOutThresholdOther: CTC_PHASE_OUT_THRESHOLD_OTHER_2025,
   actcEarnedIncomeFloor: ACTC_EARNED_INCOME_FLOOR_2025,
+  foreignTaxCreditElectionLimitMfj: FTC_ELECTION_LIMIT_MFJ_2025,
+  foreignTaxCreditElectionLimitOther: FTC_ELECTION_LIMIT_OTHER_2025,
   saversCreditContributionCap: SAVERS_CREDIT_CONTRIBUTION_CAP_2025,
   saversCreditAgiSingle: SAVERS_CREDIT_AGI_SINGLE_2025,
   saversCreditAgiHoh: SAVERS_CREDIT_AGI_HOH_2025,
@@ -663,8 +680,25 @@ export const config2025: F1040Config = {
   savingsBondPhaseoutEndSingle: SAVINGS_BOND_PHASEOUT_END_SINGLE_2025,
   kiddieUnearnedIncomeThreshold: KIDDIE_TAX_UNEARNED_INCOME_THRESHOLD_2025,
   kiddieStandardDeductionFloor: KIDDIE_TAX_STANDARD_DEDUCTION_FLOOR_2025,
+  form8814ChildIncomeLimit: FORM8814_CHILD_INCOME_LIMIT_2025,
   feieLimit: FEIE_LIMIT_2025,
   feieHousingBase: FEIE_HOUSING_BASE_2025,
+  // Notice 2025-16.
+  foreignHousingLimits: noticeHousingLimits,
+  // IRC §1400Z-2(b)(1)(B): deferral continues through December 31, 2026.
+  qofDeferralPeriodEnds: false,
+  // IRC §951A(b)(2) before P.L. 119-21.
+  cfcNetDeemedTangibleIncomeReturn: true,
+  // Rev. Proc. 2024-40 §§4.37, 4.38; 2025 Instructions for Form 8854.
+  expatriationAverageTaxThreshold: 206_000,
+  expatriationMarkToMarketExclusion: 890_000,
+  // Instructions for Form 8864 (Rev. December 2025): P.L. 119-21 raises the
+  // credit to $.20 a gallon for fuel sold or used after June 30, 2025, and
+  // ends it for fuel sold or used after 2026.
+  smallAgriBiodieselSales: {
+    twentyCentRateFrom: "2025-07-01",
+    soldBefore: "2027-01-01",
+  },
   section179Limit: SECTION_179_LIMIT_2025,
   section179PhaseoutThreshold: SECTION_179_PHASEOUT_THRESHOLD_2025,
   luxuryAutoYear1NoBonus: LUXURY_AUTO_YEAR1_NO_BONUS_2025,
@@ -713,4 +747,170 @@ export const config2025: F1040Config = {
   sepContributionRate: SEP_CONTRIBUTION_RATE_2025,
   sepMaxContribution: SEP_MAX_CONTRIBUTION_2025,
   simpleEmployerMatchRate: SIMPLE_EMPLOYER_MATCH_RATE_2025,
+  // Rev. Proc. 2025-16 Tables 1-2, each succeeding year.
+  luxuryAutoSucceedingYears: 7_060,
+  // Rev. Proc. 2024-40 §2.06(1); credit and phaseout rates IRC §32(b)(1).
+  eitcByChildren: [
+    {
+      creditRate: 0.0765,
+      phaseoutRate: 0.0765,
+      earnedIncomeAmount: 8_490,
+      maxCredit: 649,
+      phaseoutStart: 10_620,
+      phaseoutStartMfj: 17_730,
+      phaseoutEnd: 19_104,
+      phaseoutEndMfj: 26_214,
+    },
+    {
+      creditRate: 0.34,
+      phaseoutRate: 0.1598,
+      earnedIncomeAmount: 12_730,
+      maxCredit: 4_328,
+      phaseoutStart: 23_350,
+      phaseoutStartMfj: 30_470,
+      phaseoutEnd: 50_434,
+      phaseoutEndMfj: 57_554,
+    },
+    {
+      creditRate: 0.40,
+      phaseoutRate: 0.2106,
+      earnedIncomeAmount: 17_880,
+      maxCredit: 7_152,
+      phaseoutStart: 23_350,
+      phaseoutStartMfj: 30_470,
+      phaseoutEnd: 57_310,
+      phaseoutEndMfj: 64_430,
+    },
+    {
+      creditRate: 0.45,
+      phaseoutRate: 0.2106,
+      earnedIncomeAmount: 17_880,
+      maxCredit: 8_046,
+      phaseoutStart: 23_350,
+      phaseoutStartMfj: 30_470,
+      phaseoutEnd: 61_555,
+      phaseoutEndMfj: 68_675,
+    },
+  ],
+  // IRC §21(a)(2) before P.L. 119-21 §70405: 35% down to a 20% floor.
+  depCareCreditMaxRate: 0.35,
+  depCareCreditFirstFloorRate: 0.20,
+  depCareCreditSecondPhaseout: null,
+  // IRC §224(b), §225(b) and §163(h)(4)(C), added by P.L. 119-21
+  // §§70201-70203 for 2025-2028.
+  qualifiedTipsCap: 25_000,
+  qualifiedOvertimeCap: 12_500,
+  qualifiedOvertimeCapMfj: 25_000,
+  tipsOvertimePhaseoutThreshold: 150_000,
+  tipsOvertimePhaseoutThresholdMfj: 300_000,
+  tipsOvertimePhaseoutPerThousand: 100,
+  vehicleLoanInterestCap: 10_000,
+  vehicleLoanInterestPhaseoutThreshold: 100_000,
+  vehicleLoanInterestPhaseoutThresholdMfj: 200_000,
+  vehicleLoanInterestPhaseoutPerThousand: 200,
+  // P.L. 119-21 §§70424, 70425 and 70111 apply only after 2025; §68 was
+  // suspended for 2025 by IRC §68(f) as then in effect.
+  nonitemizerCharitableLimit: 0,
+  nonitemizerCharitableLimitMfj: 0,
+  charitableAgiFloorRate: 0,
+  itemizedDeductionReductionRate: 0,
+  // IRC §163(h)(3)(E)(iv): no premiums paid after December 31, 2021.
+  mortgageInsurancePremiumsDeductible: false,
+  // IRC §199A(i) (P.L. 119-21 §70105) applies after 2025.
+  qbiMinimumDeduction: 0,
+  qbiMinimumDeductionQbiFloor: 0,
+  // Rev. Proc. 2024-40 §2.04; refundable $5,000 IRC §23(a)(4) (P.L. 119-21
+  // §70402); $40,000 phaseout range IRC §23(b)(2)(A)(ii).
+  adoptionCreditMax: 17_280,
+  adoptionCreditRefundableMax: 5_000,
+  adoptionPhaseoutStart: 259_190,
+  adoptionPhaseoutRange: 40_000,
+  // Rev. Proc. 2024-40 §§2.24, 2.15(2), 2.13.
+  qualifyingRelativeGrossIncomeLimit: 5_200,
+  dependentStandardDeductionFloor: 1_350,
+  dependentStandardDeductionEarnedIncomeAddOn: 450,
+  educatorExpenseLimit: 300,
+  // Notice 2025-5 §3; charitable rate IRC §170(i).
+  standardMileageRates: [
+    {
+      from: "2025-01-01",
+      business: 0.70,
+      medicalMoving: 0.21,
+      charitable: 0.14,
+    },
+  ],
+  // P.L. 119-21 §70204(e): Trump accounts apply after 2025.
+  trumpAccountContributionLimit: 0,
+  trumpAccountEmployerExclusionLimit: 0,
+  // ── Taxes and payments ───────────────────────────────────────────────────
+  // IRC §55(d)(2) before P.L. 119-21 §70107.
+  amtExemptionPhaseOutRate: 0.25,
+  // 2024 HHS poverty guidelines, used for 2025 coverage.
+  fplBaseAlaska: 18_810,
+  fplIncrementAlaska: 6_730,
+  fplBaseHawaii: 17_310,
+  fplIncrementHawaii: 6_190,
+  // IRC §36B(b)(3)(A)(iii) (ARP, extended through 2025 by P.L. 117-169).
+  ptcApplicablePercentages: [
+    { fromFplPct: 0, toFplPct: 150, initial: 0, final: 0 },
+    { fromFplPct: 150, toFplPct: 200, initial: 0, final: 200 },
+    { fromFplPct: 200, toFplPct: 250, initial: 200, final: 400 },
+    { fromFplPct: 250, toFplPct: 300, initial: 400, final: 600 },
+    { fromFplPct: 300, toFplPct: 400, initial: 600, final: 850 },
+    { fromFplPct: 400, toFplPct: Infinity, initial: 850, final: 850 },
+  ],
+  ptcIncomeLimitFplPct: null,
+  // Rev. Proc. 2024-35 §3.02.
+  ptcRequiredContributionPercentage: 0.0902,
+  // 2025 Form 8962 instructions, Table 5.
+  ptcRepaymentCaps: [
+    { maxFplPct: 200, singleCap: 375, otherCap: 750 },
+    { maxFplPct: 300, singleCap: 975, otherCap: 1_950 },
+    { maxFplPct: 400, singleCap: 1_625, otherCap: 3_250 },
+  ],
+  ptcLawfullyPresentBelow100Fpl: true,
+  // 2025 Form 8835 instructions, Credit rates (FR Doc. 2025-09366).
+  renewableProductionRates: {
+    placedBefore2022: { full: 0.03, half: 0.015 },
+    placedAfter2021: { full: 0.006, half: 0.003 },
+  },
+  // Instructions for Form 8994 (Rev. December 2024), Compensation Limit
+  // Per Year: 60% of the 2024 IRC §414(q)(1)(B) amount of $155,000.
+  paidLeaveCompensationLimit: 93_000,
+  // IRC §45F(a) and (b) before P.L. 119-21; Form 8882 (Rev. 12/2017) lines
+  // 2, 4 and 7.
+  employerProvidedChildcare: {
+    facilityRate: 0.25,
+    smallBusinessFacilityRate: 0.25,
+    referralRate: 0.10,
+    creditLimit: 150_000,
+    smallBusinessCreditLimit: 150_000,
+  },
+  // Form 8881 (Rev. December 2025) line 6b: wages over $105,000 exclude an
+  // employee from the IRC §45E(f) contribution credit.
+  retirementContributionCreditWageLimit: 105_000,
+  // IRC §48E material-assistance rules apply to construction begun after
+  // 2025 (P.L. 119-21); none for TY2025.
+  cleanElectricityMaterialAssistanceAfter: null,
+  // 2025 Form 2210-F line 16: underpayment x days / 365 x 0.07.
+  form2210fPenaltyRate: 0.07,
+  // 2025 Instructions for Form 2210, Part III Section B, Table 2 and the
+  // penalty worksheet: columns dated 4/15/25, 6/15/25, 9/15/25 and 1/15/26;
+  // 7% for each rate period through 4/15/26. June 15, 2025 is a Sunday, so a
+  // payment on Monday, June 16 is timely (Section A, line 11 note).
+  form2210RegularMethod: {
+    installmentDueDates: [
+      "2025-04-15",
+      "2025-06-15",
+      "2025-09-15",
+      "2026-01-15",
+    ],
+    timelyThrough: ["2025-04-15", "2025-06-16", "2025-09-15", "2026-01-15"],
+    ratePeriods: [
+      { through: "2025-06-30", rate: 0.07 },
+      { through: "2025-09-30", rate: 0.07 },
+      { through: "2025-12-31", rate: 0.07 },
+      { through: "2026-04-15", rate: 0.07 },
+    ],
+  },
 };

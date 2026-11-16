@@ -1,3 +1,5 @@
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { sha256Hex } from "../../../../return-processing/prepared-source.ts";
 
@@ -6,9 +8,9 @@ export async function canonicalForm1098CopyDocument(): Promise<PDFDocument> {
   const path = ".pdf-cache/form1098-2025-printable-source.pdf";
   let bytes: Uint8Array;
   try {
-    bytes = await Deno.readFile(path);
+    bytes = await sys.readBytes(path);
   } catch (error) {
-    if (!(error instanceof Deno.errors.NotFound)) throw error;
+    if (!(sys.isNotFound(error))) throw error;
     const response = await fetch(
       "https://www.irs.gov/pub/irs-prior/f1098--2025.pdf",
     );
@@ -16,8 +18,8 @@ export async function canonicalForm1098CopyDocument(): Promise<PDFDocument> {
       throw Error(`Form1098 canonical template HTTP ${response.status}`);
     }
     bytes = new Uint8Array(await response.arrayBuffer());
-    await Deno.mkdir(".pdf-cache", { recursive: true });
-    await Deno.writeFile(path, bytes);
+    await fs.mkdir(".pdf-cache", { recursive: true });
+    await fs.writeFile(path, bytes);
   }
   const pdf = await PDFDocument.load(bytes, { updateMetadata: false });
   const form = pdf.getForm();
@@ -51,10 +53,11 @@ interface Form1098CopySource {
   readonly box6_points_paid?: number;
 }
 
-/** Synthetic, byte-bound 2025 issuer Copy B for filled-return review only. */
+/** Synthetic, byte-bound issuer Copy B for filled-return review only. */
 export async function withSyntheticForm1098Copy<T extends Form1098CopySource>(
   caseId: string,
   source: T,
+  calendarYear = 2025,
 ): Promise<
   T & {
     issuer_copy: {
@@ -68,7 +71,7 @@ export async function withSyntheticForm1098Copy<T extends Form1098CopySource>(
   const form = pdf.getForm();
   const prefix = "topmostSubform[0].CopyB[0]";
   const values: Record<string, string> = {
-    [`${prefix}.CopyHeader[0].CalendarYear[0].f2_1[0]`]: "25",
+    [`${prefix}.CopyHeader[0].CalendarYear[0].f2_1[0]`]: String(calendarYear).slice(2),
     [`${prefix}.LeftCol[0].f2_2[0]`]:
       `${source.lender_name}\n${source.source_document_reference}`,
     [`${prefix}.LeftCol[0].f2_4[0]`]: `***-**-${

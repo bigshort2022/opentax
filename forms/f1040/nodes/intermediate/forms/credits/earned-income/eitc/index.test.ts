@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import { eitc } from "./index.ts";
 import { eitc as scheduleEic } from "../../../../../../2025/mef/forms/credits/earned-income/eitc.ts";
@@ -5,8 +6,8 @@ import { FilingStatus } from "../../../../../types.ts";
 
 // ─── Test Helpers ─────────────────────────────────────────────────────────────
 
-function compute(input: Record<string, unknown>) {
-  return eitc.compute({ taxYear: 2025, formType: "f1040" }, {
+function compute(input: Record<string, unknown>, taxYear = 2025) {
+  return eitc.compute({ taxYear, formType: "f1040" }, {
     filer_has_valid_ssns: true,
     taxpayer_dob: "1985-06-15",
     main_home_in_us_over_half_year: true,
@@ -34,7 +35,7 @@ function compute(input: Record<string, unknown>) {
   });
 }
 
-Deno.test("explicit Form 1040 line 27c election suppresses an otherwise eligible EIC", () => {
+test("explicit Form 1040 line 27c election suppresses an otherwise eligible EIC", () => {
   const claim = {
     earned_income: 15_000,
     qualifying_children: 1,
@@ -45,7 +46,7 @@ Deno.test("explicit Form 1040 line 27c election suppresses an otherwise eligible
   assertEquals(getCredit({ ...claim, do_not_claim_eic: false }) > 0, true);
 });
 
-Deno.test("EITC needs verified filer SSNs", () => {
+test("EITC needs verified filer SSNs", () => {
   noCredit({
     earned_income: 12_730,
     qualifying_children: 1,
@@ -60,7 +61,7 @@ Deno.test("EITC needs verified filer SSNs", () => {
   });
 });
 
-Deno.test("filing Form 2555 disqualifies EIC even with earned income and a child", () => {
+test("filing Form 2555 disqualifies EIC even with earned income and a child", () => {
   noCredit({
     earned_income: 15_000,
     qualifying_children: 1,
@@ -69,7 +70,7 @@ Deno.test("filing Form 2555 disqualifies EIC even with earned income and a child
   });
 });
 
-Deno.test("EIC requires reviewed all-year resident status or a valid joint election", () => {
+test("EIC requires reviewed all-year resident status or a valid joint election", () => {
   const base = {
     earned_income: 15_000,
     qualifying_children: 1,
@@ -117,7 +118,7 @@ Deno.test("EIC requires reviewed all-year resident status or a valid joint elect
   );
 });
 
-Deno.test("childless EIC requires DOB, U.S. main home, and reviewed dependent status", () => {
+test("childless EIC requires DOB, U.S. main home, and reviewed dependent status", () => {
   const base = { earned_income: 12_000, filing_status: FilingStatus.Single };
   assertEquals(getCredit(base), 542);
   noCredit({ ...base, taxpayer_dob: undefined });
@@ -130,7 +131,7 @@ Deno.test("childless EIC requires DOB, U.S. main home, and reviewed dependent st
   noCredit({ ...base, childless_eic_review: undefined });
 });
 
-Deno.test("childless EIC honors the IRS birthday boundaries", () => {
+test("childless EIC honors the IRS birthday boundaries", () => {
   const base = { earned_income: 12_000, filing_status: FilingStatus.Single };
   assertEquals(getCredit({ ...base, taxpayer_dob: "2001-01-01" }), 542);
   assertEquals(getCredit({ ...base, taxpayer_dob: "1961-01-01" }), 542);
@@ -162,7 +163,7 @@ Deno.test("childless EIC honors the IRS birthday boundaries", () => {
   );
 });
 
-Deno.test("MFJ childless EIC accepts one age-eligible spouse; HOH requires unmarried review", () => {
+test("MFJ childless EIC accepts one age-eligible spouse; HOH requires unmarried review", () => {
   const base = { earned_income: 12_000 };
   assertEquals(
     getCredit({
@@ -196,9 +197,13 @@ Deno.test("MFJ childless EIC accepts one age-eligible spouse; HOH requires unmar
   );
 });
 
-Deno.test("EIC requires reviewed prior-disallowance history and the matching Form 8862 when needed", () => {
+test("EIC requires reviewed prior-disallowance history and the matching Form 8862 when needed", () => {
   const base = { earned_income: 12_000, filing_status: FilingStatus.Single };
-  noCredit({ ...base, prior_eic_disallowance_review: undefined });
+  assertThrows(
+    () => compute({ ...base, prior_eic_disallowance_review: undefined }),
+    Error,
+    "EIC needs general.prior_eic_disallowance_review",
+  );
   const required = {
     status: "requires_8862",
     disallowed_year: 2023,
@@ -271,7 +276,7 @@ Deno.test("EIC requires reviewed prior-disallowance history and the matching For
   });
 });
 
-Deno.test("a nonjoint child EIC requires the filer's qualifying-child status review", () => {
+test("a nonjoint child EIC requires the filer's qualifying-child status review", () => {
   const base = {
     earned_income: 15_000,
     qualifying_children: 1,
@@ -318,7 +323,7 @@ function noCredit(input: Record<string, unknown>): void {
 
 // ─── No Income ────────────────────────────────────────────────────────────────
 
-Deno.test("no_earned_income_no_credit — earned_income=0 → no output", () => {
+test("no_earned_income_no_credit — earned_income=0 → no output", () => {
   noCredit({
     earned_income: 0,
     qualifying_children: 1,
@@ -326,11 +331,11 @@ Deno.test("no_earned_income_no_credit — earned_income=0 → no output", () => 
   });
 });
 
-Deno.test("no_earned_income_no_credit — empty input → no output", () => {
+test("no_earned_income_no_credit — empty input → no output", () => {
   noCredit({});
 });
 
-Deno.test("computed EITC amount is retained for the MeF Schedule EIC builder", () => {
+test("computed EITC amount is retained for the MeF Schedule EIC builder", () => {
   const result = compute({
     earned_income: 12_730,
     qualifying_children: 1,
@@ -340,7 +345,7 @@ Deno.test("computed EITC amount is retained for the MeF Schedule EIC builder", (
   assertEquals(filing?.fields.credit_amount, 4_328);
 });
 
-Deno.test("qualifying-child facts survive EIC finalization and reach Schedule EIC", () => {
+test("qualifying-child facts survive EIC finalization and reach Schedule EIC", () => {
   const child = {
     first_name: "Ada",
     last_name: "Taxpayer",
@@ -369,7 +374,7 @@ Deno.test("qualifying-child facts survive EIC finalization and reach Schedule EI
   );
 });
 
-Deno.test("a positive child EIC without child rows cannot disappear from MeF", () => {
+test("a positive child EIC without child rows cannot disappear from MeF", () => {
   const result = compute({
     earned_income: 12_730,
     qualifying_children: 1,
@@ -385,7 +390,7 @@ Deno.test("a positive child EIC without child rows cannot disappear from MeF", (
 
 // ─── Investment Income Disqualifier ──────────────────────────────────────────
 
-Deno.test("investment_income_disqualifier_at_limit — $11,950 → still eligible", () => {
+test("investment_income_disqualifier_at_limit — $11,950 → still eligible", () => {
   // At exactly the limit: still qualifies. Credit = 4328 (at max for 1 child).
   const credit = getCredit({
     earned_income: 12_730,
@@ -396,7 +401,7 @@ Deno.test("investment_income_disqualifier_at_limit — $11,950 → still eligibl
   assertEquals(credit, 4_328);
 });
 
-Deno.test("investment_income_disqualifier_over_limit — $11,951 → no credit", () => {
+test("investment_income_disqualifier_over_limit — $11,951 → no credit", () => {
   noCredit({
     earned_income: 12_730,
     qualifying_children: 1,
@@ -407,7 +412,7 @@ Deno.test("investment_income_disqualifier_over_limit — $11,951 → no credit",
 
 // ─── IRS 2025 EIC Table and Worksheets A/B ────────────────────────────────
 
-Deno.test("IRS published table example: $2,455 and one child gives $842", () => {
+test("IRS published table example: $2,455 and one child gives $842", () => {
   assertEquals(
     getCredit({
       earned_income: 2_455,
@@ -418,7 +423,7 @@ Deno.test("IRS published table example: $2,455 and one child gives $842", () => 
   );
 });
 
-Deno.test("EIC uses the $50 table band, not a rounded phase-in formula", () => {
+test("EIC uses the $50 table band, not a rounded phase-in formula", () => {
   assertEquals(
     getCredit({ earned_income: 5_000, filing_status: FilingStatus.Single }),
     384,
@@ -453,7 +458,7 @@ Deno.test("EIC uses the $50 table band, not a rounded phase-in formula", () => {
   );
 });
 
-Deno.test("EIC table applies the TY2025 phase-out bands for single and joint filers", () => {
+test("EIC table applies the TY2025 phase-out bands for single and joint filers", () => {
   assertEquals(
     getCredit({ earned_income: 19_000, filing_status: FilingStatus.Single }),
     6,
@@ -480,14 +485,14 @@ Deno.test("EIC table applies the TY2025 phase-out bands for single and joint fil
   );
 });
 
-Deno.test("qualifying surviving spouse uses the single/HOH/QSS EIC table column", () => {
+test("qualifying surviving spouse uses the single/HOH/QSS EIC table column", () => {
   assertEquals(
     getCredit({ earned_income: 19_000, filing_status: FilingStatus.QSS }),
     6,
   );
 });
 
-Deno.test("EIC compares AGI table credit when AGI crosses the worksheet threshold", () => {
+test("EIC compares AGI table credit when AGI crosses the worksheet threshold", () => {
   assertEquals(
     getCredit({
       earned_income: 25_000,
@@ -509,7 +514,7 @@ Deno.test("EIC compares AGI table credit when AGI crosses the worksheet threshol
   );
 });
 
-Deno.test("EIC honors the IRS table's exact-dollar terminal footnotes", () => {
+test("EIC honors the IRS table's exact-dollar terminal footnotes", () => {
   const cases: Array<[number, number, FilingStatus, number]> = [
     [19_103, 0, FilingStatus.Single, 1],
     [19_104, 0, FilingStatus.Single, 0],
@@ -537,7 +542,7 @@ Deno.test("EIC honors the IRS table's exact-dollar terminal footnotes", () => {
   }
 });
 
-Deno.test("Worksheet B subtracts Schedule SE line 13 from Schedule C earned income", () => {
+test("Worksheet B subtracts Schedule SE line 13 from Schedule C earned income", () => {
   assertEquals(
     getCredit({
       se_net_profit: 6_365,
@@ -549,7 +554,7 @@ Deno.test("Worksheet B subtracts Schedule SE line 13 from Schedule C earned inco
   );
 });
 
-Deno.test("MFS without the separate-spouse eligibility route has no EIC", () => {
+test("MFS without the separate-spouse eligibility route has no EIC", () => {
   noCredit({
     earned_income: 12_730,
     qualifying_children: 1,
@@ -557,7 +562,7 @@ Deno.test("MFS without the separate-spouse eligibility route has no EIC", () => 
   });
 });
 
-Deno.test("reviewed MFS separation with one child uses the single EIC column", () => {
+test("reviewed MFS separation with one child uses the single EIC column", () => {
   assertEquals(
     getCredit({
       earned_income: 15_000,
@@ -574,7 +579,7 @@ Deno.test("reviewed MFS separation with one child uses the single EIC column", (
   });
 });
 
-Deno.test("computed EIC routes to Form 1040 line 27a", () => {
+test("computed EIC routes to Form 1040 line 27a", () => {
   const result = compute({
     earned_income: 12_730,
     qualifying_children: 1,
@@ -582,4 +587,62 @@ Deno.test("computed EIC routes to Form 1040 line 27a", () => {
   });
   const out = result.outputs.find((o) => o.nodeType === "f1040");
   assertEquals(out?.fields.line27_eitc, 4_328);
+});
+
+test("TY2026 EIC is zero at the completed phaseout and figured below it", () => {
+  const claim = { qualifying_children: 0, filing_status: FilingStatus.Single };
+  // Rev. Proc. 2025-32 §4.06(1): no-child completed phaseout $19,540.
+  const fields = compute({ ...claim, earned_income: 19_540 }, 2026).outputs
+    .find((o) => o.nodeType === "eitc")?.fields;
+  assertEquals(fields?.credit_amount, 0);
+  // $664 maximum less 7.65% of the $12,025 row midpoint over $10,860.
+  const credit = compute({ ...claim, earned_income: 12_000 }, 2026).outputs
+    .find((o) => o.nodeType === "eitc")?.fields;
+  assertEquals(credit?.credit_amount, 575);
+});
+
+// Pub. 596 (2025) ch. 5: EIC denied or reduced for any year after 1996, other
+// than for a math or clerical error, requires Form 8862. A missing answer is a
+// named error, not a silent zero; it does not matter when no credit is due.
+test("a missing prior-disallowance answer is a named error only when EIC would be allowed", () => {
+  assertThrows(
+    () =>
+      compute({
+        earned_income: 12_000,
+        qualifying_children: 1,
+        filing_status: FilingStatus.Single,
+        prior_eic_disallowance_review: undefined,
+      }),
+    Error,
+    "EIC needs general.prior_eic_disallowance_review",
+  );
+  noCredit({
+    earned_income: 80_000,
+    qualifying_children: 1,
+    filing_status: FilingStatus.Single,
+    prior_eic_disallowance_review: undefined,
+  });
+  noCredit({
+    earned_income: 12_000,
+    qualifying_children: 1,
+    filing_status: FilingStatus.Single,
+    prior_eic_disallowance_review: undefined,
+    do_not_claim_eic: true,
+  });
+});
+
+// Pub. 596 (2025) Rule 7, Disability Benefits: taxable benefits under an
+// employer's disability retirement plan are earned income until minimum
+// retirement age. 2025 EIC Table, one child, $12,000-$12,050 row: $4,089.
+test("employer disability-plan benefits before minimum retirement age are EIC earned income", () => {
+  assertEquals(
+    getCredit({
+      earned_income: 1_000,
+      disability_pension_earned_income: 11_000,
+      agi: 16_000,
+      qualifying_children: 1,
+      filing_status: FilingStatus.QSS,
+    }),
+    4_089,
+  );
 });

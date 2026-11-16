@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import {
   buildForm8854Annual,
@@ -53,7 +54,7 @@ function annualInput(overrides: Record<string, unknown> = {}) {
       citizenships: [{ country_code: "US", acquired_date: "1980-01-01" }],
       us_citizenship_acquisition: "BIRTH",
     },
-    tax_status_2025: "FULL_YEAR_US_CITIZEN_OR_RESIDENT",
+    tax_status: "FULL_YEAR_US_CITIZEN_OR_RESIDENT",
     prior_form8854_obligations_confirmed_complete: true,
     prior_form8854_obligation_ledger: {
       source_document_id: "DOC-PRIOR",
@@ -117,7 +118,7 @@ function source1042s(
   };
 }
 
-Deno.test("annual Form 8854 certifies no distributions from a remaining eligible item", () => {
+test("annual Form 8854 certifies no distributions from a remaining eligible item", () => {
   const parsed = annualInputSchema.parse(annualInput());
   const xml = buildForm8854Annual(parsed);
   const statements = buildForm8854AnnualNativeStatements(parsed);
@@ -142,14 +143,14 @@ Deno.test("annual Form 8854 certifies no distributions from a remaining eligible
   assertEquals(xml.includes("InitialExptrtStmtSpcfdYrInd"), false);
 });
 
-Deno.test("annual Form 8854 binds every current obligation to the prior filed inventory", () => {
+test("annual Form 8854 binds every current obligation to the prior filed inventory", () => {
   const stock = {
     item_id: "stock",
     description: "Stock holding",
     prior_form8854_document_id: "DOC-PRIOR",
     prior_mark_to_market_gain_or_loss_amount: 111_000,
     prior_deferred_tax_amount: 50_000,
-    disposition: { disposed_in_2025: false },
+    disposition: { disposed_in_tax_year: false },
   };
   const candidate = annualInput({
     deferred_properties: [stock],
@@ -188,7 +189,7 @@ Deno.test("annual Form 8854 binds every current obligation to the prior filed in
   );
 });
 
-Deno.test("annual Form 8854 emits separate eligible-item and trust waiver statements", () => {
+test("annual Form 8854 emits separate eligible-item and trust waiver statements", () => {
   const parsed = annualInputSchema.parse(annualInput({
     nongrantor_trust_interests: [{
       item_id: "trust",
@@ -227,7 +228,7 @@ Deno.test("annual Form 8854 emits separate eligible-item and trust waiver statem
   );
 });
 
-Deno.test("annual Form 8854 no-activity certification reaches the filing graph", () => {
+test("annual Form 8854 no-activity certification reaches the filing graph", () => {
   assertEquals(
     f8854Annual.compute(
       { taxYear: 2025, formType: "f1040" },
@@ -240,7 +241,7 @@ Deno.test("annual Form 8854 no-activity certification reaches the filing graph",
       f8854Annual.compute(
         { taxYear: 2025, formType: "f1040" },
         annualInputSchema.parse(annualInput({
-          tax_status_2025: "NONRESIDENT_OR_DUAL_STATUS",
+          tax_status: "NONRESIDENT_OR_DUAL_STATUS",
         })),
       ),
     Error,
@@ -251,7 +252,7 @@ Deno.test("annual Form 8854 no-activity certification reaches the filing graph",
       f8854Annual.compute(
         { taxYear: 2025, formType: "f1040" },
         annualInputSchema.parse(annualInput({
-          tax_status_2025: "NONRESIDENT_OR_DUAL_STATUS",
+          tax_status: "NONRESIDENT_OR_DUAL_STATUS",
           source_1042s: [source1042s()],
           eligible_deferred_compensation_items: [{
             item_id: "plan",
@@ -267,9 +268,9 @@ Deno.test("annual Form 8854 no-activity certification reaches the filing graph",
   );
 });
 
-Deno.test("annual Form 8854 lists prior deferred property and 2025 distributions", () => {
+test("annual Form 8854 lists prior deferred property and 2025 distributions", () => {
   const parsed = annualInputSchema.parse(annualInput({
-    tax_status_2025: "NONRESIDENT_OR_DUAL_STATUS",
+    tax_status: "NONRESIDENT_OR_DUAL_STATUS",
     source_1042s: [
       source1042s(),
       source1042s("DOC-TRUST-PAYMENT", "39"),
@@ -281,7 +282,7 @@ Deno.test("annual Form 8854 lists prior deferred property and 2025 distributions
       prior_mark_to_market_gain_or_loss_amount: 111_000,
       prior_deferred_tax_amount: 50_000,
       disposition: {
-        disposed_in_2025: true,
+        disposed_in_tax_year: true,
         entire_deferred_property_disposed_confirmed: true,
         disposition_date: "2025-05-20",
         reported_form_code: ReportedFormCode.Form8949,
@@ -336,7 +337,7 @@ Deno.test("annual Form 8854 lists prior deferred property and 2025 distributions
   assertEquals((xml.match(/<NongrantorTrustDistriDtl>/g) ?? []).length, 1);
 });
 
-Deno.test("annual Form 8854 disposition matches one filed Form 8949 sale and payment facts", () => {
+test("annual Form 8854 disposition matches one filed Form 8949 sale and payment facts", () => {
   const parsed = annualInputSchema.parse(annualInput({
     deferred_properties: [{
       item_id: "stock",
@@ -345,7 +346,7 @@ Deno.test("annual Form 8854 disposition matches one filed Form 8949 sale and pay
       prior_mark_to_market_gain_or_loss_amount: 111_000,
       prior_deferred_tax_amount: 50_000,
       disposition: {
-        disposed_in_2025: true,
+        disposed_in_tax_year: true,
         entire_deferred_property_disposed_confirmed: true,
         disposition_date: "2025-05-20",
         reported_form_code: ReportedFormCode.Form8949,
@@ -435,10 +436,10 @@ Deno.test("annual Form 8854 disposition matches one filed Form 8949 sale and pay
   );
 });
 
-Deno.test("annual Form 8854 rejects missing obligations and unsupported years", () => {
+test("annual Form 8854 rejects missing obligations and unsupported years", () => {
   for (
     const missingConfirmation of [
-      "tax_status_2025",
+      "tax_status",
       "original_form8854_mailed_confirmed",
       "attached_form8854_copy_marked_copy_confirmed",
     ]
@@ -468,24 +469,35 @@ Deno.test("annual Form 8854 rejects missing obligations and unsupported years", 
     })).success,
     false,
   );
-  assertEquals(
-    annualInputSchema.safeParse(annualInput({
-      expatriation_date: "2025-01-01",
-      part_i: {
-        ...annualInput().part_i,
-        notification: {
-          kind: "CITIZEN_STATE_DEPARTMENT",
-          date: "2025-01-01",
-        },
+  const sameYear = annualInputSchema.parse(annualInput({
+    expatriation_date: "2025-01-01",
+    part_i: {
+      ...annualInput().part_i,
+      notification: {
+        kind: "CITIZEN_STATE_DEPARTMENT",
+        date: "2025-01-01",
       },
-    })).success,
+    },
+  }));
+  assertThrows(
+    () => f8854Annual.compute({ taxYear: 2025, formType: "f1040" }, sameYear),
+    Error,
+    "Annual Form 8854 must report tax year 2025 events",
+  );
+  assertEquals(
+    f8854Annual.compute({ taxYear: 2026, formType: "f1040" }, sameYear)
+      .outputs,
+    [],
+  );
+  assertEquals(
+    annualInputSchema.safeParse(annualInput({ tax_status_2025: "x" })).success,
     false,
   );
 });
 
-Deno.test("annual Form 8854 enforces source and three-row distribution limits", () => {
+test("annual Form 8854 enforces source and three-row distribution limits", () => {
   const centsInput = annualInputSchema.parse(annualInput({
-    tax_status_2025: "NONRESIDENT_OR_DUAL_STATUS",
+    tax_status: "NONRESIDENT_OR_DUAL_STATUS",
     source_1042s: [source1042s("DOC-DISTRIBUTION", "38", 801, 240)],
     eligible_deferred_compensation_items: [{
       item_id: "plan",
@@ -505,7 +517,7 @@ Deno.test("annual Form 8854 enforces source and three-row distribution limits", 
     "<EligDeferredCompItemsDistriDtl><DistributionAmt>801</DistributionAmt><TotalTaxWithheldAmt>240</TotalTaxWithheldAmt></EligDeferredCompItemsDistriDtl>",
   );
   const groupedInput = annualInputSchema.parse(annualInput({
-    tax_status_2025: "NONRESIDENT_OR_DUAL_STATUS",
+    tax_status: "NONRESIDENT_OR_DUAL_STATUS",
     source_1042s: [source1042s("DOC-DISTRIBUTION", "38", 3_200, 960)],
     eligible_deferred_compensation_items: [{
       item_id: "plan",
@@ -528,7 +540,7 @@ Deno.test("annual Form 8854 enforces source and three-row distribution limits", 
   );
   assertEquals(
     annualInputSchema.safeParse(annualInput({
-      tax_status_2025: "NONRESIDENT_OR_DUAL_STATUS",
+      tax_status: "NONRESIDENT_OR_DUAL_STATUS",
       source_1042s: ["DOC-1", "DOC-2", "DOC-3", "DOC-4"].map((id) =>
         source1042s(id)
       ),
@@ -547,7 +559,7 @@ Deno.test("annual Form 8854 enforces source and three-row distribution limits", 
   );
   assertEquals(
     annualInputSchema.safeParse(annualInput({
-      tax_status_2025: "NONRESIDENT_OR_DUAL_STATUS",
+      tax_status: "NONRESIDENT_OR_DUAL_STATUS",
       source_1042s: [source1042s("DOC-DISTRIBUTION", "38", 1_001, 240)],
       eligible_deferred_compensation_items: [{
         item_id: "plan",
@@ -583,14 +595,14 @@ Deno.test("annual Form 8854 enforces source and three-row distribution limits", 
         prior_form8854_document_id: "DOC-PRIOR",
         prior_mark_to_market_gain_or_loss_amount: 111_000,
         prior_deferred_tax_amount: 50_000,
-        disposition: { disposed_in_2025: true, disposition_date: "2025-05-20" },
+        disposition: { disposed_in_tax_year: true, disposition_date: "2025-05-20" },
       }],
     })).success,
     false,
   );
 });
 
-Deno.test("annual Form 8854 reconciles code 38 and 39 Form 1042-S sources", () => {
+test("annual Form 8854 reconciles code 38 and 39 Form 1042-S sources", () => {
   const first = {
     ...distribution(),
     gross_distribution_amount: 500,
@@ -604,7 +616,7 @@ Deno.test("annual Form 8854 reconciles code 38 and 39 Form 1042-S sources", () =
     tax_withheld_amount: 119.75,
   };
   const input = annualInput({
-    tax_status_2025: "NONRESIDENT_OR_DUAL_STATUS",
+    tax_status: "NONRESIDENT_OR_DUAL_STATUS",
     source_1042s: [
       source1042s(),
       source1042s("DOC-TRUST-PAYMENT", "39"),
@@ -632,7 +644,7 @@ Deno.test("annual Form 8854 reconciles code 38 and 39 Form 1042-S sources", () =
   assertEquals(
     annualInputSchema.safeParse({
       ...input,
-      tax_status_2025: "FULL_YEAR_US_CITIZEN_OR_RESIDENT",
+      tax_status: "FULL_YEAR_US_CITIZEN_OR_RESIDENT",
     }).success,
     false,
   );

@@ -2,7 +2,7 @@ import type { FilerIdentity } from "../../../../../mef/header.ts";
 import { FilingStatus } from "../../../../../mef/header.ts";
 import {
   form8889,
-  inputSchema,
+  statedBeneficiarySourceSchema as inputSchema,
 } from "../../../../../nodes/intermediate/forms/adjustments/health/form8889/index.ts";
 import { inputSchema as generalSchema } from "../../../../../nodes/inputs/general/filing/general/index.ts";
 
@@ -11,6 +11,7 @@ export function reconcilePrimaryMixedMedicalForm8889(
   forms: readonly Readonly<Record<string, unknown>>[],
   allPending: Readonly<Record<string, unknown>> | undefined,
   filer: FilerIdentity | undefined,
+  taxYear: number,
 ): void {
   if (filer && filer.filingStatus !== FilingStatus.Single) return;
   const filed = forms[0];
@@ -132,7 +133,7 @@ export function reconcilePrimaryMixedMedicalForm8889(
     );
   }
   const outputs = form8889.compute(
-    { taxYear: 2025, formType: "f1040" },
+    { taxYear, formType: "f1040" },
     item,
   ).outputs;
   const expected = (outputs.find((row) => row.nodeType === "form8889")

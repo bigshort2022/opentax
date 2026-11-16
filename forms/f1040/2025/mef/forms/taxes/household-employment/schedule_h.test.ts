@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import { type FilerIdentity, FilingStatus } from "../../../types.ts";
 import { scheduleH } from "./schedule_h.ts";
@@ -45,7 +46,7 @@ const ficaOnlySource = {
   },
 };
 
-Deno.test("Schedule H native FICA-only withholding replays the reviewed W-4", () => {
+test("Schedule H native FICA-only withholding replays the reviewed W-4", () => {
   const worker = ficaOnlySource.fica_only_payroll.employee_wages[0];
   const withWithholding = {
     ...ficaOnlySource,
@@ -94,7 +95,7 @@ Deno.test("Schedule H native FICA-only withholding replays the reviewed W-4", ()
   );
 });
 
-Deno.test("Schedule H uses the form's required identity and line-level tax amounts", () => {
+test("Schedule H uses the form's required identity and line-level tax amounts", () => {
   const xml = scheduleH.build(ficaOnlySource, {
     filer,
     pending: {
@@ -116,9 +117,10 @@ Deno.test("Schedule H uses the form's required identity and line-level tax amoun
     xml,
     "<CombinedFUTATaxPlusNetTaxesAmt>474</CombinedFUTATaxPlusNetTaxesAmt>",
   );
+  assertEquals(xml.includes("HsldEmplPdCashWageOvrLmtQtrInd"), false);
 });
 
-Deno.test("Schedule H native FUTA-only student minor keeps Part I wages at zero", () => {
+test("Schedule H native FUTA-only student minor keeps Part I wages at zero", () => {
   const xml = scheduleH.build({
     employer_ein: "123456789",
     cash_wages_over_2025_limit: false,
@@ -144,7 +146,7 @@ Deno.test("Schedule H native FUTA-only student minor keeps Part I wages at zero"
           birth_date: "2008-05-10",
           birth_date_source_reference: "student-age-record",
           student_enrollment_source_reference: "2025-school-enrollment",
-          student_during_2025_verified: true,
+          student_during_tax_year_verified: true,
         },
         ordinary_cash_only: true,
         annual_cash_wages: 4_000,
@@ -165,25 +167,60 @@ Deno.test("Schedule H native FUTA-only student minor keeps Part I wages at zero"
     xml,
     "<CombinedFUTATaxPlusNetTaxesAmt>24</CombinedFUTATaxPlusNetTaxesAmt>",
   );
-});
-
-Deno.test("Schedule H reports Additional Medicare wage excess and withholding on lines 5 and 6", () => {
-  assertThrows(
-    () =>
-      scheduleH.build({
-        employer_ein: "123456789",
-        cash_wages_over_2025_limit: true,
-        cash_wages_over_quarter_limit: false,
-        ss_wages: 176_100,
-        medicare_wages: 220_000,
-        additional_medicare_wages: 20_000,
-      }, { filer }),
-    Error,
-    "needs employee payroll source",
+  // Lines A and B are "No", so line C answers the quarterly test (SH-F1040-005).
+  assertStringIncludes(
+    xml,
+    "<HsldEmplPdCashWageOverLmtCYInd>false</HsldEmplPdCashWageOverLmtCYInd><HsldEmplPdCashWageOvrLmtQtrInd>true</HsldEmplPdCashWageOvrLmtQtrInd>",
   );
 });
 
-Deno.test("Schedule H FICA-only source rejects current/prior quarter and W-2 drift", () => {
+test("Schedule H reports Additional Medicare wage excess and withholding on lines 5 and 6", () => {
+  const xml = scheduleH.build({
+    employer_ein: "123456789",
+    cash_wages_over_2025_limit: true,
+    cash_wages_over_quarter_limit: false,
+    ss_wages: 176_100,
+    medicare_wages: 220_000,
+    additional_medicare_wages: 20_000,
+  }, { filer });
+  assertStringIncludes(
+    xml,
+    "<TotMedcrTaxCashWagesAddnlWhAmt>20000</TotMedcrTaxCashWagesAddnlWhAmt>",
+  );
+});
+
+// 2025 Schedule H instructions: Part I lines 1a, 3 and 7 and Part II Section A
+// lines 13-16 are filed as employer totals; no per-employee schedule is filed.
+test("Schedule H files Part I and Section A totals without employee payroll rows", () => {
+  const xml = scheduleH.build({
+    employer_ein: "123456789",
+    cash_wages_over_2025_limit: true,
+    cash_wages_over_quarter_limit: true,
+    ss_wages: 4_259,
+    medicare_wages: 4_259,
+    federal_income_tax_withheld: 169,
+    federal_unemployment: {
+      paid_only_one_state: true,
+      all_contributions_paid_on_time: true,
+      all_futa_wages_state_taxable: true,
+      state: "OH",
+      contributions_paid: 71,
+      taxable_wages: 4_259,
+      all_household_employees_included: true,
+      prior_year_quarter_threshold_met: false,
+    },
+  }, { filer });
+  assertStringIncludes(
+    xml,
+    "<SocialSecurityTaxCashWagesAmt>4259</SocialSecurityTaxCashWagesAmt>",
+  );
+  assertStringIncludes(
+    xml,
+    "<FederalIncomeTaxWithheldAmt>169</FederalIncomeTaxWithheldAmt>",
+  );
+});
+
+test("Schedule H FICA-only source rejects current/prior quarter and W-2 drift", () => {
   const base = ficaOnlySource.fica_only_payroll;
   assertThrows(
     () =>
@@ -217,7 +254,7 @@ Deno.test("Schedule H FICA-only source rejects current/prior quarter and W-2 dri
   );
 });
 
-Deno.test("Schedule H emits single-state Section A facts and computed FUTA", () => {
+test("Schedule H emits single-state Section A facts and computed FUTA", () => {
   const xml = scheduleH.build({
     employer_ein: "123456789",
     cash_wages_over_2025_limit: true,
@@ -262,7 +299,7 @@ Deno.test("Schedule H emits single-state Section A facts and computed FUTA", () 
   );
 });
 
-Deno.test("Schedule H Section A identifies a state-granted zero experience rate", () => {
+test("Schedule H Section A identifies a state-granted zero experience rate", () => {
   const xml = scheduleH.build({
     employer_ein: "123456789",
     cash_wages_over_2025_limit: false,
@@ -299,7 +336,7 @@ Deno.test("Schedule H Section A identifies a state-granted zero experience rate"
   assertStringIncludes(xml, "<FUTATaxAmt>42</FUTATaxAmt>");
 });
 
-Deno.test("Schedule H Section B computes state-rate credit and CA credit reduction", () => {
+test("Schedule H Section B computes state-rate credit and CA credit reduction", () => {
   const xml = scheduleH.build({
     employer_ein: "123456789",
     cash_wages_over_2025_limit: false,
@@ -356,7 +393,7 @@ Deno.test("Schedule H Section B computes state-rate credit and CA credit reducti
   );
 });
 
-Deno.test("Schedule H Section B gives only 90 percent of the available late credit", () => {
+test("Schedule H Section B gives only 90 percent of the available late credit", () => {
   const xml = scheduleH.build({
     employer_ein: "123456789",
     cash_wages_over_2025_limit: false,
@@ -404,7 +441,7 @@ Deno.test("Schedule H Section B gives only 90 percent of the available late cred
   assertStringIncludes(xml, "<FUTATaxAmt>53</FUTATaxAmt>");
 });
 
-Deno.test("Schedule H does not infer required employer or unemployment facts", () => {
+test("Schedule H does not infer required employer or unemployment facts", () => {
   assertEquals(scheduleH.build({}), "");
   const basic = {
     employer_ein: "000000029",
@@ -447,7 +484,7 @@ Deno.test("Schedule H does not infer required employer or unemployment facts", (
         filer,
       }),
     Error,
-    "employee payroll source",
+    "needs Part II unemployment details",
   );
   assertThrows(
     () =>
@@ -461,7 +498,7 @@ Deno.test("Schedule H does not infer required employer or unemployment facts", (
   );
 });
 
-Deno.test("Schedule H refuses contradictory Section B source facts", () => {
+test("Schedule H refuses contradictory Section B source facts", () => {
   const base = {
     employer_ein: "123456789",
     cash_wages_over_2025_limit: false,

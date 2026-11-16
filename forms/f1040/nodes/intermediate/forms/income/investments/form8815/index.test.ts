@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import { form8815, type Form8815Input, inputSchema } from "./index.ts";
 import { FilingStatus } from "../../../../../types.ts";
@@ -26,7 +27,7 @@ const source: Form8815Input = {
   education_facts: {
     all_students_are_taxpayer_spouse_or_claimed_dependents: true,
     all_institutions_eligible: true,
-    expenses_are_eligible_2025_tuition_or_fees: true,
+    expenses_are_eligible_tuition_or_fees: true,
     expenses_not_used_for_education_credit_or_tax_free_distribution: true,
     no_coverdell_or_qtp_contributions_in_claim: true,
     nontaxable_benefits_paid_directly_by_institution_excluded: true,
@@ -44,7 +45,7 @@ const source: Form8815Input = {
     other_1040_and_schedule1_income: 70_000,
     schedule1_adjustments: 0,
     foreign_adoption_and_puerto_rico_addbacks: 0,
-    finalized_2025_income_lines_reviewed: true,
+    finalized_income_lines_reviewed: true,
     no_royalty_interest_special_computation: true,
   },
   filing_status: FilingStatus.Single,
@@ -98,7 +99,7 @@ for (
     FilingStatus.QSS,
   ]
 ) {
-  Deno.test(`2025 ${filingStatus} $99,500 start and $114,500 end`, () => {
+  test(`2025 ${filingStatus} $99,500 start and $114,500 end`, () => {
     const atStart = lines({
       filing_status: filingStatus,
       line9_worksheet: {
@@ -133,7 +134,7 @@ for (
   });
 }
 
-Deno.test("2025 MFJ $149,250 start and $179,250 end", () => {
+test("2025 MFJ $149,250 start and $179,250 end", () => {
   const start = lines({
     filing_status: FilingStatus.MFJ,
     line9_worksheet: {
@@ -165,7 +166,7 @@ Deno.test("2025 MFJ $149,250 start and $179,250 end", () => {
   );
 });
 
-Deno.test("education benefit and proceeds calculate lines 2-8", () => {
+test("education benefit and proceeds calculate lines 2-8", () => {
   const result = lines({
     line2_qualified_education_expenses: 10_000,
     line3_nontaxable_education_benefits: 2_000,
@@ -180,7 +181,7 @@ Deno.test("education benefit and proceeds calculate lines 2-8", () => {
   assertEquals(result.scheduleB?.ee_bond_exclusion, result.form?.line14);
 });
 
-Deno.test("line 4 equal to proceeds gives the full line 6 interest", () => {
+test("line 4 equal to proceeds gives the full line 6 interest", () => {
   const result = lines({
     line2_qualified_education_expenses: 14_000,
     line3_nontaxable_education_benefits: 2_000,
@@ -190,7 +191,7 @@ Deno.test("line 4 equal to proceeds gives the full line 6 interest", () => {
   assertEquals(result.form?.line14, 2_000);
 });
 
-Deno.test("line 6 worksheet removes interest already reported in earlier years", () => {
+test("line 6 worksheet removes interest already reported in earlier years", () => {
   const result = lines({
     line6_worksheet: {
       ...source.line6_worksheet,
@@ -201,7 +202,7 @@ Deno.test("line 6 worksheet removes interest already reported in earlier years",
   assertEquals(result.form?.line14, 1_500);
 });
 
-Deno.test("MFS, exhausted expenses, and unqualified bonds fail closed", () => {
+test("MFS, exhausted expenses, and unqualified bonds fail closed", () => {
   assertThrows(
     () => compute({ filing_status: FilingStatus.MFS }),
     Error,
@@ -222,7 +223,7 @@ Deno.test("MFS, exhausted expenses, and unqualified bonds fail closed", () => {
   );
 });
 
-Deno.test("omitted proceeds, MAGI worksheet, and old guessed fields are rejected", () => {
+test("omitted proceeds, MAGI worksheet, and old guessed fields are rejected", () => {
   const { bond_proceeds: _proceeds, ...withoutProceeds } = source;
   const { line9_worksheet: _worksheet, ...withoutMagi } = source;
   assertThrows(() => inputSchema.parse(withoutProceeds));
@@ -243,7 +244,7 @@ Deno.test("omitted proceeds, MAGI worksheet, and old guessed fields are rejected
   );
 });
 
-Deno.test("native MeF lines and Schedule B line 3 reconcile", () => {
+test("native MeF lines and Schedule B line 3 reconcile", () => {
   const result = lines({
     line2_qualified_education_expenses: 10_000,
     line3_nontaxable_education_benefits: 2_000,
@@ -282,7 +283,7 @@ Deno.test("native MeF lines and Schedule B line 3 reconcile", () => {
   assertEquals(xml.includes("ExclBondIntExcessAGIRt"), false);
   assertEquals(xml.includes("SavingsBondInterestAmt"), false);
   assertThrows(() => mef8815.build({ ...fields, line14: 1 }), Error, "line14");
-  assertThrows(() => mef8815.build(source), Error, "computed 2025 lines");
+  assertThrows(() => mef8815.build(source), Error, "computed form lines");
   assertThrows(() => mef8815.build(fields), Error, "finalized return");
   assertThrows(
     () =>
@@ -306,7 +307,7 @@ Deno.test("native MeF lines and Schedule B line 3 reconcile", () => {
   );
 });
 
-Deno.test("PDF projection uses computed lines and beneficiary fields", () => {
+test("PDF projection uses computed lines and beneficiary fields", () => {
   const result = lines();
   const fields = { ...source, ...result.form };
   const projected = form8815Pdf.projectFields?.(fields, {});
@@ -319,7 +320,7 @@ Deno.test("PDF projection uses computed lines and beneficiary fields", () => {
   assertEquals(form8815Pdf.pageIndices?.(fields), [0]);
 });
 
-Deno.test("Form 8815 PDF requires the same final Schedule B and filing status as MeF", () => {
+test("Form 8815 PDF requires the same final Schedule B and filing status as MeF", () => {
   const result = lines();
   const projected = form8815Pdf.projectFields?.(
     { ...source, ...result.form },
@@ -367,7 +368,7 @@ Deno.test("Form 8815 PDF requires the same final Schedule B and filing status as
   );
 });
 
-Deno.test("Form 8815 native and PDF reject return-wide MAGI tampering", () => {
+test("Form 8815 native and PDF reject return-wide MAGI tampering", () => {
   const result = lines();
   const fields = { ...source, ...result.form };
   const filer = {
@@ -400,4 +401,31 @@ Deno.test("Form 8815 native and PDF reject return-wide MAGI tampering", () => {
     assertThrows(() => mef8815.build(fields, { filer, pending: changed }));
     assertThrows(() => form8815Pdf.instances!(projected, filer, changed));
   }
+});
+
+// Draft 2026 Form 8815 (created 5/7/26), lines 9-12: $101,800 start and
+// $116,800 ceiling for single filers (Rev. Proc. 2025-32).
+test("2026 single phase-out reads the return year's $101,800 start", () => {
+  const compute2026 = (other: number) =>
+    form8815.compute(
+      { taxYear: 2026, formType: "f1040" },
+      inputSchema.parse({
+        ...source,
+        line9_worksheet: {
+          ...source.line9_worksheet,
+          other_1040_and_schedule1_income: other,
+        },
+      }),
+    ).outputs.find((item) => item.nodeType === "form8815")?.fields;
+  const form = compute2026(105_800);
+  assertEquals(
+    [form?.line9, form?.line10, form?.line11, form?.line12],
+    [107_800, 101_800, 6_000, 0.4],
+  );
+  assertEquals([form?.line13, form?.line14], [800, 1_200]);
+  assertThrows(
+    () => compute2026(114_800),
+    Error,
+    "at or above the 2026 exclusion ceiling",
+  );
 });

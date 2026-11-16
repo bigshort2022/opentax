@@ -1,3 +1,6 @@
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../scripts/support/sys.ts";
+import { test } from "bun:test";
 import {
   assertEquals,
   assertRejects,
@@ -20,7 +23,7 @@ const dir = new URL(
   import.meta.url,
 ).pathname;
 const xsd = new URL(
-  "../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+  "../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
   import.meta.url,
 ).pathname;
 const plan = buildExecutionPlan(registry);
@@ -43,11 +46,7 @@ for (
     95000,
   ]] as const
 ) {
-  Deno.test({
-    name: `Form8941 part-year owned public ${name} tax-use full-XSD/PDF`,
-    sanitizeOps: false,
-    sanitizeResources: false,
-  }, async () => {
+  test(`Form8941 part-year owned public ${name} tax-use full-XSD/PDF`, async () => {
     const { input, pending, filer } = run(receipts);
     const lines = calculateForm8941(input.f8941);
     const applied = Number(pending.f3800.form8941_applied_credit);
@@ -98,8 +97,8 @@ for (
       xml,
       "<SumSmllrAmtAndCreditForHIPAmt>6629</SumSmllrAmtAndCreditForHIPAmt>",
     );
-    await Deno.mkdir(dir, { recursive: true });
-    await Deno.writeTextFile(
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(
       dir + name + ".json",
       JSON.stringify(
         {
@@ -129,23 +128,23 @@ for (
         2,
       ),
     );
-    await Deno.writeTextFile(dir + name + ".xml", xml);
-    const valid = await new Deno.Command("xmllint", {
+    await fs.writeFile(dir + name + ".xml", xml);
+    const valid = await new sys.Command("xmllint", {
       args: ["--noout", "--schema", xsd, dir + name + ".xml"],
       stderr: "piped",
     }).output();
     assertEquals(valid.code, 0, new TextDecoder().decode(valid.stderr));
-    await Deno.writeFile(
+    await fs.writeFile(
       dir + name + ".pdf",
       await buildPdfBytes(bundle.pending, filer, dir + "irs-pdf-cache", bundle),
     );
-    const text = await new Deno.Command("pdftotext", {
+    const text = await new sys.Command("pdftotext", {
       args: ["-layout", dir + name + ".pdf", "-"],
       stdout: "piped",
     }).output();
     assertEquals(text.code, 0);
     const packet = new TextDecoder().decode(text.stdout);
-    await Deno.writeTextFile(dir + name + ".txt", packet);
+    await fs.writeFile(dir + name + ".txt", packet);
     assertStringIncludes(packet, "Small Employer Health Insurance");
     assertStringIncludes(packet, "6629");
     assertStringIncludes(packet, "11371");
@@ -158,12 +157,7 @@ for (
     }
   });
 }
-Deno.test({
-  name:
-    "Form8941 part-year actual native/PDF reject owned source and deduction/allocation tampering",
-  sanitizeOps: false,
-  sanitizeResources: false,
-}, async () => {
+test("Form8941 part-year actual native/PDF reject owned source and deduction/allocation tampering", async () => {
   const baseline = run(120000);
   const bundle = await buildMefBundle(buildPending(baseline.pending), {
     filer: baseline.filer,
@@ -291,7 +285,7 @@ Deno.test({
       name,
     );
   }
-  await Deno.writeTextFile(
+  await fs.writeFile(
     dir + "negative-proof.json",
     JSON.stringify(
       { nativeAndPdfRejected: mutations.map(([name]) => name) },
@@ -300,12 +294,7 @@ Deno.test({
     ),
   );
 });
-Deno.test({
-  name:
-    "Form8941 part-year public input rejects conflicting owned payroll and SHOP records",
-  sanitizeOps: false,
-  sanitizeResources: false,
-}, async () => {
+test("Form8941 part-year public input rejects conflicting owned payroll and SHOP records", async () => {
   for (
     const kind of [
       "payroll",

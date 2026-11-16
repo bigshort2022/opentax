@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import {
   assert,
   assertEquals,
@@ -60,7 +61,7 @@ function filedReturn() {
       active_participant: true,
       form8606_filing_details: {
         owner: IraOwner.Taxpayer,
-        prior_basis_documented_from_2024_form8606: true,
+        prior_basis_documented_from_prior_year_form8606: true,
         no_ira_distributions_or_conversions_confirmed: true,
       },
       form8606_zero_basis_source: source,
@@ -70,7 +71,7 @@ function filedReturn() {
   return result;
 }
 
-Deno.test("sourced zero-opening-basis IRA contribution joins Form 8606, Form 1040, native and PDF", () => {
+test("sourced zero-opening-basis IRA contribution joins Form 8606, Form 1040, native and PDF", () => {
   const result = filedReturn();
   assertEquals(result.pending.form8606?.print_line1_nondeductible, 7_000);
   assertEquals(result.pending.form8606?.print_line2_prior_basis, 0);
@@ -101,7 +102,7 @@ Deno.test("sourced zero-opening-basis IRA contribution joins Form 8606, Form 104
   assertEquals(pdf.print_line14_remaining_basis, 7_000);
 });
 
-Deno.test("Form 8606 zero basis rejects a changed issuer, owner, prior record, worksheet or return", () => {
+test("Form 8606 zero basis rejects a changed issuer, owner, prior record, worksheet or return", () => {
   const result = filedReturn();
   const pending = normalizeForm8606TestPending(result.pending);
   const filer = extractFilerIdentity(general);

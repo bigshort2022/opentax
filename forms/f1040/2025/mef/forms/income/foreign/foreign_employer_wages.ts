@@ -19,6 +19,8 @@ import {
 } from "../../../../../nodes/inputs/income/wages/w2/index.ts";
 import type { MefBuildContext, MefFormDescriptor } from "../../../form-descriptor.ts";
 import type { z } from "zod";
+import { mefTaxYear } from "../../../support/year-config.ts";
+import { retainedClergyExcessAllowance } from "../../../../domains/income/other/line1h-source.ts";
 
 function filingDetails(
   context?: MefBuildContext,
@@ -52,7 +54,8 @@ function w2Excess(context?: MefBuildContext): number {
   const raw = context?.pending?.w2;
   return raw === undefined
     ? 0
-    : codeDExcessDeferral(w2InputSchema.parse(raw).w2s).amount;
+    : codeDExcessDeferral(w2InputSchema.parse(raw).w2s, mefTaxYear(context))
+      .amount;
 }
 
 function standaloneFec(context?: MefBuildContext): readonly NativeFecItem[] {
@@ -121,7 +124,7 @@ function correctivePlanAmount(context?: MefBuildContext): number {
       "Corrective plan distributions need a separate line 1h source reconciliation from FEC or Form 2555 wages",
     );
   }
-  assert1099RRecipientOwner(raw, context?.filer);
+  assert1099RRecipientOwner(raw, context?.filer, mefTaxYear(context));
   const references = items.map((item) => item.source_document_reference);
   if (
     new Set(references).size !== items.length ||
@@ -258,10 +261,23 @@ export const wagesNotShownSchedule: MefFormDescriptor<
   unknown
 > = {
   pendingKey: "wages_not_shown_schedule",
-  sourcePendingKeys: ["form2555", "fec", "f1099r"],
+  sourcePendingKeys: ["form2555", "fec", "f1099r", "clergy"],
   FIELD_MAP: [],
   pdfUrl: "https://www.irs.gov/pub/irs-pdf/p4164.pdf",
   build(_fields, context) {
+    // Pub 517: the clergy excess allowance is line 1h income with "Excess
+    // allowance" beside it. Form 1040 export holds it as the sole source.
+    // TY2018 listed "EXCESS ALLOWANCE" in WagesLiteralCd; the TY2025 code
+    // list was not available to check, so the free-text choice is used.
+    const clergyExcess = retainedClergyExcessAllowance(context?.pending);
+    if (clergyExcess > 0) {
+      return elements("WagesNotShownSchedule", [
+        elements("WagesNotShownSch", [
+          element("OtherWagesNotShownTxt", "EXCESS ALLOWANCE"),
+          element("WagesNotShownAmt", clergyExcess),
+        ]),
+      ]);
+    }
     const filing = filingDetails(context);
     const fecItems = standaloneFec(context);
     const correctiveAmount = correctivePlanAmount(context);

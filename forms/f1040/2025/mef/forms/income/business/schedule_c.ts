@@ -16,7 +16,7 @@ import {
   computeTotalExpenses,
   homeOfficeDeduction,
   inputSchema as scheduleCInputSchema,
-  mealsDeductiblePct,
+  deductibleMeals,
   projectScheduleCItems,
   type ScheduleCItem,
   wagesLessEmploymentCredits,
@@ -34,6 +34,7 @@ import {
   inputSchema as form5884InputSchema,
 } from "../../../../../nodes/inputs/credits/business/f5884/index.ts";
 import { assertCurrentYearSection481aMatches } from "../../../../../nodes/inputs/income/business/f3115/index.ts";
+import { mefTaxYear } from "../../../support/year-config.ts";
 
 interface Fields {
   readonly schedule_cs?: readonly ScheduleCItem[];
@@ -271,10 +272,13 @@ function buildScheduleC(
     amount("SuppliesAmt", item.line_22_supplies),
     amount("TaxesAndLicensesAmt", item.line_23_taxes_licenses),
     amount("TravelAmt", item.line_24a_travel),
-    item.line_24b_meals === undefined ? "" : element(
-      "MealsAndEntertainmentAmt",
-      filing?.meals_deduction ?? item.line_24b_meals * mealsDeductiblePct(item),
-    ),
+    item.line_24b_meals === undefined &&
+      item.line_24b_meals_dot_hours_of_service === undefined
+      ? ""
+      : element(
+        "MealsAndEntertainmentAmt",
+        filing?.meals_deduction ?? deductibleMeals(item),
+      ),
     amount("UtilitiesAmt", item.line_25_utilities),
     amount(
       "WagesLessEmploymentCreditsAmt",
@@ -343,6 +347,7 @@ export const scheduleC: MefFormDescriptor<
       assertFarmWotcReturn(
         context.pending.form8995a ?? context.pending.form8995,
         context.pending,
+        mefTaxYear(context),
         context.filer,
         { key: "schedule_c", value: fields },
       );
@@ -381,7 +386,7 @@ export const scheduleC: MefFormDescriptor<
       assertCurrentYearSection481aMatches(
         context.pending.f3115,
         input.section481a_adjustments ?? [],
-        2025,
+        mefTaxYear(context),
       );
     }
     const claim = input.form8829_line30;

@@ -1,3 +1,4 @@
+import { roundWholeDollars } from "../../../../../whole-dollars.ts";
 import { assertIndependentPatronReturn } from "../../../deductions/business/form8995a/form8995a_independent_patron_reconciliation.ts";
 import { inputSchema as patronInputSchema } from "../../../../../nodes/intermediate/forms/deductions/business/form8995a/index.ts";
 import { replayIndependentPatronSources } from "../../../../../nodes/inputs/deductions/business/qbi_patron/independent.ts";
@@ -19,7 +20,7 @@ import { assertScheduleCReceiptSourceIdentity } from "../../../general/return-as
 import { assertForm7206SpouseCoverage } from "./form7206_spouse_coverage.ts";
 import { extractFilerIdentity } from "../../../../../mef/filer.ts";
 import type { FilerIdentity } from "../../../../../mef/header.ts";
-import { CONFIG_BY_YEAR } from "../../../../../nodes/config/index.ts";
+import { qbiYearConfig } from "../../../../../nodes/intermediate/forms/deductions/business/form8995a/thresholds.ts";
 import {
   calculateIndependentOwnerHealth,
   reconcileIndependentOwnerHealthGraph,
@@ -35,6 +36,7 @@ export const independentHealthCanonical = (value: unknown) =>
 const name = (v: string) => v.trim().replace(/\s+/g, " ").toUpperCase();
 export function assertIndependentOwnerHealthSource(
   raw: Readonly<Record<string, unknown>> | undefined,
+  taxYear: number,
   filer?: FilerIdentity,
   providedFields?: unknown,
 ) {
@@ -78,7 +80,7 @@ export function assertIndependentOwnerHealthSource(
     );
   }
   const actualFiler = filer ?? extractFilerIdentity(f),
-    owned = assertOwnedScheduleSE(p, actualFiler);
+    owned = assertOwnedScheduleSE(p, taxYear, actualFiler);
   if (!owned || !actualFiler) {
     throw new Error(
       "Independent health plans need actual separate proprietor SE and filer identities",
@@ -87,7 +89,7 @@ export function assertIndependentOwnerHealthSource(
   const result = calculateIndependentOwnerHealth(
     fields.independent_schedule_c_plans,
     owned.source,
-    CONFIG_BY_YEAR[2025].ssWageBase,
+    qbiYearConfig(taxYear).ssWageBase,
     fields.owned_sep_plans,
   );
   reconcileIndependentOwnerHealthGraph(fields, result);
@@ -163,6 +165,8 @@ export function assertIndependentOwnerHealthSource(
   const w2s = p.w2?.w2s as Array<Record<string, unknown>> | undefined;
   const wages = w2s?.reduce((n, r) => n + Number(r.box1_wages), 0) ?? 0;
   const profit = owned.source.businesses.reduce((n, b) => n + b.net_profit, 0);
+  // Line 9 and AGI add the whole-dollar line 1z, not the source wage cents.
+  const filedWages = roundWholeDollars(wages);
   if (
     !q ||
     independentHealthCanonical(q.joint_owner_health_plans_source) !==
@@ -184,12 +188,12 @@ export function assertIndependentOwnerHealthSource(
     Number(p.schedule1?.line16_sep_simple ?? 0) !== retirement ||
     p.schedule1?.line10_total_additional_income !== profit ||
     f.line8_additional_income !== profit ||
-    f.line9_total_income !== wages + profit ||
+    f.line9_total_income !== filedWages + profit ||
     p.schedule1?.line26_total_adjustments !==
       owned.deduction + result.deduction + retirement ||
     f.line10_adjustments !== owned.deduction + result.deduction + retirement ||
     f.line11_agi !==
-      wages + profit - owned.deduction - result.deduction - retirement ||
+      filedWages + profit - owned.deduction - result.deduction - retirement ||
     Number(f.line1a_wages ?? 0) !== wages
   ) {
     throw new Error(
@@ -200,7 +204,11 @@ export function assertIndependentOwnerHealthSource(
     ? replayIndependentPatronSources(p.form8995a.independent_patron_sources)
     : undefined;
   if (patron) {
-    assertIndependentPatronReturn(patronInputSchema.parse(p.form8995a), p);
+    assertIndependentPatronReturn(
+      patronInputSchema.parse(p.form8995a),
+      p,
+      taxYear,
+    );
   }
   if (
     patron &&
@@ -312,7 +320,7 @@ export function assertIndependentOwnerHealthSource(
     }
   }
   if (p.schedule_f) {
-    assertFarmWotcReturn(p.form8995a ?? p.form8995, p, actualFiler);
+    assertFarmWotcReturn(p.form8995a ?? p.form8995, p, taxYear, actualFiler);
   }
   const marketplace = p.form8962 ?? {};
   if (
@@ -332,10 +340,16 @@ export function assertIndependentOwnerHealthSource(
 /** Reconcile actual Schedule1A claims alongside the independent health source. */
 export function assertIndependentOwnerHealth(
   raw: Readonly<Record<string, unknown>> | undefined,
+  taxYear: number,
   filer?: FilerIdentity,
   providedFields?: unknown,
 ) {
-  const result = assertIndependentOwnerHealthSource(raw, filer, providedFields);
+  const result = assertIndependentOwnerHealthSource(
+    raw,
+    taxYear,
+    filer,
+    providedFields,
+  );
   const p = normalizeAllPending(raw as Record<string, unknown>);
   if (
     Number(p.f1040?.line13b_additional_deductions ?? 0) !== 0 ||
@@ -354,7 +368,7 @@ export function assertIndependentOwnerHealth(
         "Independent health additional deductions must match actual owned health and Schedule1A sources",
       );
     }
-    schedule1a.build(tips, { pending: p, filer });
+    schedule1a.build(tips, { pending: p, filer, taxYear });
   }
   return result;
 }
@@ -362,6 +376,7 @@ export function assertIndependentOwnerHealth(
 /** SEP-only graph context has no filed Form7206; validate its actual return first. */
 export function assertOwnedSepContext(
   raw: Readonly<Record<string, unknown>> | undefined,
+  taxYear: number,
   filer?: FilerIdentity,
   providedFields?: unknown,
 ) {
@@ -399,6 +414,10 @@ export function assertOwnedSepContext(
       "Owned SEP-only context cannot borrow health or retirement rows",
     );
   }
-  assertOwnedScheduleSE(p, filer ?? extractFilerIdentity(p.f1040));
-  assertIndependentPatronReturn(patronInputSchema.parse(p.form8995a), p);
+  assertOwnedScheduleSE(p, taxYear, filer ?? extractFilerIdentity(p.f1040));
+  assertIndependentPatronReturn(
+    patronInputSchema.parse(p.form8995a),
+    p,
+    taxYear,
+  );
 }

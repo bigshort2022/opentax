@@ -57,8 +57,8 @@ export const returnSourceSchema = z.discriminatedUnion("kind", [
   ...k1ActivityReturnSourceSchema.options,
   z.object({
     kind: z.literal(ReturnSourceKind.BusinessCasualty),
-    // AGI is recalculated return context, not a business casualty source fact.
-    row: casualtySchema.omit({ agi: true }),
+    // Personal-use casualties are not a business casualty source fact.
+    row: casualtySchema.omit({ personal_casualties: true }),
   }).strict(),
 ]);
 type ReturnSource = z.infer<typeof returnSourceSchema>;
@@ -271,7 +271,8 @@ export async function reconcileForm8886CurrentReturnSources(
   }
   if (hasCapitalSources) {
     assertNoRepeatedBrokerSaleSources(pending.f1099b, pending.f8949);
-    assertCapitalSaleSourceRows(pending);
+    // Form 8886 packets are prepared only for TY2025; the TY2026 export takes none.
+    assertCapitalSaleSourceRows(pending, 2025);
     assertScheduleDK1Source(pending.schedule_d, pending);
     assertBox11CodeSSources(pending, owners);
     assertScheduleD1040Join(pending);

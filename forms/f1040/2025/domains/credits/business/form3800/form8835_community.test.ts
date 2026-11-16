@@ -1,3 +1,5 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
 import {
   assertEquals,
   assertRejects,
@@ -22,7 +24,7 @@ import {
 import { energyCommunityCapacity } from "../../../../../nodes/inputs/credits/business/f8835/energy-community-source.ts";
 
 for (const c of communityCases) {
-  Deno.test(`Form 8835 annual energy community complete return: ${c.id}`, async () => {
+  test(`Form 8835 annual energy community complete return: ${c.id}`, async () => {
     const { input, attachments, expected } = await communityFixture(c);
     const execution = f1040_2025.executeReturn(input);
     assertEquals(execution.diagnostics, []);
@@ -164,16 +166,16 @@ for (const c of communityCases) {
     }
     let root: string | undefined;
     try {
-      root = Deno.env.get("FORM8835_COMMUNITY_EVIDENCE_DIR");
+      root = process.env.FORM8835_COMMUNITY_EVIDENCE_DIR;
     } catch { /* optional private export */ }
     if (root) {
-      await Deno.mkdir(root, { recursive: true });
-      await Deno.writeFile(`${root}/${c.id}.pdf`, pdf);
-      await Deno.writeTextFile(`${root}/${c.id}.xml`, prepared.bundle.xml);
+      await fs.mkdir(root, { recursive: true });
+      await fs.writeFile(`${root}/${c.id}.pdf`, pdf);
+      await fs.writeFile(`${root}/${c.id}.xml`, prepared.bundle.xml);
       for (const a of attachments) {
-        await Deno.writeFile(`${root}/${c.id}-${a.fileName}`, a.bytes);
+        await fs.writeFile(`${root}/${c.id}-${a.fileName}`, a.bytes);
       }
-      await Deno.writeTextFile(
+      await fs.writeFile(
         `${root}/${c.id}.json`,
         JSON.stringify(
           {
@@ -193,7 +195,7 @@ for (const c of communityCases) {
   });
 }
 
-Deno.test("Form 8835 community: exact half, published date/vintage, and brownfield safe harbors", async () => {
+test("Form 8835 community: exact half, published date/vintage, and brownfield safe harbors", async () => {
   const item = async (i: number) =>
     inputSchema.parse({
       f8835s: (await communityFixture(communityCases[i])).input.f8835,
@@ -205,23 +207,23 @@ Deno.test("Form 8835 community: exact half, published date/vintage, and brownfie
   });
   coal.energy_community_source!.generating_units[0].nameplate_kw_ac--;
   coal.energy_community_source!.generating_units[1].nameplate_kw_ac++;
-  assertThrows(() => calculateForm8835(coal), Error, "50-percent");
+  assertThrows(() => calculateForm8835(coal, 2025), Error, "50-percent");
   const earlyYear = await item(2);
-  assertEquals(calculateForm8835(earlyYear).line11, 60); // no proration at June 22
+  assertEquals(calculateForm8835(earlyYear, 2025).line11, 60); // no proration at June 22
   earlyYear.energy_community_source!.qualification_date = "2025-06-23";
-  assertThrows(() => calculateForm8835(earlyYear), Error, "does not qualify");
+  assertThrows(() => calculateForm8835(earlyYear, 2025), Error, "does not qualify");
   const newYear = await item(3);
   const q = newYear.energy_community_source!.generating_units[0].qualification;
   if (q.category !== "statistical_area") throw new Error("fixture category");
   q.vintage = "vintage1";
-  assertThrows(() => calculateForm8835(newYear), Error, "does not qualify");
+  assertThrows(() => calculateForm8835(newYear, 2025), Error, "does not qualify");
   q.vintage = "vintage2";
   newYear.energy_community_source!.qualification_date = "2025-06-22";
-  assertThrows(() => calculateForm8835(newYear), Error, "does not qualify");
+  assertThrows(() => calculateForm8835(newYear, 2025), Error, "does not qualify");
   const phase1 = await item(4);
-  assertEquals(calculateForm8835(phase1).line11, 60);
+  assertEquals(calculateForm8835(phase1, 2025).line11, 60);
   phase1.energy_community_source!.generating_units[1].nameplate_kw_ac++;
-  assertThrows(() => calculateForm8835(phase1), Error, "does not qualify");
+  assertThrows(() => calculateForm8835(phase1, 2025), Error, "does not qualify");
   phase1.energy_community_source!.generating_units[1].nameplate_kw_ac--;
   const brown =
     phase1.energy_community_source!.generating_units[0].qualification;
@@ -232,15 +234,15 @@ Deno.test("Form 8835 community: exact half, published date/vintage, and brownfie
   (brown.method as any)
     .presence_or_potential_contamination_identified_verified = true;
   brown.report_completed_on = "2025-06-24";
-  assertThrows(() => calculateForm8835(phase1), Error, "does not qualify");
+  assertThrows(() => calculateForm8835(phase1, 2025), Error, "does not qualify");
   const newCoal = await item(1);
   newCoal.energy_community_source!.qualification_date = "2025-06-22";
-  assertThrows(() => calculateForm8835(newCoal), Error, "does not qualify");
+  assertThrows(() => calculateForm8835(newCoal, 2025), Error, "does not qualify");
   const government = await item(7);
   const governmentReview = government.energy_community_source!
     .generating_units[0].qualification as any;
   governmentReview.method.government_level = "municipal";
   assertThrows(() => inputSchema.parse({ f8835s: [government] }));
   const phase2 = await item(5);
-  assertEquals(calculateForm8835(phase2).line11, 60); // Phase II has no 5MW limit
+  assertEquals(calculateForm8835(phase2, 2025).line11, 60); // Phase II has no 5MW limit
 });

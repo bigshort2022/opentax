@@ -1,3 +1,5 @@
+import { mefTaxYear } from "../mef/support/year-config.ts";
+import { hasUnstatusedForm8874Investment } from "../domains/credits/business/form8874/form8874_cde_status_evidence.ts";
 import {
   form8886CoversLargeCapitalSources,
   type PreparedForm8886ReturnPackets,
@@ -14,6 +16,7 @@ import {
   inputSchema as form4684InputSchema,
 } from "../../nodes/intermediate/forms/deductions/casualty/form4684/index.ts";
 import { isSupportedForm2106Route } from "../domains/adjustments/employment/form2106/form2106_staged.ts";
+import { isSupportedClergyRoute } from "../domains/income/wages/clergy/clergy_source.ts";
 import { isSupportedForm8844DirectEmployerInput } from "../mef/forms/credits/business/f8844_source.ts";
 import { reconcileForm8941DocumentSource } from "../mef/forms/credits/health/f8941_source.ts";
 import {
@@ -53,7 +56,10 @@ const MISSING_ATTACHMENTS: readonly MissingAttachment[] = [
     exportKinds: ["mef", "pdf"],
     reason:
       "Clergy income needs matched W-2, housing designation, taxable excess, parsonage/SE, and Form 4361 evidence",
-    isActive: (fields) => nonempty(fields.clergys),
+    // Sourced rows file through Form 1040 line 1h, Schedule SE and Schedule
+    // 2, reconciled again at export; an allowance inside W-2 box 1 does not.
+    isActive: (fields) =>
+      nonempty(fields.clergys) && !isSupportedClergyRoute(fields),
   },
   {
     pendingKey: "f8862",
@@ -117,7 +123,12 @@ const MISSING_ATTACHMENTS: readonly MissingAttachment[] = [
     pendingKey: "f3903",
     exportKinds: ["mef", "pdf"],
     reason: "Form 3903 moving expenses require a native attachment",
-    isActive: (fields) => nonempty(fields.f3903s),
+    isActive: (fields) =>
+      Array.isArray(fields.f3903s) &&
+      fields.f3903s.some((item) =>
+        item === null || typeof item !== "object" ||
+        !("storage_fees_only" in item)
+      ),
   },
   {
     pendingKey: "f3468",
@@ -210,7 +221,7 @@ const MISSING_ATTACHMENTS: readonly MissingAttachment[] = [
     exportKinds: ["mef", "pdf"],
     reason:
       "Form 8874 direct QEI needs authenticated CDE status and recapture history",
-    isActive: (fields) => nonempty(fields.investments),
+    isActive: hasUnstatusedForm8874Investment,
   },
   {
     pendingKey: "f8882",
@@ -482,6 +493,7 @@ export function assertAttachmentCoverage(
   pending: object,
   exportKind: ExportKind,
   preparedForm8886?: PreparedForm8886ReturnPackets,
+  taxYear: number = mefTaxYear(),
 ): void {
   const byKey = pending as Readonly<Record<string, unknown>>;
   if (byKey.benefit_1042s !== undefined) {
@@ -604,7 +616,7 @@ export function assertAttachmentCoverage(
   const passiveLossCopies =
     (byKey.form7203 as Record<string, unknown> | undefined)
         ?.current_passive_s_corp_loss !== undefined
-      ? projectPassiveSCorpLossCopies(byKey)
+      ? projectPassiveSCorpLossCopies(byKey, { taxYear, formType: "f1040" })
       : undefined;
   for (const form of MISSING_ATTACHMENTS) {
     if (!form.exportKinds.includes(exportKind)) continue;

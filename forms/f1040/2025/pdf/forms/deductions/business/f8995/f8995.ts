@@ -66,7 +66,8 @@ const fields: ReadonlyArray<PdfFieldEntry> = [
   }),
 ];
 
-export const form8995Pdf: PdfFormDescriptor = {
+export function form8995PdfFor(taxYear: number): PdfFormDescriptor {
+  return {
   pendingKey: "form8995",
   pdfUrl: "https://www.irs.gov/pub/irs-prior/f8995--2025.pdf",
   filerFields: [
@@ -100,6 +101,7 @@ export const form8995Pdf: PdfFormDescriptor = {
       (deduction === undefined || deduction === null || deduction === 0) &&
       fields.multi_business_filing_rows === undefined &&
       fields.joint_owner_filing_rows === undefined &&
+      fields.excess_business_loss_filing_row === undefined &&
       fields.current_k1_qbi_sources === undefined &&
       fields.current_passive_s_corp_loss === undefined &&
       fields.current_passive_property_sources === undefined &&
@@ -108,7 +110,7 @@ export const form8995Pdf: PdfFormDescriptor = {
       !(typeof fields.line1_qbi === "number" && fields.line1_qbi > 0 &&
         typeof fields.line1_business_reference === "string")
     ) {
-      assertNoUnfiled8995Loss(fields, allPending);
+      assertNoUnfiled8995Loss(fields, allPending, taxYear);
       return {};
     }
     if (
@@ -120,6 +122,7 @@ export const form8995Pdf: PdfFormDescriptor = {
     const { businesses, lines } = assertPositive8995(
       fields,
       allPending,
+      taxYear,
     );
     return {
       pdf_current_joint_ordinary: allPending.general?.filing_status === "mfj" &&
@@ -150,4 +153,7 @@ export const form8995Pdf: PdfFormDescriptor = {
       ),
     };
   },
-};
+  };
+}
+
+export const form8995Pdf: PdfFormDescriptor = form8995PdfFor(2025);

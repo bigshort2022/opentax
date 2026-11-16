@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { execute } from "../../../../../../../core/runtime/executor.ts";
 import { buildExecutionPlan } from "../../../../../../../core/runtime/planner.ts";
@@ -105,12 +106,12 @@ function standaloneAotcPending() {
   return buildPending(result.pending);
 }
 
-Deno.test("reviewed AOTC credit calculates, but notice assertions cannot authorize export", async () => {
+test("reviewed AOTC credit calculates, but notice assertions cannot authorize export", async () => {
   const pending = standaloneAotcPending();
   assertThrows(
     () => nativeForm8862.build(pending.f8862!, { pending }),
     Error,
-    "executor-owned authentication of prior IRS notice issuance and contents",
+    "retained prior IRS notice copy with matching SHA-256",
   );
   assertThrows(
     () =>
@@ -121,16 +122,16 @@ Deno.test("reviewed AOTC credit calculates, but notice assertions cannot authori
         schedule3: pending.schedule3!,
       }),
     Error,
-    "executor-owned authentication of prior IRS notice issuance and contents",
+    "retained prior IRS notice copy with matching SHA-256",
   );
   await assertRejects(
     () => buildMefBundle(pending, { filer: base.filer, attachments: [] }),
     Error,
-    "executor-owned authentication of prior IRS notice issuance and contents",
+    "retained prior IRS notice copy with matching SHA-256",
   );
 });
 
-Deno.test("standalone AOTC rejects altered student identity and exact credit amounts in both exports", () => {
+test("standalone AOTC rejects altered student identity and exact credit amounts in both exports", () => {
   const pending = standaloneAotcPending();
   const form8863 = pending.f8863!;
   const student = form8863.f8863s[0];

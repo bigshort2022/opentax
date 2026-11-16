@@ -1,0 +1,13 @@
+{
+  "reason": "Known MeF blockers per sample return; a finding leaves when its fix lands",
+  "approvedBy": "pending-review",
+  "expires": "2027-01-31",
+  "returns": {
+    "single-two-at-risk-business-losses": [
+      "rule S1-F1040-195"
+    ]
+  },
+  "reasons": {
+    "single-two-at-risk-business-losses": "Schedule 1 line 3 and Schedule SE line 2 take the Form 6198 line 21 deductible losses (-500, -900; 1,600 net with the 3,000 profit). 2025 Schedule C instructions, line 31: apply the at-risk rules before entering a loss, and 'the amount on line 31 will be your loss, and it may be smaller than the amount you figured by subtracting line 30 from line 29'; Form 6198 instructions (Rev. 11-2025), line 21: report the deductible loss on the return. S1-F1040-195 ('BusinessIncomeLossAmt must be equal to the sum of all Schedule C NetProfitOrLossAmt unless Form 8958 is present') then needs NetProfitOrLossAmt to be the limited loss, while SC-F1040-023-01 ('Each NetProfitOrLossAmt must be equal to TentativeProfitOrLossAmt minus HomeBusinessExpenseAmt') needs it to be -2,000 and -3,000. No value satisfies both when the limit binds: the engine files line 29 minus line 30 and S1-F1040-195 rejects; filing the limited loss would move the reject to SC-F1040-023-01. The IRS1040ScheduleC NetProfitOrLossAmt otherLossAmt and passiveActivityLossAmt attributes are undocumented in 2025v5.4 and IRS1040Schedule1 BusinessIncomeLossAmt has no separate at-risk element, so whether MeF reads either attribute is unverified."
+  }
+}

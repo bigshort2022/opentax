@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { scheduleSELines } from "./calculation.ts";
+import { type FarmOptionalLimits, scheduleSELines } from "./calculation.ts";
 
 export const ownerIdentitySchema = z.object({
   primary_ssn: z.string().regex(/^\d{9}$/),
@@ -9,7 +9,10 @@ export const ownerBusinessSchema = z.object({
   recipient: z.enum(["T", "S"]),
   source_reference: z.string().trim().min(1),
   net_profit: z.number().finite(),
-  kind: z.enum(["schedule_c", "schedule_f"]),
+  // "partnership" is K-1 (Form 1065) box 14 code A, which joins Schedule C on
+  // Schedule SE line 2 (i1040sse, Line 2). "ministerial" is a minister's net
+  // earnings reconciled to a W-2, also on line 2 (i1040sse, Ministers).
+  kind: z.enum(["schedule_c", "schedule_f", "partnership", "ministerial"]),
   business_name: z.string().trim().min(1).optional(),
   ein: z.string().regex(/^\d{9}$/).optional(),
   qbi_no_other_adjustments_confirmed: z.boolean().optional(),
@@ -39,7 +42,11 @@ export type OwnerSEFields = {
 };
 
 /** Net businesses within each proprietor; never net one spouse against the other. */
-export function ownedScheduleSE(raw: unknown, ssWageBase: number) {
+export function ownedScheduleSE(
+  raw: unknown,
+  ssWageBase: number,
+  limits?: FarmOptionalLimits,
+) {
   const source = ownerSourcesSchema.parse(raw);
   source.businesses.sort((a, b) =>
     a.source_reference < b.source_reference
@@ -81,7 +88,7 @@ export function ownedScheduleSE(raw: unknown, ssWageBase: number) {
       net_profit_schedule_f: 0,
       w2_ss_wages: 0,
     };
-    if (business.kind === "schedule_c") {
+    if (business.kind !== "schedule_f") {
       if (
         business.farm_optional_method_elected !== undefined ||
         business.gross_farm_income !== undefined
@@ -133,7 +140,7 @@ export function ownedScheduleSE(raw: unknown, ssWageBase: number) {
   const instances = (["T", "S"] as const).flatMap((recipient) => {
     const fields = owners.get(recipient);
     if (!fields) return [];
-    const lines = scheduleSELines(fields, ssWageBase);
+    const lines = scheduleSELines(fields, ssWageBase, limits);
     return lines ? [{ ...fields, ...lines }] : [];
   });
   return {
@@ -141,6 +148,10 @@ export function ownedScheduleSE(raw: unknown, ssWageBase: number) {
     instances,
     tax: instances.reduce((sum, row) => sum + row.line12, 0),
     deduction: instances.reduce((sum, row) => sum + row.line13, 0),
-    medicareEarnings: instances.reduce((sum, row) => sum + row.line6, 0),
+    // Form 8959 line 8 adds each filed Schedule SE line 6 (whole dollars).
+    medicareEarnings: instances.reduce(
+      (sum, row) => sum + Math.round(row.line6),
+      0,
+    ),
   };
 }

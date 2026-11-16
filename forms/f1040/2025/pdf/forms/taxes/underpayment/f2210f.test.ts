@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import { calculateForm2210FBoxB } from "../../../../domains/taxes/underpayment/form2210f/form2210f_box_b.ts";
 import { form2210fPdf } from "./f2210f.ts";
@@ -45,16 +46,16 @@ function source() {
     current_line4_refundable_credits_excluding_schedule3_line11: 1_000,
     current_withholding: 1_000,
     current_excess_social_security_or_rrta_withholding: 0,
-    estimated_payments_by_2026_01_15: 1_000,
+    estimated_payments_by_january_15: 1_000,
     full_underpayment_paid_on: "2026-03-01",
   };
 }
 
-Deno.test("Form 2210-F PDF omits an absent form", () => {
+test("Form 2210-F PDF omits an absent form", () => {
   assertEquals(form2210fPdf.projectFields?.({}, {}), {});
 });
 
-Deno.test("Form 2210-F PDF maps box B and printed line 14 date, leaving reserved line 5 blank", () => {
+test("Form 2210-F PDF maps box B and printed line 14 date, leaving reserved line 5 blank", () => {
   const facts = source();
   const lines = calculateForm2210FBoxB(facts);
   const pending = {
@@ -84,7 +85,7 @@ Deno.test("Form 2210-F PDF maps box B and printed line 14 date, leaving reserved
   );
 });
 
-Deno.test("Form 2210-F PDF maps every printed amount to its canonical widget", () => {
+test("Form 2210-F PDF maps every printed amount to its canonical widget", () => {
   const widgets = new Map(form2210fPdf.fields.map((field) => [
     field.domainKey,
     field.pdfField,
@@ -114,7 +115,7 @@ Deno.test("Form 2210-F PDF maps every printed amount to its canonical widget", (
   assertEquals(widgets.size, expected.length + 1);
 });
 
-Deno.test("Form 2210-F PDF rejects changed 1040 tax and unsourced filed lines", () => {
+test("Form 2210-F PDF rejects changed 1040 tax and unsourced filed lines", () => {
   const facts = source();
   const lines = calculateForm2210FBoxB(facts);
   const pending = {
@@ -150,6 +151,6 @@ Deno.test("Form 2210-F PDF rejects changed 1040 tax and unsourced filed lines", 
         filed_lines: lines,
       },
       pending,
-    ), Error, "distinct filed 2024 taxpayer, spouse, and 2025 joint returns"
+    ), Error, "distinct filed prior-year taxpayer and spouse returns"
   );
 });

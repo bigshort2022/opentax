@@ -1,3 +1,5 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
 import { assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
 import { f1040_2025 } from "../../../../index.ts";
 import { buildPending } from "../../../../mef/execution/pending.ts";
@@ -14,8 +16,7 @@ for (
     ["withholding-covered", 9000, null, 0, 0],
   ] as const
 ) {
-  Deno.test(`Form 2210-F public packet reconciles ${id}`, async () => {
-    // deno-lint-ignore no-explicit-any -- mutable heterogeneous public-return fixture
+  test(`Form 2210-F public packet reconciles ${id}`, async () => {
     const input = structuredClone(base.inputs) as Record<string, any>;
     input.w2[0].box2_fed_withheld = withholding;
     Object.assign(input.f2210f.source, {
@@ -25,7 +26,6 @@ for (
     const result = f1040_2025.executeReturn(input);
     assertEquals(result.diagnostics, []);
     const pending = buildPending(result.pending);
-    // deno-lint-ignore no-explicit-any -- normalized pending form fixture
     const fields = pending.f2210f as Record<string, any>;
     assertEquals(fields.filed_lines.line11, 9000);
     assertEquals(fields.filed_lines.line13, 9000 - withholding);
@@ -52,22 +52,16 @@ for (
       packet.bundle,
       origins,
     );
-    const permission = await Deno.permissions.query({
-      name: "env",
-      variable: "FORM2210F_PACKETS_DIR",
-    });
-    const out = permission.state === "granted"
-      ? Deno.env.get("FORM2210F_PACKETS_DIR")
-      : undefined;
+    const out = process.env.FORM2210F_PACKETS_DIR;
     if (out) {
       const dir = `${out}/${id}`;
-      await Deno.mkdir(dir, { recursive: true });
-      await Deno.writeTextFile(
+      await fs.mkdir(dir, { recursive: true });
+      await fs.writeFile(
         `${dir}/source-pending.json`,
         JSON.stringify({ input, pending, origins }, null, 2),
       );
-      await Deno.writeTextFile(`${dir}/return.xml`, packet.bundle.xml);
-      await Deno.writeFile(`${dir}/return.pdf`, pdf);
+      await fs.writeFile(`${dir}/return.xml`, packet.bundle.xml);
+      await fs.writeFile(`${dir}/return.pdf`, pdf);
     }
     for (const key of ["line1", "line8", "line13", "line16"]) {
       const changed = {
@@ -86,8 +80,7 @@ for (
   });
 }
 
-Deno.test("ordinary Form 2210 mandatory methods retain both public export guards", async () => {
-  // deno-lint-ignore no-explicit-any -- mutable heterogeneous public-return fixture
+test("ordinary Form 2210 mandatory methods retain both public export guards", async () => {
   const input = structuredClone(base.inputs) as Record<string, any>;
   delete input.f2210f;
   const baseline = buildPending(f1040_2025.executeReturn(input).pending);

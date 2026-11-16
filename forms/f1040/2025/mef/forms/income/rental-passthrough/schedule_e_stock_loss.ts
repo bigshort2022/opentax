@@ -1,3 +1,4 @@
+import { mefTaxYear } from "../../../support/year-config.ts";
 import { projectPassiveSCorp7203Copy } from "../../../../domains/income/business/passive-s-corp-loss-copies.ts";
 import { element, elements } from "../../../../../mef/xml.ts";
 import type { MefBuildContext, MefFormDescriptor } from "../../../form-descriptor.ts";
@@ -23,7 +24,12 @@ export function buildReviewedStockLossScheduleE(
     );
   }
   if (rawFields.owned_debt_loss_sources !== undefined) {
-    const rows = projectOwned7203Family(rawFields, pending, context?.filer),
+    const rows = projectOwned7203Family(
+        rawFields,
+        pending,
+        context?.filer,
+        mefTaxYear(context),
+      ),
       total = rows.reduce((n, r) => n + r.allowed, 0);
     return elements("IRS1040ScheduleE", [
       element("PriorYearsLossesInd", "false"),
@@ -46,6 +52,7 @@ export function buildReviewedStockLossScheduleE(
     rawFields,
     pending,
     context?.filer,
+    mefTaxYear(context),
   );
   if (
     !ledger.materially_participated_in_s_corporation ||
@@ -81,7 +88,10 @@ export const scheduleEStockLoss: MefFormDescriptor<
   pdfUrl: "https://www.irs.gov/pub/irs-prior/f1040se--2025.pdf",
   build(fields, context) {
     if (fields.current_passive_s_corp_loss !== undefined) {
-      projectPassiveSCorp7203Copy(fields, context?.pending, context?.filer);
+      projectPassiveSCorp7203Copy(fields, context?.pending, context?.filer, {
+        taxYear: mefTaxYear(context),
+        formType: "f1040",
+      });
       return "";
     }
     return buildReviewedStockLossScheduleE(fields, context);

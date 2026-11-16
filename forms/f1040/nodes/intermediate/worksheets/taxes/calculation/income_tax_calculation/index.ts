@@ -17,7 +17,7 @@ import { calculateForm8615 } from "../../../../forms/taxes/investments/form8615/
 import { inputSchema as form8615SourceSchema } from "../../../../../inputs/taxes/investments/f8615/schema.ts";
 import { f8812 } from "../../../../../inputs/credits/child/f8812/index.ts";
 import { CONFIG_BY_YEAR } from "../../../../../config/index.ts";
-import { ordinaryTax2025 } from "../tax_table_2025.ts";
+import { ordinaryTaxForYear } from "../year_schedule.ts";
 import {
   foreignEarnedIncomePreferentialTax,
   preferentialTax,
@@ -110,8 +110,6 @@ export const inputSchema = z.object({
 });
 
 type IncomeTaxCalcInput = z.infer<typeof inputSchema>;
-
-// ─── Pure helpers ─────────────────────────────────────────────────────────────
 
 // ─── Node class ───────────────────────────────────────────────────────────────
 
@@ -236,13 +234,19 @@ class IncomeTaxCalculationNode extends TaxNode<typeof inputSchema> {
             rate28Gain: rate28,
             form4952Election,
             electedCapitalGain,
+            taxYear: ctx.taxYear,
           }, floor);
         } else {
-          const stackedTax = ordinaryTax2025(
+          const stackedTax = ordinaryTaxForYear(
             input.taxable_income + floor,
             input.filing_status,
+            ctx.taxYear,
           );
-          const floorTax = ordinaryTax2025(floor, input.filing_status);
+          const floorTax = ordinaryTaxForYear(
+            floor,
+            input.filing_status,
+            ctx.taxYear,
+          );
           tax = Math.max(0, stackedTax - floorTax);
         }
       }
@@ -258,9 +262,14 @@ class IncomeTaxCalculationNode extends TaxNode<typeof inputSchema> {
         rate28Gain: rate28,
         form4952Election,
         electedCapitalGain,
+        taxYear: ctx.taxYear,
       });
     } else {
-      tax = ordinaryTax2025(input.taxable_income, input.filing_status);
+      tax = ordinaryTaxForYear(
+        input.taxable_income,
+        input.filing_status,
+        ctx.taxYear,
+      );
     }
     let regularTaxBeforeAdditionalItems = tax;
 
@@ -304,6 +313,7 @@ class IncomeTaxCalculationNode extends TaxNode<typeof inputSchema> {
         childAdjustedGrossIncome: input.form8615_child_agi,
         childDeduction: input.form8615_child_deduction,
         childForeignEarnedIncomeExclusion: foreignExclusion,
+        taxYear: ctx.taxYear,
         brackets: cfg,
       });
     }
@@ -338,11 +348,15 @@ class IncomeTaxCalculationNode extends TaxNode<typeof inputSchema> {
             rate28Gain: rate28,
             form4952Election,
             electedCapitalGain,
+            taxYear: ctx.taxYear,
           }, floor)
           : Math.max(
             0,
-            ordinaryTax2025(withoutTaxable + floor, input.filing_status) -
-              ordinaryTax2025(floor, input.filing_status),
+            ordinaryTaxForYear(
+                withoutTaxable + floor,
+                input.filing_status,
+                ctx.taxYear,
+              ) - ordinaryTaxForYear(floor, input.filing_status, ctx.taxYear),
           );
       } else if (hasPrefIncome) {
         without = preferentialTax({
@@ -356,9 +370,14 @@ class IncomeTaxCalculationNode extends TaxNode<typeof inputSchema> {
           rate28Gain: rate28,
           form4952Election,
           electedCapitalGain,
+          taxYear: ctx.taxYear,
         });
       } else {
-        without = ordinaryTax2025(withoutTaxable, input.filing_status);
+        without = ordinaryTaxForYear(
+          withoutTaxable,
+          input.filing_status,
+          ctx.taxYear,
+        );
       }
       form8621DeferredTaxBeforeCredits = Math.max(0, tax - without);
     }

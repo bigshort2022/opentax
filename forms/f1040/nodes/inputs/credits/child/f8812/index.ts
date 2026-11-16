@@ -10,6 +10,7 @@ import { f1040 } from "../../../../outputs/general/return-assembly/f1040/index.t
 import { filingStatusSchema } from "../../../../types.ts";
 import type { NodeContext } from "../../../../../../../core/types/node-context.ts";
 import { CONFIG_BY_YEAR } from "../../../../config/index.ts";
+import type { F1040Config } from "../../../../config/index.ts";
 
 export const earnedIncomeWorksheetSchema = z.object({
   form1040_line1z_wages: z.number().nonnegative(),
@@ -117,6 +118,11 @@ export const inputSchema = z.object({
   // Set by Form 8862 when prior-year CTC/ACTC disallowance has been cleared
   form8862_filed: z.boolean().optional(),
   credit_limit_worksheet: creditLimitWorksheetSchema.optional(),
+  // Credit Limit Worksheet A line 2 from the computed Schedule 3 (schedule3).
+  schedule3_credit_limit_worksheet: creditLimitWorksheetSchema.optional(),
+  // Schedule 3 has a credit (Worksheet B or another late-settled line) that
+  // the computed Schedule 3 cannot yet total for Worksheet A line 2.
+  schedule3_credit_limit_pending: z.literal(true).optional(),
   part_iib: z.object({
     line21_w2_withheld_social_security_medicare: z.number().nonnegative(),
     schedule1_line15: z.number().nonnegative(),
@@ -141,8 +147,18 @@ export const inputSchema = z.object({
   auto_earned_income: z.number().nonnegative().optional(),
   // Net self-employment profit for ACTC earned income (from schedule_c node)
   auto_se_earned_income: z.number().nonnegative().optional(),
+  // Form 1040 line 1h disability pension before minimum retirement age (from
+  // f1099r); 2025 Schedule 8812 instructions, Earned Income Chart — Line 18a.
+  auto_disability_pension_earned_income: z.number().nonnegative().optional(),
   // Number of other qualifying dependents for ODC (from general node)
   auto_other_dependents: z.number().int().nonnegative().optional(),
+  // Earned Income Worksheet lines for a wage-only return (agi_aggregator),
+  // less line 1b, and W-2 box 12 code Q nontaxable combat pay (w2).
+  auto_earned_income_worksheet: earnedIncomeWorksheetSchema.innerType().omit({
+    nontaxable_combat_pay: true,
+    schedule_se_line15: true,
+  }).optional(),
+  auto_nontaxable_combat_pay: z.number().nonnegative().optional(),
 });
 
 /** One Form 1040 line 28 election applies to the whole return. */
@@ -225,20 +241,22 @@ export function calculatePartIIBLines(
   return { line21, line22, line23, line24, line25, line26 };
 }
 
-/** IRS TY2025 Schedule 8812 Credit Limit Worksheet B, lines 1 through 14. */
+/** Schedule 8812 Credit Limit Worksheet B, lines 1 through 14. */
 export function calculateCreditLimitWorksheetBLines(
   line12: number,
   qualifyingChildren: number,
   earnedIncomeWorksheet: EarnedIncomeWorksheet,
   bonaFidePrResident: boolean,
-  payrollAndCredits?: PartIIBDetails,
+  payrollAndCredits: PartIIBDetails | undefined,
+  cfg: Pick<F1040Config, "actcMaxPerChild" | "actcEarnedIncomeFloor">,
 ) {
   const line1 = line12;
-  const line2 = qualifyingChildren * 1_700;
+  const line2 = qualifyingChildren * cfg.actcMaxPerChild;
   const line3 = calculateEarnedIncomeWorksheet(earnedIncomeWorksheet).line7;
-  const line4 = Math.max(0, line3 - 2_500);
+  const line4 = Math.max(0, line3 - cfg.actcEarnedIncomeFloor);
   const line5 = line4 * ACTC_EARNED_INCOME_RATE;
-  const usesPayrollBranch = line2 < 5_100
+  // Line 6 asks whether line 2 reaches three children's ACTC maximum.
+  const usesPayrollBranch = line2 < 3 * cfg.actcMaxPerChild
     ? bonaFidePrResident && line5 < line1
     : line5 < line1;
   if (usesPayrollBranch && !payrollAndCredits) {
@@ -280,6 +298,20 @@ export function calculateCreditLimitWorksheetBLines(
   };
 }
 
+// Draft 2026 Schedule 3 reserves line 5b (the §25C credit ended after 2025,
+// P.L. 119-21 §70505), and the draft 2026 Schedule 8812 instructions drop it
+// from Credit Limit Worksheet A line 2.
+function assertWorksheetALine2ForYear(
+  taxYear: number,
+  worksheet: CreditLimitWorksheet,
+): void {
+  if (taxYear >= 2026 && worksheet.schedule3_line5b !== 0) {
+    throw new Error(
+      `Schedule 3 line 5b is reserved for ${taxYear}; Credit Limit Worksheet A has no line 5b amount`,
+    );
+  }
+}
+
 export function calculateCreditLimitWorksheetALine5(
   form1040Line18Tax: number,
   worksheet: CreditLimitWorksheet,
@@ -300,6 +332,22 @@ export function calculateCreditLimitWorksheetALine5(
   }
   return Math.max(0, form1040Line18Tax - line2 - line4);
 }
+
+// A return without Schedule 3 credits enters zero for every Schedule 3 line
+// on Credit Limit Worksheet A line 2 and has no Worksheet B credit (2025
+// Schedule 8812 instructions, Credit Limit Worksheets A and B).
+const NO_SCHEDULE3_CREDITS: CreditLimitWorksheet = {
+  schedule3_line1: 0,
+  schedule3_line2: 0,
+  schedule3_line3: 0,
+  schedule3_line4: 0,
+  schedule3_line5b: 0,
+  schedule3_line6d: 0,
+  schedule3_line6f: 0,
+  schedule3_line6l: 0,
+  schedule3_line6m: 0,
+  worksheet_b_applies: false,
+};
 
 function returnValue<K extends keyof F8812Item>(
   items: F8812Item[],
@@ -328,7 +376,8 @@ function buildAutoItem(input: F8812Input): F8812Item | null {
     agi: input.auto_agi,
     income_tax_liability: input.auto_income_tax_liability,
     earned_income:
-      (input.auto_earned_income ?? 0) + (input.auto_se_earned_income ?? 0) ||
+      (input.auto_earned_income ?? 0) + (input.auto_se_earned_income ?? 0) +
+        (input.auto_disability_pension_earned_income ?? 0) ||
       undefined,
   };
 }
@@ -481,13 +530,17 @@ export function calculateSchedule8812Lines(
       "Schedule 8812 credit-limit worksheet cannot be supplied both on an item and at the root",
     );
   }
-  const creditWorksheet = input.credit_limit_worksheet ??
+  const suppliedWorksheet = input.credit_limit_worksheet ??
     itemCreditWorksheets[0];
+  const derivedWorksheet = input.schedule3_credit_limit_worksheet ??
+    (input.schedule3_credit_limit_pending ? undefined : NO_SCHEDULE3_CREDITS);
+  const creditWorksheet = suppliedWorksheet ?? derivedWorksheet;
   if (!creditWorksheet) {
     throw new Error(
       "Schedule 8812 needs complete Credit Limit Worksheet A and B answers",
     );
   }
+  assertWorksheetALine2ForYear(taxYear, creditWorksheet);
   if (
     creditWorksheet.worksheet_b_applies &&
     (line4 === 0 || hasFEIE)
@@ -514,7 +567,18 @@ export function calculateSchedule8812Lines(
       "Schedule 8812 earned-income worksheet cannot be supplied both on an item and at the root",
     );
   }
-  const worksheetInput = input.earned_income_worksheet ?? itemWorksheets[0];
+  // Line 18a falls back to the return's own wage-only Earned Income
+  // Worksheet; a keyed worksheet or line 18a overrides it.
+  const derivedEarnedIncome = input.auto_earned_income_worksheet &&
+      input.line18a_earned_income === undefined &&
+      returnValue(items, "line18a_earned_income") === undefined
+    ? {
+      ...input.auto_earned_income_worksheet,
+      nontaxable_combat_pay: input.auto_nontaxable_combat_pay ?? 0,
+    }
+    : undefined;
+  const worksheetInput = input.earned_income_worksheet ?? itemWorksheets[0] ??
+    derivedEarnedIncome;
   if (creditWorksheet.worksheet_b_applies && !worksheetInput) {
     throw new Error(
       "Schedule 8812 Worksheet B needs its earned-income worksheet line 7 sources",
@@ -527,9 +591,23 @@ export function calculateSchedule8812Lines(
       worksheetInput!,
       isPrResident,
       input.part_iib,
+      cfg,
     )
     : null;
   const line13 = calculateCreditLimitWorksheetALine5(tax, creditWorksheet);
+  if (
+    suppliedWorksheet && input.schedule3_credit_limit_worksheet &&
+    !suppliedWorksheet.worksheet_b_applies &&
+    line13 !==
+      calculateCreditLimitWorksheetALine5(
+        tax,
+        input.schedule3_credit_limit_worksheet,
+      )
+  ) {
+    throw new Error(
+      "Schedule 8812 Credit Limit Worksheet A differs from the return's Schedule 3 credits",
+    );
+  }
   const line14 = Math.min(line12, line13);
 
   const canClaimActc = line4 > 0 && !doNotClaimActc && !hasFEIE;

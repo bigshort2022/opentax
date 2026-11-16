@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import { buildForm8854PartI } from "../../../../../2025/mef/forms/general/foreign/f8854/f8854_part_i.ts";
 import {
@@ -10,13 +11,13 @@ import {
 } from "../../../../../2025/mef/forms/general/foreign/f8854/f8854_part_ii_a.ts";
 import {
   averageAnnualNetIncomeTax,
-  AVG_ANNUAL_TAX_THRESHOLD_2025,
   ExpatriateType,
   f8854,
+  form8854YearAmounts,
   inputSchema,
   isCoveredExpatriate,
-  MARK_TO_MARKET_EXCLUSION_2025,
   NET_WORTH_THRESHOLD,
+  PRIOR_YEAR_TAX_KEYS,
   sectionAExceptionAnswers,
 } from "./index.ts";
 import { allocateMarkToMarketExclusion } from "./mark-to-market.ts";
@@ -130,7 +131,7 @@ function input(overrides: Record<string, unknown> = {}) {
   return {
     expatriation_date: "2025-06-15",
     expatriate_type: ExpatriateType.CITIZEN,
-    tax_status_2025: "FULL_YEAR_US_CITIZEN_OR_RESIDENT",
+    tax_status: "FULL_YEAR_US_CITIZEN_OR_RESIDENT",
     part_i: {
       mailing_address: {
         kind: "US",
@@ -155,7 +156,7 @@ function input(overrides: Record<string, unknown> = {}) {
         tax_year: year,
         filed_form1040_document_id: `filed-${year}-form1040`,
         filed_form1040_sha256: String(year).repeat(16),
-        form1040_line24_total_tax: priorTax[`year_${year}`],
+        form1040_line24_total_tax: priorTax[PRIOR_YEAR_TAX_KEYS[2024 - year]],
         schedule3_line1_foreign_tax_credit: 0,
         irs_acceptance_reference: `irs-accepted-${year}`,
       }),
@@ -170,11 +171,11 @@ function input(overrides: Record<string, unknown> = {}) {
 
 function priorYearTax(amount: number) {
   return {
-    year_2024: amount,
-    year_2023: amount,
-    year_2022: amount,
-    year_2021: amount,
-    year_2020: amount,
+    first_year_before: amount,
+    second_year_before: amount,
+    third_year_before: amount,
+    fourth_year_before: amount,
+    fifth_year_before: amount,
   };
 }
 
@@ -208,12 +209,12 @@ function dualCitizenPartI() {
   };
 }
 
-Deno.test("Form 8854 Section A binds five filed Form 1040 tax lines and Schedule 3 foreign credits", () => {
+test("Form 8854 Section A binds five filed Form 1040 tax lines and Schedule 3 foreign credits", () => {
   const sources = input().prior_year_filed_return_sources;
   const filed = input({
     prior_year_us_income_tax_less_foreign_tax_credit: {
       ...priorYearTax(0),
-      year_2024: 80,
+      first_year_before: 80,
     },
     prior_year_filed_return_sources: sources.map((source) =>
       source.tax_year === 2024
@@ -227,7 +228,7 @@ Deno.test("Form 8854 Section A binds five filed Form 1040 tax lines and Schedule
   });
   const parsed = inputSchema.parse(filed);
   assertEquals(
-    parsed.prior_year_us_income_tax_less_foreign_tax_credit.year_2024,
+    parsed.prior_year_us_income_tax_less_foreign_tax_credit.first_year_before,
     80,
   );
   assertEquals(isCoveredExpatriate(parsed), false);
@@ -273,10 +274,12 @@ Deno.test("Form 8854 Section A binds five filed Form 1040 tax lines and Schedule
   );
 });
 
-Deno.test("Form 8854 uses TY2025 covered-expatriate thresholds", () => {
-  assertEquals(AVG_ANNUAL_TAX_THRESHOLD_2025, 206_000);
+test("Form 8854 uses TY2025 covered-expatriate thresholds", () => {
+  assertEquals(form8854YearAmounts("2025-06-30"), {
+    averageTaxThreshold: 206_000,
+    markToMarketExclusion: 890_000,
+  });
   assertEquals(NET_WORTH_THRESHOLD, 2_000_000);
-  assertEquals(MARK_TO_MARKET_EXCLUSION_2025, 890_000);
   assertEquals(
     isCoveredExpatriate(inputSchema.parse(input({
       prior_year_us_income_tax_less_foreign_tax_credit: priorYearTax(206_000),
@@ -287,7 +290,7 @@ Deno.test("Form 8854 uses TY2025 covered-expatriate thresholds", () => {
     isCoveredExpatriate(inputSchema.parse(input({
       prior_year_us_income_tax_less_foreign_tax_credit: {
         ...priorYearTax(206_000),
-        year_2024: 206_005,
+        first_year_before: 206_005,
       },
     }))),
     true,
@@ -295,11 +298,11 @@ Deno.test("Form 8854 uses TY2025 covered-expatriate thresholds", () => {
   assertEquals(
     averageAnnualNetIncomeTax(inputSchema.parse(input({
       prior_year_us_income_tax_less_foreign_tax_credit: {
-        year_2024: 100_000,
-        year_2023: 200_000,
-        year_2022: 300_000,
-        year_2021: 400_000,
-        year_2020: 500_000,
+        first_year_before: 100_000,
+        second_year_before: 200_000,
+        third_year_before: 300_000,
+        fourth_year_before: 400_000,
+        fifth_year_before: 500_000,
       },
     }))),
     300_000,
@@ -324,7 +327,7 @@ Deno.test("Form 8854 uses TY2025 covered-expatriate thresholds", () => {
   );
 });
 
-Deno.test("Form 8854 dual-citizen exception waives only tax and net-worth tests", () => {
+test("Form 8854 dual-citizen exception waives only tax and net-worth tests", () => {
   const dual = {
     us_citizen_at_birth: true,
     other_country_citizen_at_birth: true,
@@ -372,7 +375,7 @@ Deno.test("Form 8854 dual-citizen exception waives only tax and net-worth tests"
   );
 });
 
-Deno.test("Form 8854 minor exception uses the strict age and residence boundaries", () => {
+test("Form 8854 minor exception uses the strict age and residence boundaries", () => {
   const minor = {
     date_of_birth: "2007-01-01",
     us_resident_tax_years_before_expatriation: 10,
@@ -411,7 +414,7 @@ Deno.test("Form 8854 minor exception uses the strict age and residence boundarie
   );
 });
 
-Deno.test("Form 8854 validates its source date and asset amounts", () => {
+test("Form 8854 validates its source date and asset amounts", () => {
   assertEquals(
     inputSchema.safeParse(input({
       expatriate_type: ExpatriateType.LONG_TERM_RESIDENT,
@@ -493,7 +496,7 @@ Deno.test("Form 8854 validates its source date and asset amounts", () => {
     inputSchema.safeParse(input({
       prior_year_us_income_tax_less_foreign_tax_credit: {
         ...priorYearTax(0),
-        year_2024: -1,
+        first_year_before: -1,
       },
     })).success,
     false,
@@ -501,7 +504,7 @@ Deno.test("Form 8854 validates its source date and asset amounts", () => {
   assertEquals(
     inputSchema.safeParse(input({
       prior_year_us_income_tax_less_foreign_tax_credit: {
-        year_2024: 1,
+        first_year_before: 1,
       },
     })).success,
     false,
@@ -526,7 +529,7 @@ Deno.test("Form 8854 validates its source date and asset amounts", () => {
   );
 });
 
-Deno.test("Form 8854 Part I XML follows address, notification and citizenship order", () => {
+test("Form 8854 Part I XML follows address, notification and citizenship order", () => {
   const xml = buildForm8854PartI(inputSchema.parse(input({
     part_i: {
       ...input().part_i,
@@ -563,7 +566,7 @@ Deno.test("Form 8854 Part I XML follows address, notification and citizenship or
   );
 });
 
-Deno.test("Form 8854 Part I supports long-term dual-resident notice and foreign contact", () => {
+test("Form 8854 Part I supports long-term dual-resident notice and foreign contact", () => {
   const xml = buildForm8854PartI(inputSchema.parse(input({
     expatriate_type: ExpatriateType.LONG_TERM_RESIDENT,
     part_i: {
@@ -591,7 +594,7 @@ Deno.test("Form 8854 Part I supports long-term dual-resident notice and foreign 
   assertEquals(xml.includes("USCitizenByBirthInd"), false);
 });
 
-Deno.test("Form 8854 Section A emits all five prior years and explicit exception answers", () => {
+test("Form 8854 Section A emits all five prior years and explicit exception answers", () => {
   const dual = {
     us_citizen_at_birth: true,
     other_country_citizen_at_birth: true,
@@ -603,11 +606,11 @@ Deno.test("Form 8854 Section A emits all five prior years and explicit exception
   const parsed = inputSchema.parse(input({
     part_i: dualCitizenPartI(),
     prior_year_us_income_tax_less_foreign_tax_credit: {
-      year_2024: 1,
-      year_2023: 2,
-      year_2022: 3,
-      year_2021: 4,
-      year_2020: 5,
+      first_year_before: 1,
+      second_year_before: 2,
+      third_year_before: 3,
+      fourth_year_before: 4,
+      fifth_year_before: 5,
     },
     balance_sheet: balanceSheetWithNetWorth(2_000_000),
     exception_facts: {
@@ -655,7 +658,7 @@ Deno.test("Form 8854 Section A emits all five prior years and explicit exception
   );
 });
 
-Deno.test("Form 8854 Section A line 3 links a native explanation statement", () => {
+test("Form 8854 Section A line 3 links a native explanation statement", () => {
   const parsed = inputSchema.parse(input({
     significant_asset_liability_changes_prior_5_years: true,
     significant_change_explanation: "A real property gift reduced net worth.",
@@ -683,7 +686,7 @@ Deno.test("Form 8854 Section A line 3 links a native explanation statement", () 
   );
 });
 
-Deno.test("Form 8854 Section B derives net worth without counting line 5a twice", () => {
+test("Form 8854 Section B derives net worth without counting line 5a twice", () => {
   const sheet = {
     ...balanceSheetWithNetWorth(500_000),
     nonmarketable_foreign_securities: {
@@ -754,7 +757,7 @@ Deno.test("Form 8854 Section B derives net worth without counting line 5a twice"
   assertEquals(isCoveredExpatriate(negative), false);
 });
 
-Deno.test("Form 8854 Section B emits ordered totals and linked detail statements", () => {
+test("Form 8854 Section B emits ordered totals and linked detail statements", () => {
   const sheet = {
     ...balanceSheetWithNetWorth(100_000),
     partnership_interests: [{
@@ -834,7 +837,7 @@ Deno.test("Form 8854 Section B emits ordered totals and linked detail statements
   );
 });
 
-Deno.test("Form 8854 dual-citizen country reconciles with Part I", () => {
+test("Form 8854 dual-citizen country reconciles with Part I", () => {
   const dual = {
     us_citizen_at_birth: true,
     other_country_citizen_at_birth: true,
@@ -868,12 +871,12 @@ Deno.test("Form 8854 dual-citizen country reconciles with Part I", () => {
   );
 });
 
-Deno.test("Form 8854 allocates the 2025 exclusion to gain assets, not losses", () => {
+test("Form 8854 allocates the 2025 exclusion to gain assets, not losses", () => {
   const allocations = allocateMarkToMarketExclusion([
     asset("business", 2_000_000, 200_000),
     asset("stock", 1_000_000, 800_000),
     asset("loss", 500_000, 800_000),
-  ]);
+  ], 890_000);
   assertEquals(
     allocations.map((row) => ({
       gainOrLoss: row.builtInGainOrLoss,
@@ -892,20 +895,20 @@ Deno.test("Form 8854 allocates the 2025 exclusion to gain assets, not losses", (
   );
 });
 
-Deno.test("Form 8854 caps exclusion at total positive gain and balances cents", () => {
+test("Form 8854 caps exclusion at total positive gain and balances cents", () => {
   assertEquals(
     allocateMarkToMarketExclusion([
       asset("A", 100, 0),
       asset("B", 50, 0),
       asset("C", 10, 20),
-    ]).map((row) => [row.exclusionAllocated, row.gainAfterExclusion]),
+    ], 890_000).map((row) => [row.exclusionAllocated, row.gainAfterExclusion]),
     [[100, 0], [50, 0], [0, 0]],
   );
   const rows = allocateMarkToMarketExclusion([
     asset("A", 890_000.01, 0),
     asset("B", 890_000.01, 0),
     asset("C", 890_000.01, 0),
-  ]);
+  ], 890_000);
   assertEquals(rows.map((row) => row.exclusionAllocated), [
     296_666.67,
     296_666.67,
@@ -919,18 +922,18 @@ Deno.test("Form 8854 caps exclusion at total positive gain and balances cents", 
   );
 });
 
-Deno.test("Form 8854 rejects duplicate asset IDs and invalid precision", () => {
+test("Form 8854 rejects duplicate asset IDs and invalid precision", () => {
   assertThrows(
-    () => allocateMarkToMarketExclusion([asset("A", 1, 0), asset("A", 2, 0)]),
+    () => allocateMarkToMarketExclusion([asset("A", 1, 0), asset("A", 2, 0)], 890_000),
     Error,
     "Duplicate Form 8854 asset ID",
   );
   assertThrows(
-    () => allocateMarkToMarketExclusion([asset("A", 1.001, 0)]),
+    () => allocateMarkToMarketExclusion([asset("A", 1.001, 0)], 890_000),
   );
 });
 
-Deno.test("Form 8854 Section C separates excluded items and links native statements", () => {
+test("Form 8854 Section C separates excluded items and links native statements", () => {
   const section = {
     ...sectionC([asset("stock", 1_000_000, 100_000)]),
     eligible_deferred_compensation: [{
@@ -985,7 +988,7 @@ Deno.test("Form 8854 Section C separates excluded items and links native stateme
     xml,
     "<TotGainAfterAllocationExclAmt>10000</TotGainAfterAllocationExclAmt>",
   );
-  const statements = buildForm8854SectionCStatements(parsed.section_c!);
+  const statements = buildForm8854SectionCStatements(parsed.section_c!, 890_000);
   assertStringIncludes(
     statements.eligibleDeferredCompensation,
     "<EligDeferredCompItemStmt>",
@@ -1008,7 +1011,7 @@ Deno.test("Form 8854 Section C separates excluded items and links native stateme
   );
 });
 
-Deno.test("Form 8854 Section C rejects unsupported ownership and absent covered facts", () => {
+test("Form 8854 Section C rejects unsupported ownership and absent covered facts", () => {
   assertEquals(
     inputSchema.safeParse(input({
       assets: [asset("legacy", 1, 0)],
@@ -1068,7 +1071,7 @@ Deno.test("Form 8854 Section C rejects unsupported ownership and absent covered 
   );
 });
 
-Deno.test("Form 8854 Section C XML uses consistent whole-dollar property math", () => {
+test("Form 8854 Section C XML uses consistent whole-dollar property math", () => {
   const parsed = inputSchema.parse(input({
     balance_sheet: balanceSheetWithNetWorth(2_000_000),
     section_c: sectionC([
@@ -1091,14 +1094,14 @@ Deno.test("Form 8854 Section C XML uses consistent whole-dollar property math", 
     xml,
     "<TotGainAfterAllocationExclAmt>10012</TotGainAfterAllocationExclAmt>",
   );
-  const statements = buildForm8854SectionCStatements(parsed.section_c!);
+  const statements = buildForm8854SectionCStatements(parsed.section_c!, 890_000);
   assertStringIncludes(
     statements.computation,
     "<TotalBuiltInGainAmt>900012</TotalBuiltInGainAmt>",
   );
 });
 
-Deno.test("Form 8854 Section D allocates tax over all gain property before partial election", () => {
+test("Form 8854 Section D allocates tax over all gain property before partial election", () => {
   const parsed = inputSchema.parse(input({
     balance_sheet: balanceSheetWithNetWorth(2_000_000),
     section_c: sectionC([
@@ -1111,6 +1114,7 @@ Deno.test("Form 8854 Section D allocates tax over all gain property before parti
   const allocation = calculateSectionDDeferral(
     parsed.section_c!,
     parsed.section_d,
+    890_000,
   );
   assertEquals(allocation?.taxEligibleForDeferral, 500_000);
   assertEquals(allocation?.totalDeferredTax, 50_000);
@@ -1155,7 +1159,7 @@ Deno.test("Form 8854 Section D allocates tax over all gain property before parti
   assertStringIncludes(statement, "<DeferredTaxAmt>50000</DeferredTaxAmt>");
 });
 
-Deno.test("Form 8854 Section D rejects invalid elections and emits a no-deferral answer", () => {
+test("Form 8854 Section D rejects invalid elections and emits a no-deferral answer", () => {
   assertEquals(buildForm8854SectionD(inputSchema.parse(input())), "");
   const covered = inputSchema.parse(input({
     balance_sheet: balanceSheetWithNetWorth(2_000_000),
@@ -1242,7 +1246,7 @@ Deno.test("Form 8854 Section D rejects invalid elections and emits a no-deferral
   );
 });
 
-Deno.test("Form 8854 initial bundle assembles Parts I and II without pretending to register filing", () => {
+test("Form 8854 initial bundle assembles Parts I and II without pretending to register filing", () => {
   const noncovered = buildForm8854InitialBundle(
     inputSchema.parse(input()),
     {
@@ -1302,7 +1306,7 @@ Deno.test("Form 8854 initial bundle assembles Parts I and II without pretending 
   ]);
 });
 
-Deno.test("Form 8854 native statement set is stable before document IDs are assigned", () => {
+test("Form 8854 native statement set is stable before document IDs are assigned", () => {
   const parsed = inputSchema.parse(input({
     balance_sheet: balanceSheetWithNetWorth(2_000_000),
     section_c: sectionC([asset("stock", 1_000_000, 100_000)]),
@@ -1354,7 +1358,7 @@ Deno.test("Form 8854 native statement set is stable before document IDs are assi
   );
 });
 
-Deno.test("Form 8854 initial bundle requires actual IDs for election PDFs", () => {
+test("Form 8854 initial bundle requires actual IDs for election PDFs", () => {
   const parsed = inputSchema.parse(input({
     balance_sheet: balanceSheetWithNetWorth(2_000_000),
     section_c: sectionC([
@@ -1419,7 +1423,7 @@ Deno.test("Form 8854 initial bundle requires actual IDs for election PDFs", () =
   );
 });
 
-Deno.test("Form 8854 trust full-value election requires a linked valuation ruling", () => {
+test("Form 8854 trust full-value election requires a linked valuation ruling", () => {
   const section = {
     ...sectionC(),
     nongrantor_trust_interests: [{
@@ -1472,7 +1476,7 @@ Deno.test("Form 8854 trust full-value election requires a linked valuation rulin
   ]);
 });
 
-Deno.test("Form 8854 gain property matches one identified Form 8949 deemed sale", () => {
+test("Form 8854 gain property matches one identified Form 8949 deemed sale", () => {
   const parsed = inputSchema.parse(input({
     balance_sheet: balanceSheetWithNetWorth(2_000_000),
     section_c: sectionC([asset("stock", 1_000_000, 100_000)]),
@@ -1525,7 +1529,7 @@ Deno.test("Form 8854 gain property matches one identified Form 8949 deemed sale"
   );
 });
 
-Deno.test("Form 8854 Form 8949 holding period follows acquisition and deemed-sale dates", () => {
+test("Form 8854 Form 8949 holding period follows acquisition and deemed-sale dates", () => {
   const parsed = inputSchema.parse(input({
     balance_sheet: balanceSheetWithNetWorth(2_000_000),
     section_c: sectionC([asset("stock", 1_000_000, 100_000)]),
@@ -1564,7 +1568,7 @@ Deno.test("Form 8854 Form 8949 holding period follows acquisition and deemed-sal
   );
 });
 
-Deno.test("Form 8854 Form 8949 digital-asset fact matches the no-report box", () => {
+test("Form 8854 Form 8949 digital-asset fact matches the no-report box", () => {
   const base = input({
     balance_sheet: balanceSheetWithNetWorth(2_000_000),
     section_c: sectionC([asset("stock", 1_000_000, 100_000)]),
@@ -1615,7 +1619,7 @@ Deno.test("Form 8854 Form 8949 digital-asset fact matches the no-report box", ()
   );
 });
 
-Deno.test("Form 8854 capital reconciliation refuses uncharacterized losses and duplicated IDs", () => {
+test("Form 8854 capital reconciliation refuses uncharacterized losses and duplicated IDs", () => {
   assertEquals(
     inputSchema.safeParse(input({
       balance_sheet: balanceSheetWithNetWorth(2_000_000),
@@ -1637,7 +1641,7 @@ Deno.test("Form 8854 capital reconciliation refuses uncharacterized losses and d
   );
 });
 
-Deno.test("Form 8854 deductible capital loss matches its unadjusted Form 8949 row", () => {
+test("Form 8854 deductible capital loss matches its unadjusted Form 8949 row", () => {
   const parsed = inputSchema.parse(input({
     balance_sheet: balanceSheetWithNetWorth(2_000_000),
     section_c: sectionC([{
@@ -1666,7 +1670,7 @@ Deno.test("Form 8854 deductible capital loss matches its unadjusted Form 8949 ro
   );
 });
 
-Deno.test("Form 8854 personal-use loss requires Form 8949 code L and zero recognized loss", () => {
+test("Form 8854 personal-use loss requires Form 8949 code L and zero recognized loss", () => {
   const parsed = inputSchema.parse(input({
     balance_sheet: balanceSheetWithNetWorth(2_000_000),
     section_c: sectionC([{
@@ -1695,7 +1699,7 @@ Deno.test("Form 8854 personal-use loss requires Form 8949 code L and zero recogn
   );
 });
 
-Deno.test("Form 8854 Form 8949 loss treatment cannot be claimed for a gain or Form 4797 asset", () => {
+test("Form 8854 Form 8949 loss treatment cannot be claimed for a gain or Form 4797 asset", () => {
   const gain = {
     ...asset("gain", 200, 100),
     form8949_loss_treatment: Form8949LossTreatment.DeductibleCapital,
@@ -1716,7 +1720,7 @@ Deno.test("Form 8854 Form 8949 loss treatment cannot be claimed for a gain or Fo
   }
 });
 
-Deno.test("Form 8854 does not turn deemed gain into a dollar-for-dollar Schedule 2 tax", () => {
+test("Form 8854 does not turn deemed gain into a dollar-for-dollar Schedule 2 tax", () => {
   assertEquals(
     f8854.compute(
       { taxYear: 2025, formType: "f1040" },
@@ -1729,7 +1733,7 @@ Deno.test("Form 8854 does not turn deemed gain into a dollar-for-dollar Schedule
   );
 });
 
-Deno.test("Form 8854 calculation node rejects covered non-Form 8949 property", () => {
+test("Form 8854 calculation node rejects covered non-Form 8949 property", () => {
   assertThrows(
     () =>
       f8854.compute(
@@ -1749,7 +1753,7 @@ Deno.test("Form 8854 calculation node rejects covered non-Form 8949 property", (
   );
 });
 
-Deno.test("Form 8854 noncovered initial input reaches the registered XML path", () => {
+test("Form 8854 noncovered initial input reaches the registered XML path", () => {
   assertEquals(
     f8854.compute(
       { taxYear: 2025, formType: "f1040" },
@@ -1758,7 +1762,7 @@ Deno.test("Form 8854 noncovered initial input reaches the registered XML path", 
     [],
   );
   assertEquals(
-    inputSchema.safeParse(input({ tax_status_2025: undefined })).success,
+    inputSchema.safeParse(input({ tax_status: undefined })).success,
     false,
   );
   assertThrows(
@@ -1766,10 +1770,72 @@ Deno.test("Form 8854 noncovered initial input reaches the registered XML path", 
       f8854.compute(
         { taxYear: 2025, formType: "f1040" },
         inputSchema.parse(input({
-          tax_status_2025: "NONRESIDENT_OR_DUAL_STATUS",
+          tax_status: "NONRESIDENT_OR_DUAL_STATUS",
         })),
       ),
     Error,
     "nonresident or dual-status returns cannot use this Form 1040 MeF path",
+  );
+});
+
+function input2026(tax: number, overrides: Record<string, unknown> = {}) {
+  const base = input();
+  return {
+    ...base,
+    expatriation_date: "2026-06-15",
+    part_i: {
+      ...base.part_i,
+      notification: { kind: "CITIZEN_STATE_DEPARTMENT", date: "2026-06-15" },
+    },
+    prior_year_us_income_tax_less_foreign_tax_credit: priorYearTax(tax),
+    prior_year_filed_return_sources: base.prior_year_filed_return_sources.map(
+      (source) => ({
+        ...source,
+        tax_year: source.tax_year + 1,
+        form1040_line24_total_tax: tax,
+      }),
+    ),
+    ...overrides,
+  };
+}
+
+test("Form 8854 TY2026 uses Rev. Proc. 2025-32 amounts and 2021-2025 returns", () => {
+  assertEquals(form8854YearAmounts("2026-06-15"), {
+    averageTaxThreshold: 211_000,
+    markToMarketExclusion: 910_000,
+  });
+  const at = inputSchema.parse(input2026(211_000));
+  assertEquals(isCoveredExpatriate(at), false);
+  assertEquals(
+    f8854.compute({ taxYear: 2026, formType: "f1040" }, at).outputs,
+    [],
+  );
+  assertEquals(
+    isCoveredExpatriate(inputSchema.parse(input2026(211_001))),
+    true,
+  );
+  assertThrows(
+    () => f8854.compute({ taxYear: 2025, formType: "f1040" }, at),
+    Error,
+    "Initial Form 8854 expatriation date must be in tax year 2025",
+  );
+  assertEquals(inputSchema.safeParse(input()).success, true);
+  assertEquals(
+    inputSchema.safeParse({ ...input2026(0), expatriation_date: "2025-06-15" })
+      .success,
+    false,
+  );
+  assertEquals(
+    inputSchema.safeParse(input({
+      prior_year_us_income_tax_less_foreign_tax_credit: {
+        ...priorYearTax(0),
+        year_2024: 0,
+      },
+    })).success,
+    false,
+  );
+  assertEquals(
+    inputSchema.safeParse({ ...input(), tax_status_2025: "x" }).success,
+    false,
   );
 });

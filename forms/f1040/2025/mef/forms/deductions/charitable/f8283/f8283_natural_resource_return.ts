@@ -1,3 +1,4 @@
+import { mefTaxYear } from "../../../../support/year-config.ts";
 import { assertForm6251CharitableSource } from "../../../../../domains/taxes/amt/form6251/form6251_charitable_source.ts";
 import { schedule_f } from "../../../../../../nodes/intermediate/forms/income/business/schedule_f/index.ts";
 import { calculateCharitableNaturalResource } from "../../../../../../nodes/inputs/deductions/charitable/f8283/natural-resource-source.ts";
@@ -96,9 +97,10 @@ export function assertCharitableNaturalResourceReturn(
   assertForm6251CharitableSource(
     (pending.form6251 ?? {}) as Record<string, unknown>,
     pending,
+    mefTaxYear(context),
   );
   if (!active) return;
-  const ctx = { taxYear: 2025, formType: "f1040" };
+  const ctx = { taxYear: mefTaxYear(context), formType: "f1040" };
   const compare = (
     outputs: readonly { nodeType: string; fields: Record<string, unknown> }[],
     targets: readonly string[],

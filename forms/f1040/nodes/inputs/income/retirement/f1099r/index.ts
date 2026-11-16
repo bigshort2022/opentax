@@ -16,6 +16,7 @@ import {
 } from "../../../../intermediate/forms/income/retirement/form8606/recharacterization.ts";
 import { reconcileRothOwnerInventoryCopies, rothOwnerInventorySchema } from "../../../../intermediate/forms/income/retirement/form8606/roth-inventory.ts";
 import {
+  assertRothActivityTaxYear,
   reviewedRothActivity,
   rothActivityReviewSchema,
 } from "../../../../intermediate/forms/income/retirement/form8606/roth-activity.ts";
@@ -32,6 +33,8 @@ import {
 import { OutputNodes } from "../../../../../../../core/types/output-nodes.ts";
 import { f1040 } from "../../../../outputs/general/return-assembly/f1040/index.ts";
 import { agi_aggregator } from "../../../../intermediate/aggregation/general/return-assembly/agi_aggregator/index.ts";
+import { eitc } from "../../../../intermediate/forms/credits/earned-income/eitc/index.ts";
+import { f8812 } from "../../../credits/child/f8812/index.ts";
 import { form5329 } from "../../../../intermediate/forms/taxes/retirement/form5329/index.ts";
 import { form4972Elections } from "../../../../intermediate/forms/taxes/retirement/form4972/elections.ts";
 import {
@@ -123,6 +126,9 @@ function effectiveTaxableAmount(
     return reviewedRothActivity(item.roth_activity_review).taxable;
   }
   if (item.exclude_8606_roth === true) return 0;
+  if (item.roth_prior_contribution_basis !== undefined) {
+    return rothBasisTaxable(item);
+  }
 
   const rawTaxable = item.box2a_taxable_amount ?? item.box1_gross_distribution;
 
@@ -132,6 +138,10 @@ function effectiveTaxableAmount(
 
   // Rollover codes G and S produce zero taxable (not C — that's a Roth conversion)
   if (item.rollover_code === "G" || item.rollover_code === "S") return 0;
+  // Code H is a direct rollover of a designated Roth account to a Roth IRA,
+  // which is not taxable (2025 Instructions for Forms 1099-R and 5498, box 7
+  // code H; 2025 Instructions for Form 1040, lines 5a and 5b).
+  if (code1 === DistributionCode.CodeH) return 0;
   // A code-G Form 1099-R can report a taxable Roth rollover in box 2a.
   // With no box 2a, retain the non-taxable direct-rollover treatment.
   if (code1 === "G" && item.box2a_taxable_amount === undefined) return 0;
@@ -429,8 +439,12 @@ export const itemSchema = z.object({
   direct_rollover_confirmed: z.boolean().optional(),
 
   // Disability flags
-  disability_flag: z.boolean().optional(),
-  disability_as_wages: z.boolean().optional(),
+  disability_flag: z.boolean().optional().describe(
+    "Box 7 code 3 disability distribution; a recipient under 65 may claim Schedule R (add schedule_r)",
+  ),
+  disability_as_wages: z.boolean().optional().describe(
+    "Disability pension paid before the plan's minimum retirement age: Form 1040 line 1h",
+  ),
 
   // Special treatment flags
   carry_to_5329: z.boolean().optional(),
@@ -466,6 +480,10 @@ export const itemSchema = z.object({
   roth_distribution_evidence: rothDistributionEvidenceSchema.optional(),
   roth_activity_review: rothActivityReviewSchema.optional(),
   roth_owner_inventory_review: rothOwnerInventorySchema.optional(),
+  // Code J: the owner's basis in regular Roth IRA contributions carried from
+  // prior years (2025 Form 8606 line 22). The distribution is taxable only
+  // above it (Form 8606 lines 22-25; Pub. 590-B ordering rules).
+  roth_prior_contribution_basis: z.number().nonnegative().optional(),
 
   // Form 8606 — year-end FMV of all traditional IRAs (line 6).
   // Required when prior_ira_basis is set and there are remaining IRA assets after distribution.
@@ -498,6 +516,22 @@ export const itemSchema = z.object({
       path: ["nonstandard_document_review", "source_document_reference"],
       message:
         "Nonstandard 1099-R review must match the retained payer-copy reference",
+    });
+  }
+  // Instructions for Form 1040 (2025), line 1h (page 25): only a disability
+  // pension before minimum retirement age goes on line 1h; IRA payments stay
+  // on lines 4a and 4b.
+  if (
+    item.disability_as_wages === true &&
+    (item.disability_flag !== true ||
+      item.box7_distribution_code !== DistributionCode.Code3 ||
+      item.box7_ira_simple_indicator === true)
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["disability_as_wages"],
+      message:
+        "Form 1040 line 1h disability pension needs a non-IRA Form 1099-R with disability_flag and box 7 code 3",
     });
   }
 });
@@ -591,9 +625,11 @@ export function assertDistinct1099RCopies(
 
 // Form 1040 line 5c(1) follows a payer-reported pension/plan direct rollover,
 // not an IRA distribution, an excluded Form 4972 distribution, or a disability
-// payment reported as wages. Code G can have a taxable Roth portion in box 2a.
+// payment reported as wages. Code G can have a taxable Roth portion in box 2a;
+// code H is a designated Roth account's direct rollover to a Roth IRA.
 export function isPensionDirectRollover(item: R1099Item): boolean {
-  return item.box7_distribution_code === DistributionCode.CodeG &&
+  return (item.box7_distribution_code === DistributionCode.CodeG ||
+    item.box7_distribution_code === DistributionCode.CodeH) &&
     item.direct_rollover_confirmed === true &&
     item.box7_ira_simple_indicator !== true &&
     item.box1_gross_distribution > 0 &&
@@ -629,8 +665,9 @@ export function requiresIraDistributionStatement(item: R1099Item): boolean {
 
 export function iraDistributionExplanation(
   items: readonly R1099Item[],
+  taxYear: number,
 ): string | undefined {
-  assertIraRolloverEvidence(items);
+  assertIraRolloverEvidence(items, taxYear);
   const rows = items.flatMap((item, index) => {
     if (!requiresIraDistributionStatement(item)) return [];
     const rollover = item.ira_rollover;
@@ -701,8 +738,11 @@ export function iraDistributionExplanation(
   return explanation;
 }
 
-export function assertIraRolloverEvidence(items: readonly R1099Item[]): void {
-  for (const item of items) validateIraRolloverEvidence(item);
+export function assertIraRolloverEvidence(
+  items: readonly R1099Item[],
+  taxYear: number,
+): void {
+  for (const item of items) validateIraRolloverEvidence(item, taxYear);
   for (const owner of ["T", "S"] as const) {
     const dates = items.filter((item) =>
       (item.ts ?? "T") === owner &&
@@ -933,7 +973,7 @@ function validatePrivateLetterWaiver(item: R1099Item): void {
   }
 }
 
-function validateIraRolloverEvidence(item: R1099Item): void {
+function validateIraRolloverEvidence(item: R1099Item, taxYear: number): void {
   const iraRolloverCode = item.rollover_code === RolloverCode.G ||
     item.rollover_code === RolloverCode.S ||
     item.rollover_code === RolloverCode.X ||
@@ -1073,17 +1113,19 @@ function validateIraRolloverEvidence(item: R1099Item): void {
     const elapsedDays =
       (Date.parse(completed_on) - Date.parse(distributed_on)) /
       86_400_000;
-    if (!distributed_on.startsWith("2025-") || elapsedDays < 0) {
+    if (!distributed_on.startsWith(`${taxYear}-`) || elapsedDays < 0) {
       throw new Error(
-        "IRA rollover needs a 2025 distribution completed after payment",
+        `IRA rollover needs a ${taxYear} distribution completed after payment`,
       );
     }
     validateLateWaiver(item);
     if (
-      !completed_on.startsWith("2025-") &&
-      !completed_on.startsWith("2026-")
+      !completed_on.startsWith(`${taxYear}-`) &&
+      !completed_on.startsWith(`${taxYear + 1}-`)
     ) {
-      throw new Error("IRA rollover completion must be in 2025 or 2026");
+      throw new Error(
+        `IRA rollover completion must be in ${taxYear} or ${taxYear + 1}`,
+      );
     }
     if (
       item.rollover_code === RolloverCode.X &&
@@ -1107,7 +1149,29 @@ function validateIraRolloverEvidence(item: R1099Item): void {
 }
 
 // Cross-field validation for a single item
-function validateItem(item: R1099Item): void {
+/** Form 8606 line 25a: a code J distribution over the contribution basis. */
+function rothBasisTaxable(item: R1099Item): number {
+  return Math.max(
+    0,
+    item.box1_gross_distribution - (item.roth_prior_contribution_basis ?? 0),
+  );
+}
+
+function validateItem(item: R1099Item, taxYear: number): void {
+  if (
+    item.roth_prior_contribution_basis !== undefined &&
+    (item.box7_distribution_code !== DistributionCode.CodeJ ||
+      item.box7_code2 !== undefined || item.ts === undefined ||
+      item.exclude_8606_roth === true ||
+      item.roth_distribution_evidence !== undefined ||
+      item.roth_activity_review !== undefined ||
+      item.roth_owner_inventory_review !== undefined ||
+      item.rollover_code !== undefined || item.prior_ira_basis !== undefined)
+  ) {
+    throw new Error(
+      "Roth contribution basis applies to one owner's code J Form 1099-R without another Roth or rollover treatment",
+    );
+  }
   if (item.ira_recharacterization_review) reviewedIraRecharacterization(item);
   if (
     item.box7_distribution_code === DistributionCode.Code8 &&
@@ -1130,10 +1194,10 @@ function validateItem(item: R1099Item): void {
     )
   ) {
     throw new Error(
-      "Non-IRA code 8 corrective distribution needs one identified 2025 Form 1099-R, owner, payer and positive taxable box 2a",
+      "Non-IRA code 8 corrective distribution needs one identified Form 1099-R, owner, payer and positive taxable box 2a",
     );
   }
-  validateIraRolloverEvidence(item);
+  validateIraRolloverEvidence(item, taxYear);
   if (item.roth_owner_inventory_review &&
     (item.roth_activity_review || item.roth_distribution_evidence || item.prior_ira_basis !== undefined ||
       item.form8606_distribution_evidence || (item.rollover_code && !(item.rollover_code === "C" && item.roth_owner_inventory_review.current_conversion?.accounts.some(a => a.transfers.some(t => (t.issued_form1099r.completed_form4852_reference ?? t.issued_form1099r.source_document_reference) === item.source_document_reference)))) || item.exclude_4972 || item.qcd_full ||
@@ -1141,6 +1205,7 @@ function validateItem(item: R1099Item): void {
     throw new Error("Complete Roth inventory conflicts with another distribution treatment");
   }
   if (item.roth_activity_review) {
+    assertRothActivityTaxYear(item.roth_activity_review, taxYear);
     const facts = reviewedRothActivity(item.roth_activity_review);
     const payment = facts.review.payment;
     if (
@@ -1183,13 +1248,13 @@ function validateItem(item: R1099Item): void {
       item.box2a_taxable_amount !== undefined ||
       item.box2b_not_determined !== true ||
       !item.box13_date_of_payment ||
-      !/^2025-\d{2}-\d{2}$/.test(item.box13_date_of_payment) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(item.box13_date_of_payment) ||
       Number.isNaN(Date.parse(`${item.box13_date_of_payment}T00:00:00Z`)) ||
       new Date(`${item.box13_date_of_payment}T00:00:00Z`).toISOString()
           .slice(0, 10) !== item.box13_date_of_payment ||
       item.box13_date_of_payment <=
         evidence.contribution_receipt.received_on ||
-      !item.box13_date_of_payment.startsWith("2025-") ||
+      !item.box13_date_of_payment.startsWith(`${taxYear}-`) ||
       item.source_document_reference !==
         evidence.form1099r_source_document_reference ||
       item.recipient_ssn?.replace(/\D/g, "") !==
@@ -1292,8 +1357,8 @@ export function correctivePlanItems(items: R1099Items): R1099Items {
   );
 }
 
-// Disability-as-wages items: disability routing to line1a
-function disabilityWagesItems(items: R1099Items): R1099Items {
+// Disability pensions before minimum retirement age: Form 1040 line 1h.
+export function disabilityWagesItems(items: R1099Items): R1099Items {
   return items.filter(
     (item) =>
       item.disability_flag === true && item.disability_as_wages === true,
@@ -1363,7 +1428,7 @@ function form8606PartIInput(item: R1099Item) {
     distribution_evidence: evidence,
     filing_details: {
       owner: item.ts === "S" ? IraOwner.Spouse : IraOwner.Taxpayer,
-      prior_basis_documented_from_2024_form8606: true as const,
+      prior_basis_documented_from_prior_year_form8606: true as const,
       no_ira_distributions_or_conversions_confirmed: false,
     },
   };
@@ -1454,7 +1519,7 @@ function pensionF1040Fields(
   qcdAnnualLimit: number,
   psoExclusionLimit: number,
 ): Record<string, number> {
-  // Exclude disability-as-wages items from pension lines (they go to line1a)
+  // Exclude disability-as-wages items from pension lines (they go to line 1h)
   const disWagesSet = new Set(disabilityWagesItems(activeItems(items)));
   const active = pensionItems(activeItems(items)).filter((item) =>
     !disWagesSet.has(item)
@@ -1474,21 +1539,18 @@ function pensionF1040Fields(
   return fields;
 }
 
-// Build f1040 line1a output for disability-as-wages items
-function disabilityWagesF1040Fields(
+// Instructions for Form 1040 (2025), line 1h (page 25): disability pensions
+// shown on Form 1099-R before the employer's minimum retirement age.
+export function disabilityPensionEarnedIncome(
   items: R1099Items,
   qcdAnnualLimit: number,
   psoExclusionLimit: number,
-): Record<string, number> {
-  const disItems = disabilityWagesItems(activeItems(items));
-  if (disItems.length === 0) return {};
-  const total = disItems.reduce(
+): number {
+  return disabilityWagesItems(activeItems(items)).reduce(
     (sum, item) =>
       sum + effectiveTaxableAmount(item, qcdAnnualLimit, psoExclusionLimit),
     0,
   );
-  if (total <= 0) return {};
-  return { line1a_wages: total };
 }
 
 function correctivePlanF1040Fields(items: R1099Items): Record<string, number> {
@@ -1536,7 +1598,7 @@ function form8606RothInput(item: R1099Item) {
 // Form 5329 outputs: code 1 ordinarily routes early distributions here.
 // A reviewed, source-matched Form 8915-F qualified disaster distribution is
 // exempt and the exporter requires its actual Form 8915-F document.
-function form5329Outputs(items: R1099Items): NodeOutput[] {
+function form5329Outputs(items: R1099Items, taxYear: number): NodeOutput[] {
   const inventories = reconcileRothOwnerInventoryCopies(activeItems(items));
   const earlyItems = activeItems(items).filter(
     (item) =>
@@ -1564,9 +1626,11 @@ function form5329Outputs(items: R1099Items): NodeOutput[] {
       ? taxableTraditionalDistribution({
         ...form8606PartIInput(item),
         nondeductible_contributions: 0,
-      })
+      }, taxYear)
       // Form 5329 line 1 uses the early distribution included in income.
       // A confirmed IRA rollover removes its rolled portion from that amount.
+      : item.roth_prior_contribution_basis !== undefined
+      ? rothBasisTaxable(item)
       : isIraRollover(item)
       ? effectiveTaxableAmount(item, 0, 0)
       : item.box2a_taxable_amount ?? item.box1_gross_distribution;
@@ -2045,6 +2109,8 @@ class F1099rNode extends TaxNode<typeof inputSchema> {
   readonly outputNodes = new OutputNodes([
     f1040,
     agi_aggregator,
+    eitc,
+    f8812,
     form5329,
     form4972Elections,
     form8606,
@@ -2071,16 +2137,19 @@ class F1099rNode extends TaxNode<typeof inputSchema> {
         "TY2025 code P Form 1099-R needs prior-year correction and receipt-date review before current-year filing",
       );
     }
-    if (
-      ctx.taxYear !== 2025 &&
-      r1099s.some((item) => item.form8915f_treatment !== undefined)
-    ) {
-      throw new Error("Form 8915-F source treatment is limited to TY2025");
-    }
 
     // Cross-field validation
     for (const item of r1099s) {
-      validateItem(item);
+      validateItem(item, ctx.taxYear);
+    }
+    // One owner's prior-year Roth contribution basis is applied once.
+    const basisOwners = r1099s.filter((item) =>
+      item.roth_prior_contribution_basis !== undefined
+    ).map((item) => item.ts);
+    if (new Set(basisOwners).size !== basisOwners.length) {
+      throw new Error(
+        "Roth contribution basis needs one code J Form 1099-R per owner",
+      );
     }
     const corrective = correctivePlanItems(r1099s);
     const stateLocalWithholding = activeItems(r1099s).reduce(
@@ -2088,17 +2157,18 @@ class F1099rNode extends TaxNode<typeof inputSchema> {
         sum + (item.box14_state_tax ?? 0) + (item.box17_local_tax ?? 0),
       0,
     );
+    // Code 8: corrective distributions taxable in the return year (2025 and
+    // 2026 Instructions for Forms 1099-R and 5498, box 7 code 8).
     if (
       corrective.length > 0 &&
-      (ctx.taxYear !== 2025 ||
-        new Set(corrective.map((item) => item.source_document_reference))
-            .size !== corrective.length)
+      new Set(corrective.map((item) => item.source_document_reference))
+          .size !== corrective.length
     ) {
       throw new Error(
-        "TY2025 corrective plan distributions need distinct Form 1099-R source references",
+        "Corrective plan distributions need distinct Form 1099-R source references",
       );
     }
-    assertIraRolloverEvidence(r1099s);
+    assertIraRolloverEvidence(r1099s, ctx.taxYear);
 
     const outputs: NodeOutput[] = [
       ...(stateLocalWithholding > 0
@@ -2122,13 +2192,17 @@ class F1099rNode extends TaxNode<typeof inputSchema> {
       cfg.qcdAnnualLimit,
       cfg.psoExclusionLimit,
     );
-    // Disability-as-wages fields
-    const disWagesFields = disabilityWagesF1040Fields(
-      r1099s,
-      cfg.qcdAnnualLimit,
-      cfg.psoExclusionLimit,
+    const disabilityPension = Math.max(
+      0,
+      disabilityPensionEarnedIncome(
+        r1099s,
+        cfg.qcdAnnualLimit,
+        cfg.psoExclusionLimit,
+      ),
     );
     const correctiveFields = correctivePlanF1040Fields(r1099s);
+    const line1h = disabilityPension +
+      (correctiveFields.line1h_other_earned ?? 0);
     // Withholding fields
     const withholdingFields = withholdingF1040Fields(r1099s);
 
@@ -2136,8 +2210,7 @@ class F1099rNode extends TaxNode<typeof inputSchema> {
     const f1040Fields: Partial<z.infer<typeof f1040["inputSchema"]>> = {
       ...iraFields,
       ...pensionFields,
-      ...disWagesFields,
-      ...correctiveFields,
+      ...(line1h > 0 ? { line1h_other_earned: line1h } : {}),
       ...withholdingFields,
     };
     if (r1099s.some(isPensionDirectRollover)) {
@@ -2158,7 +2231,6 @@ class F1099rNode extends TaxNode<typeof inputSchema> {
     // Route IRA/pension taxable amounts to AGI aggregator.
     // Only emit line4b_ira_taxable when > 0 to avoid accumulation conflicts with form8606,
     // which emits its own line4b_ira_taxable to agi_aggregator for items with prior_ira_basis.
-    // Also route disability-as-wages (line1a_wages) so AGI is computed correctly.
     const agiFields: Partial<z.infer<typeof agi_aggregator["inputSchema"]>> =
       {};
     if ((iraFields.line4b_ira_taxable ?? 0) > 0) {
@@ -2167,11 +2239,18 @@ class F1099rNode extends TaxNode<typeof inputSchema> {
     if (pensionFields.line5b_pension_taxable !== undefined) {
       agiFields.line5b_pension_taxable = pensionFields.line5b_pension_taxable;
     }
-    if ((disWagesFields.line1a_wages ?? 0) > 0) {
-      agiFields.line1a_wages = disWagesFields.line1a_wages;
-    }
-    if ((correctiveFields.line1h_other_earned ?? 0) > 0) {
-      agiFields.line1h_other_earned = correctiveFields.line1h_other_earned;
+    if (line1h > 0) agiFields.line1h_other_earned = line1h;
+    // Pub. 596 (2025) Rule 7, Disability Benefits: employer disability
+    // retirement benefits are earned income until minimum retirement age.
+    // 2025 Schedule 8812 instructions, Earned Income Chart — Line 18a: earned
+    // income starts from Form 1040 line 1z, which includes line 1h.
+    if (disabilityPension > 0) {
+      outputs.push(this.outputNodes.output(eitc, {
+        disability_pension_earned_income: disabilityPension,
+      }));
+      outputs.push(this.outputNodes.output(f8812, {
+        auto_disability_pension_earned_income: disabilityPension,
+      }));
     }
     if (Object.keys(agiFields).length > 0) {
       outputs.push(
@@ -2185,7 +2264,7 @@ class F1099rNode extends TaxNode<typeof inputSchema> {
     }
 
     // Secondary form outputs
-    outputs.push(...form5329Outputs(r1099s));
+    outputs.push(...form5329Outputs(r1099s, ctx.taxYear));
     outputs.push(...form4972Outputs(r1099s));
     outputs.push(...form8606Outputs(r1099s));
 

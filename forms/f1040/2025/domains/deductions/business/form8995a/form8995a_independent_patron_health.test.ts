@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { assert, assertEquals, assertRejects } from "@std/assert";
 import { independentPatronHealthFixtures } from "../../../../pdf/reviews/general/composed-returns/review-independent-patron-health.fixture.ts";
 import { f1040_2025 } from "../../../../index.ts";
@@ -43,8 +46,8 @@ const ownedExpected = [
   ]],
   [[6000, 0], [133403, 167283], [105318, 104552], [9479, 9410], [17202, 24047]],
 ];
-Deno.test("actual independent patron owner policies flow through7206, separate QBI and full return XSD/PDF", async () => {
-  const archive = await Deno.makeTempDir({
+test("actual independent patron owner policies flow through7206, separate QBI and full return XSD/PDF", async () => {
+  const archive = await sys.makeTempDir({
     prefix: "opentax-independent-patron-health-source-",
   });
   console.log("Health source archive:", archive);
@@ -84,7 +87,7 @@ Deno.test("actual independent patron owner policies flow through7206, separate Q
           0,
         ]);
         assert(
-          calculateIndependentPatronBusinesses(pending.form8995a).rows[n].input
+          calculateIndependentPatronBusinesses(pending.form8995a, 2025).rows[n].input
             .patron_filing_details!.w2_wages_allocable_to_qualified_payments >
             0,
         );
@@ -107,20 +110,20 @@ Deno.test("actual independent patron owner policies flow through7206, separate Q
       origins,
     );
     const xml = `${archive}/${index}.xml`;
-    await Deno.writeTextFile(xml, bundle.xml);
-    await Deno.writeFile(`${archive}/${index}.pdf`, pdf);
-    const child = await new Deno.Command("xmllint", {
+    await fs.writeFile(xml, bundle.xml);
+    await fs.writeFile(`${archive}/${index}.pdf`, pdf);
+    const child = await new sys.Command("xmllint", {
       args: [
         "--noout",
         "--schema",
-        ".state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+        "irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
         xml,
       ],
       stdout: "piped",
       stderr: "piped",
     }).output();
     assertEquals(child.code, 0, new TextDecoder().decode(child.stderr));
-    await Deno.writeTextFile(
+    await fs.writeFile(
       `${archive}/${index}.json`,
       JSON.stringify(
         {
@@ -138,7 +141,7 @@ Deno.test("actual independent patron owner policies flow through7206, separate Q
     );
   }
 });
-Deno.test("patron owner plans reject borrowed identity, income, halfSE, payments, deductions and filed conflicts", async () => {
+test("patron owner plans reject borrowed identity, income, halfSE, payments, deductions and filed conflicts", async () => {
   const fixture = independentPatronHealthFixtures()[0];
   const result = f1040_2025.executeReturn(fixture.inputs);
   assertEquals(result.diagnostics, []);
@@ -203,12 +206,12 @@ Deno.test("patron owner plans reject borrowed identity, income, halfSE, payments
   );
 });
 
-Deno.test("zero business Part II wages and property stay zero above the shared income threshold", () => {
+test("zero business Part II wages and property stay zero above the shared income threshold", () => {
   const fixture = independentPatronHealthFixtures()[1];
   const result = f1040_2025.executeReturn(fixture.inputs);
   assertEquals(result.diagnostics, []);
   const pending = buildPending(result.pending) as any;
-  const rows = calculateIndependentPatronBusinesses(pending.form8995a).rows;
+  const rows = calculateIndependentPatronBusinesses(pending.form8995a, 2025).rows;
   for (const row of rows) {
     assert(row.input.w2_wages! > 0);
     // This printed-line control exercises the same zero business under a
@@ -217,7 +220,7 @@ Deno.test("zero business Part II wages and property stay zero above the shared i
       ...row.input,
       taxable_income: 600000,
     };
-    const filed = calculateOneBusiness8995ALines(highIncome);
+    const filed = calculateOneBusiness8995ALines(highIncome, 2025);
     assertEquals([
       filed.line2,
       filed.line4,

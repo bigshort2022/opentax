@@ -1,3 +1,4 @@
+import { priorYearDepreciationTotal } from "../../../deductions/business/form4562/prior-year.ts";
 import { calculateCharitableNaturalResource } from "../../../../../inputs/deductions/charitable/f8283/natural-resource-source.ts";
 import { schedule1a } from "../../../deductions/additional/schedule1a/index.ts";
 import { form7206 } from "../../../adjustments/health/form7206/index.ts";
@@ -23,7 +24,6 @@ import { CONFIG_BY_YEAR } from "../../../../../config/index.ts";
 // ── TY2025 Constants ──────────────────────────────────────────────────────────
 
 // IRC §1402(b) — minimum net farm profit to owe SE tax
-const SE_TAX_THRESHOLD = 400;
 
 export * from "./model.ts";
 import {
@@ -44,8 +44,8 @@ function perItemOutputs(
 ): NodeOutput[] {
   const outputs: NodeOutput[] = [];
 
-  // Form 8995 (QBI): only when net profit > 0
-  if (netProfit > 0 || item.qbi_wotc_filing_review) {
+  // Form 8995 (QBI): a farm loss is QBI too and offsets other businesses.
+  if (netProfit !== 0 || item.qbi_wotc_filing_review) {
     outputs.push(output(form8995, {
       schedule_f_qbi_businesses: [{
         business_reference: item.farm_id,
@@ -90,6 +90,32 @@ class ScheduleFNode extends TaxNode<typeof inputSchema> {
   }
 
   compute(ctx: NodeContext, rawInput: z.infer<typeof inputSchema>): NodeResult {
+    // Prior-year assets become this activity's depreciation (Pub. 946,
+    // Appendix A); the finalized rows carry the deduction to every reader.
+    if (!rawInput.schedule_fs?.some((item) => item.prior_year_assets)) {
+      return this.computeRows(ctx, rawInput);
+    }
+    const schedule_fs = rawInput.schedule_fs.map((item) => {
+      if (!item.prior_year_assets) return item;
+      const { prior_year_assets: assets, ...rest } = item;
+      const { rows, total } = priorYearDepreciationTotal(assets, ctx.taxYear);
+      return {
+        ...rest,
+        line14_depreciation: (item.line14_depreciation ?? 0) + total,
+        prior_year_depreciation_rows: rows,
+      };
+    });
+    const result = this.computeRows(ctx, { ...rawInput, schedule_fs });
+    return {
+      ...result,
+      outputs: [
+        ...result.outputs,
+        { nodeType: this.nodeType, fields: { schedule_fs } },
+      ],
+    };
+  }
+
+  private computeRows(ctx: NodeContext, rawInput: z.infer<typeof inputSchema>): NodeResult {
     const cfg = CONFIG_BY_YEAR[ctx.taxYear];
     if (!cfg) throw new Error(`No f1040 config for year ${ctx.taxYear}`);
     const input = inputSchema.parse(rawInput);
@@ -117,13 +143,11 @@ class ScheduleFNode extends TaxNode<typeof inputSchema> {
         : (input.patron_filing_review || input.independent_patron_reviews)
         ? patronFiledBusinessLines("schedule_f", filedItems[index])
           .profit
-        : (ctx.taxYear === 2025
-          ? filedOwnedScheduleF(
-            filedItems[index],
-            input.farm_optional_method_elected === true,
-            reductions.get(input.schedule_fs[index].farm_id ?? "") ?? 0,
-          )?.profit
-          : undefined) ?? result.atRiskNet
+        : filedOwnedScheduleF(
+          filedItems[index],
+          input.farm_optional_method_elected === true,
+          reductions.get(input.schedule_fs[index].farm_id ?? "") ?? 0,
+        )?.profit ?? result.atRiskNet
     );
     const propertyNet = netProfits.reduce((sum, p) => sum + p, 0);
     const totalNetProfit = propertyNet;
@@ -192,7 +216,7 @@ class ScheduleFNode extends TaxNode<typeof inputSchema> {
     const qualified = filedItems.map((item, index) => ({
       item,
       profit: netProfits[index],
-    })).filter((row) => row.profit > 0 || row.item.qbi_wotc_filing_review);
+    })).filter((row) => row.profit !== 0 || row.item.qbi_wotc_filing_review);
     if (qualified.length) {
       outputs.push(output(form8995, {
         schedule_f_qbi_businesses: routed.filter((row) =>
@@ -217,14 +241,15 @@ class ScheduleFNode extends TaxNode<typeof inputSchema> {
       outputs.push(
         this.outputNodes.output(schedule_se, {
           owner_business_sources: input.schedule_fs.map((item, index) => {
-            if (!item.proprietor_recipient || !item.farm_id) {
+            if (!item.proprietor_recipient) {
               throw new Error(
                 "Joint Schedule SE needs each farm proprietor and source activity",
               );
             }
+            // Without a farm ID, the row's place identifies the activity.
             return {
               recipient: item.proprietor_recipient,
-              source_reference: item.farm_id,
+              source_reference: item.farm_id ?? `schedule_f_${index + 1}`,
               kind: "schedule_f",
               business_name: item.line_c_farm_name,
               ein: item.line_d_ein?.replace(/\D/g, ""),
@@ -261,8 +286,9 @@ class ScheduleFNode extends TaxNode<typeof inputSchema> {
         gross_farm_income: Math.max(0, grossFarmIncome),
         net_profit_schedule_f: line34NetFarmProfit,
       }));
-    } else if (totalNetProfit >= SE_TAX_THRESHOLD) {
-      // Schedule SE line 1a takes the net of all Schedule F activities.
+    } else if (totalNetProfit !== 0) {
+      // Schedule SE line 1a takes the signed net of all Schedule F activities;
+      // Schedule SE adds Schedule C before its line 4c $400 test.
       outputs.push(this.outputNodes.output(schedule_se, {
         net_profit_schedule_f: totalNetProfit,
       }));

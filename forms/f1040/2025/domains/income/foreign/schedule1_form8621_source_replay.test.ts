@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { buildExecutionPlan } from "../../../../../../core/runtime/planner.ts";
 import { execute } from "../../../../../../core/runtime/executor.ts";
@@ -27,7 +28,7 @@ function retained(item: Record<string, unknown>) {
   };
 }
 
-Deno.test("Schedule 1 Form 8621 source replay retains QEF, MTM, and section 1291 totals", () => {
+test("Schedule 1 Form 8621 source replay retains QEF, MTM, and section 1291 totals", () => {
   const base = {
     company_name: "Offshore Fund Ltd",
     company_ein_or_ref: "FUND001",
@@ -71,7 +72,7 @@ Deno.test("Schedule 1 Form 8621 source replay retains QEF, MTM, and section 1291
     "line8z_form8621_section1291",
   ] as const;
   for (const [index, pending] of holdings.entries()) {
-    assertSchedule1Form8621Source(pending);
+    assertSchedule1Form8621Source(pending, { taxYear: 2025, formType: "f1040" });
     const key = keys[index];
     const schedule1 = pending.schedule1 as Record<string, number>;
     assertThrows(
@@ -79,7 +80,7 @@ Deno.test("Schedule 1 Form 8621 source replay retains QEF, MTM, and section 1291
         assertSchedule1Form8621Source({
           ...pending,
           schedule1: { ...schedule1, [key]: schedule1[key] + 1 },
-        }),
+        }, { taxYear: 2025, formType: "f1040" }),
       Error,
       "differs from retained PFIC holdings",
     );
@@ -98,13 +99,13 @@ Deno.test("Schedule 1 Form 8621 source replay retains QEF, MTM, and section 1291
             item: { ...form.items[0].item, qef_ordinary_income: 2_001 },
           }],
         },
-      }),
+      }, { taxYear: 2025, formType: "f1040" }),
     Error,
     "differs from retained PFIC holdings",
   );
 });
 
-Deno.test("Schedule 1 Form 8621 income needs retained PFIC source at both exports", async () => {
+test("Schedule 1 Form 8621 income needs retained PFIC source at both exports", async () => {
   const result = execute(
     buildExecutionPlan(registry),
     registry,

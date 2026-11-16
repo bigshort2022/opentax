@@ -1,4 +1,3 @@
-import { unzipSync, zipSync } from "fflate";
 import { createHash } from "node:crypto";
 import type { FilerIdentity } from "../../../mef/header.ts";
 import { element, elements } from "../../../mef/xml.ts";
@@ -19,6 +18,19 @@ import {
   assertFilingResidencyReview,
   type FilingResidencyReview,
 } from "./residency-review.ts";
+import {
+  julianDay,
+  MefTestCd,
+  submissionManifestFindings,
+} from "./submission-manifest.ts";
+import { crc32, unzipEntries, zipEntries } from "./zip.ts";
+import { EnvelopeFact } from "../../../../../core/validation/predicates.ts";
+import {
+  type EnvelopeFacts,
+  processingDateFact,
+  type RulePrefixTally,
+  submissionEnvelopeReport,
+} from "../../../validation/business-rule-report.ts";
 
 const XML_DECLARATION = '<?xml version="1.0" encoding="UTF-8"?>\n';
 const encoder = new TextEncoder();
@@ -30,7 +42,7 @@ export interface MefSubmissionArchiveOptions {
   readonly residencyReview: FilingResidencyReview;
 }
 
-export interface MefSubmissionArchive {
+interface MefSubmissionArchiveContents {
   readonly submissionId: string;
   readonly fileName: string;
   readonly processingDate: Date;
@@ -39,6 +51,51 @@ export interface MefSubmissionArchive {
   readonly bundle: MefBundle;
   readonly filer: FilerIdentity;
   readonly residencyReview: FilingResidencyReview;
+  /** ATS returns (`general.ats_test_submission`) go to the IRS test environment. */
+  readonly testCd: MefTestCd;
+}
+
+export interface MefSubmissionArchive extends MefSubmissionArchiveContents {
+  /** The R0000, X0000, T0000 and STATE rules run on these bytes, by prefix. */
+  readonly envelopeRules: RulePrefixTally;
+}
+
+/** The transmitter's A2A identity for the T0000 Message ID rules. */
+export interface MefTransmitter {
+  readonly etin: string;
+  readonly messageId: string;
+}
+
+/** Reject the archive when MeF's submission, XML or transmission rules would. */
+function assertEnvelopeRules(
+  archive: MefSubmissionArchiveContents,
+  facts: EnvelopeFacts,
+): RulePrefixTally {
+  // The envelope rules read the emitted XML; pending supplies only the
+  // Form 1040 filing status and ATS flag.
+  const { report, byPrefix } = submissionEnvelopeReport(
+    { f1040: archive.bundle.pending.f1040 ?? {} },
+    archive.filer,
+    archive.bundle.xml,
+    {
+      [EnvelopeFact.SubmissionZip]: archive.bytes,
+      [EnvelopeFact.ProcessingDate]: processingDateFact(
+        archive.processingDate,
+      ),
+      ...facts,
+    },
+  );
+  const rejects = report.entries.filter((entry) =>
+    entry.severity === "reject" || entry.severity === "reject_and_stop"
+  );
+  if (rejects.length > 0) {
+    throw new Error(
+      `MeF submission fails ${
+        rejects.map((entry) => entry.ruleNumber).join(", ")
+      }: ${rejects[0].message}`,
+    );
+  }
+  return byPrefix;
 }
 
 export interface MefTransmissionSubmission {
@@ -49,6 +106,7 @@ export interface MefTransmissionSubmission {
 export interface MefTransmissionPackage {
   readonly sendSubmissionsRequestXml: string;
   readonly containerZipBytes: Uint8Array;
+  readonly testCd: MefTestCd;
 }
 
 function sameBytes(
@@ -61,22 +119,6 @@ function sameBytes(
 
 function sha256HexSync(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
-}
-
-const CRC32_TABLE = Uint32Array.from({ length: 256 }, (_, index) => {
-  let value = index;
-  for (let bit = 0; bit < 8; bit++) {
-    value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
-  }
-  return value >>> 0;
-});
-
-function crc32(bytes: Uint8Array): number {
-  let value = 0xffffffff;
-  for (const byte of bytes) {
-    value = CRC32_TABLE[(value ^ byte) & 0xff] ^ (value >>> 8);
-  }
-  return (value ^ 0xffffffff) >>> 0;
 }
 
 /** Check physical ZIP entries and decoded payloads before filing. */
@@ -204,7 +246,7 @@ export function zipDirectoryEntryCount(
   return undefined;
 }
 
-function assertPreparedBundleDigests(archive: MefSubmissionArchive): void {
+function assertPreparedBundleDigests(archive: MefSubmissionArchiveContents): void {
   const { bundle } = archive;
   const attachmentNames = bundle.attachments.map((item) => item.fileName);
   const digestNames = Object.keys(bundle.attachmentSha256ByFileName);
@@ -228,7 +270,9 @@ function assertPreparedBundleDigests(archive: MefSubmissionArchive): void {
   }
 }
 
-function assertPreparedArchiveContents(archive: MefSubmissionArchive): void {
+function assertPreparedArchiveContents(
+  archive: MefSubmissionArchiveContents,
+): void {
   validateSubmissionIdentity(archive);
   assertPreparedBundleDigests(archive);
   archive.bundle.attachments.forEach(assertMefPdfEnvelope);
@@ -237,7 +281,7 @@ function assertPreparedArchiveContents(archive: MefSubmissionArchive): void {
   assertPreparedBundleProjection(archive.bundle, archive.filer);
   let entries: Record<string, Uint8Array>;
   try {
-    entries = unzipSync(archive.bytes);
+    entries = unzipEntries(archive.bytes);
   } catch {
     throw new Error("MeF transmission submission ZIP is unreadable");
   }
@@ -275,7 +319,9 @@ function assertPreparedArchiveContents(archive: MefSubmissionArchive): void {
     ?.[1];
   if (
     !efin || !tin || efin !== returnEfin || tin !== returnTin ||
-    archive.manifestXml !== buildManifestXml(archive.submissionId, efin, tin)
+    archive.manifestXml !==
+      buildManifestXml(archive.submissionId, efin, tin) ||
+    archive.testCd !== submissionTestCd(archive.bundle)
   ) {
     throw new Error(
       "MeF transmission submission manifest differs from its ID or prepared return",
@@ -296,9 +342,10 @@ function assertPreparedArchiveContents(archive: MefSubmissionArchive): void {
   );
 }
 
-function dayOfYear(date: Date): number {
-  const start = Date.UTC(date.getUTCFullYear(), 0, 1);
-  return Math.floor((date.getTime() - start) / 86_400_000) + 1;
+function submissionTestCd(bundle: MefBundle): MefTestCd {
+  return bundle.pending.f1040?.ats_test_submission === true
+    ? MefTestCd.Test
+    : MefTestCd.Production;
 }
 
 function validateSubmissionIdentity(options: MefSubmissionArchiveOptions): {
@@ -326,7 +373,7 @@ function validateSubmissionIdentity(options: MefSubmissionArchiveOptions): {
     throw new Error("MeF submission ZIP needs a valid processing date");
   }
   const expectedPrefix = efin + String(processingDate.getUTCFullYear()) +
-    String(dayOfYear(processingDate)).padStart(3, "0");
+    String(julianDay(processingDate)).padStart(3, "0");
   if (
     !/^[0-9]{13}[a-z0-9]{7}$/.test(submissionId) ||
     !submissionId.startsWith(expectedPrefix)
@@ -389,6 +436,18 @@ export async function buildMefSubmissionArchive(
   );
   await assertPreparedAttachmentManifest(bundle);
   const manifestXml = buildManifestXml(options.submissionId, efin, tin);
+  const findings = submissionManifestFindings(
+    manifestXml,
+    bundle.xml,
+    options.processingDate,
+  );
+  if (findings.length > 0) {
+    throw new Error(
+      `MeF submission manifest fails ${
+        findings.map((finding) => finding.ruleNumber).join(", ")
+      }: ${findings[0].message}`,
+    );
+  }
   const files: Record<string, Uint8Array> = {
     "manifest/manifest.xml": encoder.encode(manifestXml),
     "xml/submission.xml": encoder.encode(XML_DECLARATION + bundle.xml),
@@ -396,26 +455,34 @@ export async function buildMefSubmissionArchive(
   for (const attachment of bundle.attachments) {
     files[`attachment/${attachment.fileName}`] = attachment.bytes;
   }
-  const archive: MefSubmissionArchive = {
+  const archive: MefSubmissionArchiveContents = {
     submissionId: options.submissionId,
     fileName: `${options.submissionId}.zip`,
     processingDate: options.processingDate,
-    bytes: zipSync(files, { level: 6 }),
+    bytes: zipEntries(files, true),
     manifestXml,
     bundle,
     filer: options.filer,
     residencyReview,
+    testCd: submissionTestCd(bundle),
   };
   assertPreparedArchiveContents(archive);
-  return archive;
+  return { ...archive, envelopeRules: assertEnvelopeRules(archive, {}) };
 }
 
 /** Build the A2A SOAP body element and its uncompressed ZIP attachment. */
 export function buildMefTransmissionPackage(
   submissions: ReadonlyArray<MefTransmissionSubmission>,
+  transmitter?: MefTransmitter,
 ): MefTransmissionPackage {
   if (submissions.length < 1 || submissions.length > 100) {
     throw new Error("MeF transmission needs 1 to 100 submissions");
+  }
+  const testCd = submissions[0].archive.testCd;
+  if (submissions.some(({ archive }) => archive.testCd !== testCd)) {
+    throw new Error(
+      "MeF transmission cannot mix ATS test and production submissions",
+    );
   }
   const files: Record<string, Uint8Array> = {};
   const requestEntries: string[] = [];
@@ -452,8 +519,21 @@ export function buildMefTransmissionPackage(
   const list = elements("SubmissionDataList", requestEntries);
   const sendSubmissionsRequestXml = XML_DECLARATION +
     `<SendSubmissionsRequest xmlns="http://www.irs.gov/a2a/mef/MeFTransmitterService.xsd">${list}</SendSubmissionsRequest>`;
-  return {
-    sendSubmissionsRequestXml,
-    containerZipBytes: zipSync(files, { level: 0 }),
+  const containerZipBytes = zipEntries(files, false);
+  const transmissionFacts: EnvelopeFacts = {
+    [EnvelopeFact.TransmissionZip]: containerZipBytes,
+    [EnvelopeFact.TransmissionSubmissionIds]: submissions.map(({ archive }) =>
+      archive.submissionId
+    ),
+    ...(transmitter
+      ? {
+        [EnvelopeFact.MessageId]: transmitter.messageId,
+        [EnvelopeFact.TransmitterEtin]: transmitter.etin,
+      }
+      : {}),
   };
+  for (const { archive } of submissions) {
+    assertEnvelopeRules(archive, transmissionFacts);
+  }
+  return { sendSubmissionsRequestXml, containerZipBytes, testCd };
 }

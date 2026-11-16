@@ -1,4 +1,5 @@
-import { assertEquals } from "@std/assert";
+import { test } from "bun:test";
+import { assertEquals, assertThrows } from "@std/assert";
 import {
   calculateForm8396,
   calculateForm8396Line1,
@@ -28,11 +29,11 @@ const source = {
   interest_paid_to_related_person: false,
   certificate_is_reissued: false,
   nonspouse_coowner: false,
-  prior_2024_form8396: {
+  prior_year_form8396: {
     document_reference: "Filed 2024 Form 8396",
-    line14_2023_carryforward: 300,
-    line16_2022_carryforward: 100,
-    line17_2024_carryforward: 400,
+    line14_second_prior_year_carryforward: 300,
+    line16_third_prior_year_carryforward: 100,
+    line17_prior_year_carryforward: 400,
   },
 } as const;
 
@@ -40,7 +41,7 @@ function parsed() {
   return form8396SourceSchema.parse(source);
 }
 
-Deno.test("Form 8396 limits a high-rate current credit and keeps the three vintages", () => {
+test("Form 8396 limits a high-rate current credit and keeps the three vintages", () => {
   const lines = calculateForm8396(parsed(), 1_500);
   assertEquals(lines.line3, 2_000);
   assertEquals([lines.line4, lines.line5, lines.line6], [100, 300, 400]);
@@ -50,14 +51,14 @@ Deno.test("Form 8396 limits a high-rate current credit and keeps the three vinta
   assertEquals(lines.line14, 400);
   assertEquals(lines.line16, 300);
   assertEquals(lines.line17, 500);
-  assertEquals(lines.carryforwardTo2026, {
-    year2023: 300,
-    year2024: 400,
-    year2025: 500,
+  assertEquals(lines.carryforwardToNextYear, {
+    secondPriorYear: 300,
+    priorYear: 400,
+    currentYear: 500,
   });
 });
 
-Deno.test("Form 8396 does not apply the high-rate cap at exactly 20 percent", () => {
+test("Form 8396 does not apply the high-rate cap at exactly 20 percent", () => {
   assertEquals(
     calculateForm8396Line3(form8396SourceSchema.parse({
       ...source,
@@ -67,7 +68,7 @@ Deno.test("Form 8396 does not apply the high-rate cap at exactly 20 percent", ()
   );
 });
 
-Deno.test("Form 8396 allocates interest when the certified loan is smaller", () => {
+test("Form 8396 allocates interest when the certified loan is smaller", () => {
   const allocated = form8396SourceSchema.parse({
     ...source,
     interest_evidence: {
@@ -83,7 +84,7 @@ Deno.test("Form 8396 allocates interest when the certified loan is smaller", () 
   assertEquals(calculateForm8396Line3(allocated), 1_200);
 });
 
-Deno.test("Form 8396 carryforward-only claim has no current-year interest", () => {
+test("Form 8396 carryforward-only claim has no current-year interest", () => {
   const carryOnly = form8396SourceSchema.parse({
     ...source,
     current_year_claim: false,
@@ -93,7 +94,7 @@ Deno.test("Form 8396 carryforward-only claim has no current-year interest", () =
   assertEquals([lines.line1, lines.line3, lines.line9], [0, 0, 200]);
 });
 
-Deno.test("Form 8396 prorates a high-rate cap for a nonspouse co-owner", () => {
+test("Form 8396 prorates a high-rate cap for a nonspouse co-owner", () => {
   assertEquals(
     calculateForm8396Line3(form8396SourceSchema.parse({
       ...source,
@@ -104,22 +105,22 @@ Deno.test("Form 8396 prorates a high-rate cap for a nonspouse co-owner", () => {
   );
 });
 
-Deno.test("Form 8396 current credit is used before 2022, 2023, and 2024 carryforwards", () => {
+test("Form 8396 current credit is used before 2022, 2023, and 2024 carryforwards", () => {
   const lines = calculateForm8396(parsed(), 2_200);
   assertEquals(lines.line9, 2_200);
-  assertEquals(lines.carryforwardTo2026, {
-    year2023: 200,
-    year2024: 400,
-    year2025: 0,
+  assertEquals(lines.carryforwardToNextYear, {
+    secondPriorYear: 200,
+    priorYear: 400,
+    currentYear: 0,
   });
-  assertEquals(calculateForm8396(parsed(), 2_800).carryforwardTo2026, {
-    year2023: 0,
-    year2024: 0,
-    year2025: 0,
+  assertEquals(calculateForm8396(parsed(), 2_800).carryforwardToNextYear, {
+    secondPriorYear: 0,
+    priorYear: 0,
+    currentYear: 0,
   });
 });
 
-Deno.test("Form 8396 source routes its line 3 reduction and defers line 9 tax use", () => {
+test("Form 8396 source routes its line 3 reduction and defers line 9 tax use", () => {
   const result = form8396.compute(
     { taxYear: 2025, formType: "f1040" },
     parsed(),
@@ -147,7 +148,7 @@ Deno.test("Form 8396 source routes its line 3 reduction and defers line 9 tax us
   );
 });
 
-Deno.test("Form 8396 rejects unsupported or incomplete MCC claims", () => {
+test("Form 8396 rejects unsupported or incomplete MCC claims", () => {
   for (
     const invalid of [
       { ...source, mcc_rate: 0.05 },
@@ -166,7 +167,6 @@ Deno.test("Form 8396 rejects unsupported or incomplete MCC claims", () => {
         },
       },
       { ...source, nonspouse_coowner: true },
-      { ...source, certificate_issue_date: "2026-01-01" },
       {
         ...source,
         qualified_home_address_if_different: {
@@ -187,17 +187,17 @@ Deno.test("Form 8396 rejects unsupported or incomplete MCC claims", () => {
       },
       {
         ...source,
-        prior_2024_form8396: {
-          ...source.prior_2024_form8396,
-          line14_2023_carryforward: 0,
-          line16_2022_carryforward: 0,
-          line17_2024_carryforward: 0,
+        prior_year_form8396: {
+          ...source.prior_year_form8396,
+          line14_second_prior_year_carryforward: 0,
+          line16_third_prior_year_carryforward: 0,
+          line17_prior_year_carryforward: 0,
         },
       },
       {
         ...source,
-        prior_2024_form8396: {
-          ...source.prior_2024_form8396,
+        prior_year_form8396: {
+          ...source.prior_year_form8396,
           document_reference: "",
         },
       },
@@ -205,4 +205,35 @@ Deno.test("Form 8396 rejects unsupported or incomplete MCC claims", () => {
   ) {
     assertEquals(form8396SourceSchema.safeParse(invalid).success, false);
   }
+});
+
+// Draft 2026 Form 8396 (created 9/8/26): lines 4-6 take the 2023, 2024 and
+// 2025 carryforwards from lines 16, 14 and 17 of the 2025 Form 8396, and the
+// MCC is one issued for the return year or earlier.
+test("Form 8396 checks the MCC issue date against the return year", () => {
+  const issued2026 = form8396SourceSchema.parse({
+    ...source,
+    certificate_issue_date: "2026-01-01",
+  });
+  assertThrows(
+    () => form8396.compute({ taxYear: 2025, formType: "f1040" }, issued2026),
+    Error,
+    "issued by the 2025 tax year",
+  );
+  const result = form8396.compute(
+    { taxYear: 2026, formType: "f1040" },
+    issued2026,
+  );
+  assertEquals(
+    result.outputs.find((row) => row.nodeType === "schedule_a")
+      ?.fields.form8396_interest_credit_reduction,
+    2_000,
+  );
+  const lines = calculateForm8396(issued2026, 1_500);
+  assertEquals([lines.line4, lines.line5, lines.line6], [100, 300, 400]);
+  assertEquals(lines.carryforwardToNextYear, {
+    secondPriorYear: 300,
+    priorYear: 400,
+    currentYear: 500,
+  });
 });

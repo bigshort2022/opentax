@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import { assertForm8835BondSource } from "./bond-source.ts";
 import { calculateForm8835, EnergyType, itemSchema } from "./index.ts";
@@ -32,7 +33,7 @@ function fixture(proceeds = 12500) {
     ...bondFields(0, proceeds),
   });
 }
-Deno.test("f8835 bond review: cumulative financing, filed ratio and reduction cap", () => {
+test("f8835 bond review: cumulative financing, filed ratio and reduction cap", () => {
   for (
     const [proceeds, ratio, reduction] of [
       [10000, .10, 600],
@@ -43,7 +44,7 @@ Deno.test("f8835 bond review: cumulative financing, filed ratio and reduction ca
   ) {
     const f = fixture(proceeds);
     assertForm8835BondSource(f, true);
-    const l = calculateForm8835(f);
+    const l = calculateForm8835(f, 2025);
     assertEquals([l.line5a, l.line5d, l.line15], [
       ratio,
       reduction,
@@ -51,7 +52,7 @@ Deno.test("f8835 bond review: cumulative financing, filed ratio and reduction ca
     ]);
   }
 });
-Deno.test("f8835 bond review rejects incomplete, conflicting or misdated inventories", () => {
+test("f8835 bond review rejects incomplete, conflicting or misdated inventories", () => {
   const mutations: Array<(f: ReturnType<typeof fixture>) => void> = [
     (f) => {
       f.tax_exempt_bond_proceeds = 12500.001;
@@ -111,7 +112,7 @@ Deno.test("f8835 bond review rejects incomplete, conflicting or misdated invento
   for (const change of mutations) {
     const f = fixture();
     change(f);
-    assertThrows(() => calculateForm8835(itemSchema.parse(f)));
+    assertThrows(() => calculateForm8835(itemSchema.parse(f), 2025));
   }
   const unsourced = fixture();
   delete unsourced.tax_exempt_bond_source;

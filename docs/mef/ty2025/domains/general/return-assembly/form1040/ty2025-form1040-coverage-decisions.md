@@ -63,9 +63,8 @@ not tax-situation support. Form 2210's new regular native/PDF staging stays
 outside both registries: 67/0 focused, two standalone document XSDs and four
 viewed interactive PDF pages. Source/prior acceptance and final payment/
 penalty reconciliation remain open, with future 44–46 deferred. The
-[census](../../../../inventory/ty2025-xsd-document-root-census.md), [crosswalk](../../../../inventory/ty2025-unregistered-root-applicability.md),
-[conditional roots](../../../../inventory/ty2025-conditional-roots-refund-nol-penalty-methods.md) and
-[form audit](./ty2025-form1040-form-audit.md) now reflect that boundary; see
+[census](../../../../inventory/ty2025-xsd-document-root-census.md), [crosswalk](../../../../inventory/ty2025-unregistered-root-applicability.md)
+and [form audit](./ty2025-form1040-form-audit.md) now reflect that boundary; see
 [Form 2210 gap](../../../taxes/underpayment/form2210/ty2025-form2210-gap.md). No scope exclusion is added.
 Private replay: `form2210-inventory-reconciliation-20261008-v1/audit.json`.
 That historical 2,637-path observation is superseded by the current checkpoint below; its inventory check alone claimed no regression result.
@@ -75,7 +74,7 @@ Build-stage disposition queue updated 2026-10-03. This is the decision layer
 over the [registered-descriptor audit](./ty2025-form1040-form-audit.md) and the
 [211-root schema census](../../../../inventory/ty2025-xsd-document-root-census.md); it does not
 certify any filing route. The current descriptor and source-literal counts are
-recorded in those inventories and the [product board](../../../../../../../product_board.md).
+recorded in those inventories.
 They measure different things: some descriptors are statements, and a literal
 is neither registration nor valid, complete output. The ordered
 [unregistered-root reviews](../../../../inventory/ty2025-unregistered-root-applicability.md) cover
@@ -156,7 +155,7 @@ statuses have since been reconciled with the current tree.
 | Source-only or separate workflow candidate  | Some K-1, payment, entity and information roots may belong to another filer or workflow.                                                                                                                                                                                                                                                                        | The current return's attachment rule must be confirmed individually. Neither schema presence nor nonregistration proves an exclusion.                                                                      |
 
 Static boundary review on 2026-10-01 found that the public `general` input
-rejects an explicit `dual_status_return_2025` before calculation, the TY2025
+rejects an explicit `dual_status_return` before calculation, the TY2025
 MeF builder rejects a return type other than `1040` or a year other than 2025,
 and both MeF and PDF export run the final-header dual-status guard. Existing
 focused rejection fixtures cover the public input, prepared return, MeF, and

@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import { k1_trust } from "../../../income/rental-passthrough/k1_trust/index.ts";
 import { f3468 } from "./index.ts";
@@ -6,10 +7,11 @@ import {
   trustK1PartVFixture,
   trustPartVStatementFixture,
 } from "./trust-part-v.fixture.ts";
+import { assertTrustPartVReturnYear } from "./trust-part-v-source.ts";
 
 const context = { taxYear: 2025, formType: "f1040" };
 
-Deno.test("trust K-1 box 14 code M routes reviewed property facts to Form 3468", () => {
+test("trust K-1 box 14 code M routes reviewed property facts to Form 3468", () => {
   const result = k1_trust.compute(
     context,
     k1_trust.inputSchema.parse(trustK1PartVFixture),
@@ -22,7 +24,7 @@ Deno.test("trust K-1 box 14 code M routes reviewed property facts to Form 3468",
   assertEquals(result.outputs.some((row) => row.nodeType === "f3800"), false);
 });
 
-Deno.test("Form 3468 derives 30% credit and sends it to Form 3800 line 1v source", () => {
+test("Form 3468 derives 30% credit and sends it to Form 3800 line 1v source", () => {
   const result = f3468.compute(
     context,
     f3468.inputSchema.parse(trustForm3468PartVFixture),
@@ -42,7 +44,7 @@ Deno.test("Form 3468 derives 30% credit and sends it to Form 3800 line 1v source
   }]);
 });
 
-Deno.test("Form 3468 rejects a changed review packet and direct-credit mix", () => {
+test("Form 3468 rejects a changed review packet and direct-credit mix", () => {
   const { not_section48d_lessee_confirmed: _missing, ...withoutLesseeReview } =
     trustPartVStatementFixture;
   assertThrows(() =>
@@ -84,7 +86,7 @@ Deno.test("Form 3468 rejects a changed review packet and direct-credit mix", () 
   );
 });
 
-Deno.test("K-1 box 13 code M cannot be relabeled as clean electricity", () => {
+test("K-1 box 13 code M cannot be relabeled as clean electricity", () => {
   assertThrows(() =>
     k1_trust.compute(
       context,
@@ -95,5 +97,30 @@ Deno.test("K-1 box 13 code M cannot be relabeled as clean electricity", () => {
         }],
       }),
     )
+  );
+});
+
+// Instructions for Form 3468 (2026), Part V: construction begun after 2025
+// needs a material assistance cost ratio (Notice 2026-15).
+test("trust Part V reads the return year's service and construction dates", () => {
+  const in2026 = {
+    ...trustPartVStatementFixture,
+    construction_started_on: "2025-06-01",
+    placed_in_service_on: "2026-03-01",
+  };
+  assertTrustPartVReturnYear(in2026, 2026);
+  assertThrows(
+    () => assertTrustPartVReturnYear(trustPartVStatementFixture, 2026),
+    Error,
+    "needs a 2026 service date",
+  );
+  assertThrows(
+    () =>
+      assertTrustPartVReturnYear(
+        { ...in2026, construction_started_on: "2026-01-15" },
+        2026,
+      ),
+    Error,
+    "material assistance cost ratio",
   );
 });

@@ -1,3 +1,5 @@
+import { test } from "bun:test";
+import * as sys from "../../../../../../scripts/support/sys.ts";
 import { assertEquals, assertRejects } from "@std/assert";
 import { execute } from "../../../../../../core/runtime/executor.ts";
 import { buildExecutionPlan } from "../../../../../../core/runtime/planner.ts";
@@ -12,11 +14,11 @@ const fixture = pdfReviewFixtures.find((item) =>
   item.id === "single-form8814-child-gain-with-schedule-d"
 )!;
 const xsd = new URL(
-  "../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+  "../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
   import.meta.url,
 ).pathname;
 
-Deno.test("Schedule 1 line 8z Form 8814 amount replays retained child election at both exports", async () => {
+test("Schedule 1 line 8z Form 8814 amount replays retained child election at both exports", async () => {
   const result = execute(
     buildExecutionPlan(registry),
     registry,
@@ -45,7 +47,7 @@ Deno.test("Schedule 1 line 8z Form 8814 amount replays retained child election a
   });
   assertEquals(positive.xml.includes("FORM 8814"), true);
   const pdf = await buildPdfBytes(pending, fixture.filer);
-  const extracted = new Deno.Command("pdftotext", {
+  const extracted = new sys.Command("pdftotext", {
     args: ["-", "-"],
     stdin: "piped",
     stdout: "piped",
@@ -62,13 +64,13 @@ Deno.test("Schedule 1 line 8z Form 8814 amount replays retained child election a
   );
   let xsdAvailable = true;
   try {
-    Deno.statSync(xsd);
+    sys.statSync(xsd);
   } catch {
     xsdAvailable = false;
   }
   assertEquals(xsdAvailable, true, "Missing verification prerequisite: complete local XSD");
   if (xsdAvailable) {
-    const validator = new Deno.Command("xmllint", {
+    const validator = new sys.Command("xmllint", {
       args: ["--noout", "--schema", xsd, "-"],
       stdin: "piped",
       stdout: "piped",

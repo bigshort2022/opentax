@@ -1,3 +1,4 @@
+import { mefTaxYear } from "../../../../mef/support/year-config.ts";
 import { assertDependentKiddieTaxFamilyReturn } from "../../../../../nodes/inputs/taxes/investments/f8615/dependent-source-review.ts";
 import { assertW2ArcherContributionSources } from "../../../../domains/adjustments/health/form8853/form8853_contributions_reconciliation.ts";
 import { assertEducationIncomeSource } from "../../../../../nodes/inputs/income/other/education_income/index.ts";
@@ -21,14 +22,19 @@ import { assertOtherFormsWithholding } from "../../../../domains/payments/withho
 import { assertPresidentialCampaignSource } from "../../../../domains/general/return-assembly/presidential-campaign-source.ts";
 import { retainedActcOptOut } from "../../../../domains/credits/earned-income/actc-opt-out-source.ts";
 import { retainedEicOptOut } from "../../../../domains/credits/earned-income/earned-income/eic-opt-out-source.ts";
-import { assertLine1hSupportedSource } from "../../../../domains/income/other/line1h-source.ts";
-import { assertIdentified1099IntOwner } from "../../../../domains/income/other/f1099i/f1099int-owner-reconciliation.ts";
-import { assertPositive1099OidOwner } from "../../../../domains/income/other/f1099o/f1099oid-owner-reconciliation.ts";
-import { assertPositive1099DivOwner } from "../../../../domains/income/other/f1099d/f1099div-owner-reconciliation.ts";
+import {
+  assertLine1hSupportedSource,
+  retainedClergyExcessAllowance,
+  retainedDisabilityPension,
+} from "../../../../domains/income/other/line1h-source.ts";
+import { assertFileableClergyReturn } from "../../../../domains/income/wages/clergy/clergy_source.ts";
+import { assertIdentified1099IntOwner } from "../../../../domains/income/investments/f1099int/f1099int-owner-reconciliation.ts";
+import { assertPositive1099OidOwner } from "../../../../domains/income/investments/f1099oid/f1099oid-owner-reconciliation.ts";
+import { assertPositive1099DivOwner } from "../../../../domains/income/investments/f1099div/f1099div-owner-reconciliation.ts";
 import { assertPositive1099GOwner } from "../../../../domains/income/other/f1099g/f1099g-owner-reconciliation.ts";
-import { assertPositive1099MOwner } from "../../../../domains/income/other/f1099m/f1099m-owner-reconciliation.ts";
-import { assertPositive1099NecOwner } from "../../../../domains/income/other/f1099n/f1099nec-owner-reconciliation.ts";
-import { assertPositive1099PatrOwner } from "../../../../domains/income/other/f1099p/f1099patr-owner-reconciliation.ts";
+import { assertPositive1099MOwner } from "../../../../domains/income/business/f1099m/f1099m-owner-reconciliation.ts";
+import { assertPositive1099NecOwner } from "../../../../domains/income/business/f1099nec/f1099nec-owner-reconciliation.ts";
+import { assertPositive1099PatrOwner } from "../../../../domains/income/business/f1099patr/f1099patr-owner-reconciliation.ts";
 import { assertDirectCapitalGainDistributionSource } from "../../../../domains/income/investments/line7a-source-reconciliation.ts";
 import { assertNoUnsupportedDeceasedReturn } from "../../../../domains/general/return-assembly/filer-source-reconciliation.ts";
 import { assertHohQualifyingChildSource } from "../../../../domains/general/return-assembly/filing-status/hoh-qualifying-child-source.ts";
@@ -621,6 +627,12 @@ const fields: ReadonlyArray<PdfFieldEntry> = [
     pdfField: "topmostSubform[0].Page2[0].f2_23[0]",
   },
   {
+    // Line 27b, "Clergy filing Schedule SE" (2025 AcroForm c2_12).
+    kind: "checkbox",
+    domainKey: "print_line27b_clergy",
+    pdfField: "topmostSubform[0].Page2[0].c2_12[0]",
+  },
+  {
     kind: "checkbox",
     domainKey: "print_do_not_claim_eic",
     pdfField: "topmostSubform[0].Page2[0].c2_13[0]",
@@ -699,16 +711,24 @@ const fields: ReadonlyArray<PdfFieldEntry> = [
 function line1hType(
   fields: Record<string, unknown>,
   allPending: Record<string, Record<string, unknown>>,
+  taxYear: number,
 ):
   | "FEC"
   | "EXCESS DEFERRALS"
   | "CORRECTIVE DISTRIBUTION"
+  | "DISABILITY PENSION"
+  | "EXCESS ALLOWANCE"
   | "FEC + EXCESS DEFERRALS"
   | undefined {
   const fecSource = allPending.fec;
   const physicalSource = allPending.form2555?.filing_details;
   const sources: Array<{
-    type: "FEC" | "EXCESS DEFERRALS" | "CORRECTIVE DISTRIBUTION";
+    type:
+      | "FEC"
+      | "EXCESS DEFERRALS"
+      | "CORRECTIVE DISTRIBUTION"
+      | "DISABILITY PENSION"
+      | "EXCESS ALLOWANCE";
     amount: number;
   }> = [];
   if (fecSource !== undefined) {
@@ -729,6 +749,7 @@ function line1hType(
   if (allPending.w2 !== undefined) {
     const excess = codeDExcessDeferral(
       w2InputSchema.parse(allPending.w2).w2s,
+      taxYear,
     );
     if (excess.amount > 0) {
       sources.push({ type: "EXCESS DEFERRALS", amount: excess.amount });
@@ -753,7 +774,7 @@ function line1hType(
           items.length
       ) {
         throw new Error(
-          "Form 1040 PDF line 1h corrective distributions need identified 2025 Form 1099-R sources",
+          `Form 1040 PDF line 1h corrective distributions need identified ${taxYear} Form 1099-R sources`,
         );
       }
       sources.push({
@@ -764,6 +785,15 @@ function line1hType(
         ),
       });
     }
+  }
+  const disability = retainedDisabilityPension(allPending, taxYear);
+  if (disability > 0) {
+    sources.push({ type: "DISABILITY PENSION", amount: disability });
+  }
+  // Pub 517: "On the dotted line next to line 1h, enter 'Excess allowance'."
+  const clergyExcess = retainedClergyExcessAllowance(allPending);
+  if (clergyExcess > 0) {
+    sources.push({ type: "EXCESS ALLOWANCE", amount: clergyExcess });
   }
   if (sources.length === 0) return undefined;
   const mixedFecExcess = sources.length === 2 &&
@@ -794,14 +824,16 @@ function line1hType(
   return mixedFecExcess ? "FEC + EXCESS DEFERRALS" : sources[0].type;
 }
 
-export const irs1040Pdf: PdfFormDescriptor = {
+/** Form 1040 projection and guards for the return year; the 2025 layout. */
+export function form1040PdfFor(taxYear: number): PdfFormDescriptor {
+  return {
   pendingKey: "f1040",
   // Year-pinned: /pub/irs-pdf/f1040.pdf silently changes revision each filing
   // season; this module is the 2025 form and must always fetch the 2025 PDF.
   pdfUrl: "https://www.irs.gov/pub/irs-prior/f1040--2025.pdf",
   projectFields(fields, allPending) {
-    assertHohQualifyingChildSource(fields, allPending);
-    assertQssNonclaimedChildSource(fields, allPending);
+    assertHohQualifyingChildSource(fields, allPending, taxYear);
+    assertQssNonclaimedChildSource(fields, allPending, taxYear);
     const hasForm8888 = allPending.f8888 !== undefined;
     if (
       hasForm8888 &&
@@ -818,7 +850,7 @@ export const irs1040Pdf: PdfFormDescriptor = {
     assertPositive1099MOwner(fields, allPending);
     assertPositive1099NecOwner(fields, allPending);
     assertPositive1099PatrOwner(fields, allPending);
-    assertJointDependentRefundSource(fields, allPending);
+    assertJointDependentRefundSource(fields, allPending, taxYear);
     assertNoUnsupportedDeceasedReturn(
       fields,
       allPending?.general as Record<string, unknown> | undefined,
@@ -826,8 +858,9 @@ export const irs1040Pdf: PdfFormDescriptor = {
     assertLine36EstimatedTaxSource(fields, allPending);
     assertPresidentialCampaignSource(fields, allPending);
     assertReturnWideArithmetic(fields);
-    const printLine1hType = line1hType(fields, allPending);
-    assertLine1hSupportedSource(fields, allPending);
+    const clergy = assertFileableClergyReturn(allPending, taxYear);
+    const printLine1hType = line1hType(fields, allPending, taxYear);
+    assertLine1hSupportedSource(fields, taxYear, allPending);
     assertDirectCapitalGainDistributionSource(fields, allPending);
     const standard = fields.line12a_standard_deduction;
     const itemized = fields.line12e_itemized_deductions;
@@ -847,6 +880,7 @@ export const irs1040Pdf: PdfFormDescriptor = {
     const printFormerSpouseEstimatedTaxSsn = assertEstimatedPaymentLine26(
       fields,
       allPending,
+      taxYear,
     );
     assertOtherFormsWithholding(fields, allPending);
     assertReturnScheduleJoins(fields, allPending);
@@ -888,7 +922,7 @@ export const irs1040Pdf: PdfFormDescriptor = {
         (dep.ssn ?? dep.itin ?? dep.atin)?.replaceAll("-", "");
       printedDependents[`dependent_${i}_relationship`] = dep.relationship;
       printedDependents[`dependent_${i}_home`] =
-        dependentLivedWithFilerOverHalfYear(dep);
+        dependentLivedWithFilerOverHalfYear(dep, taxYear);
       printedDependents[`dependent_${i}_home_us`] =
         dep.lived_in_us_over_half_year;
       printedDependents[`dependent_${i}_full_time_student`] =
@@ -922,7 +956,7 @@ export const irs1040Pdf: PdfFormDescriptor = {
           "Form 1040 PDF line 5c needs valid Form 1099-R source facts",
         );
       }
-      assertIraRolloverEvidence(source.data.f1099rs);
+      assertIraRolloverEvidence(source.data.f1099rs, taxYear);
       if (rollover !== source.data.f1099rs.some(isPensionDirectRollover)) {
         throw new Error(
           "Form 1040 PDF line 5c rollover does not match the payer-reported Form 1099-R code G",
@@ -1037,6 +1071,9 @@ export const irs1040Pdf: PdfFormDescriptor = {
         ? ty2025IrsCountryName(fields.address_foreign_country)
         : undefined,
       print_line1h_type: printLine1hType,
+      print_line27b_clergy: clergy?.form1040Line27bClergy === true
+        ? true
+        : undefined,
       print_do_not_claim_actc: retainedActcOptOut(
         allPending.f8812,
         fields.line28_actc,
@@ -1282,4 +1319,7 @@ export const irs1040Pdf: PdfFormDescriptor = {
       pdfField: "topmostSubform[0].Page1[0].Address_ReadOrder[0].f1_27[0]",
     },
   ],
-};
+  };
+}
+
+export const irs1040Pdf: PdfFormDescriptor = form1040PdfFor(mefTaxYear());

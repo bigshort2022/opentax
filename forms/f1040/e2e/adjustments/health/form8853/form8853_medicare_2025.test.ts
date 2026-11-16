@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../scripts/support/sys.ts";
 import {
   centsLedger,
   deathLedger,
@@ -27,13 +30,12 @@ import { form8853 as native } from "../../../../2025/mef/forms/adjustments/healt
 import { extractFilerIdentity } from "../../../../mef/filer.ts";
 import {
   calculateMedicareLedger,
-  type MedicareDistributionLedger,
 } from "../../../../nodes/intermediate/forms/adjustments/health/form8853/medicare_distributions.ts";
 
-Deno.test("Medicare worksheet uses balance less60% deductible without reducing taxable income", () => {
-  assertEquals(calculateMedicareLedger(priorBalanceLedger).worksheet, {
+test("Medicare worksheet uses balance less60% deductible without reducing taxable income", () => {
+  assertEquals(calculateMedicareLedger(priorBalanceLedger, 2025).worksheet, {
     line1: 8000,
-    hadAccountAtEnd2024: true,
+    hadAccountAtPriorYearEnd: true,
     line2: 10000,
     line3: 8000,
     line4: 4800,
@@ -41,9 +43,9 @@ Deno.test("Medicare worksheet uses balance less60% deductible without reducing t
     line6: 2800,
     line7: 1400,
   });
-  assertEquals(calculateMedicareLedger(partialLedger).worksheet, {
+  assertEquals(calculateMedicareLedger(partialLedger, 2025).worksheet, {
     line1: 3000,
-    hadAccountAtEnd2024: true,
+    hadAccountAtPriorYearEnd: true,
     line2: 10000,
     line3: 12000,
     line4: 7200,
@@ -51,29 +53,29 @@ Deno.test("Medicare worksheet uses balance less60% deductible without reducing t
     line6: 200,
     line7: 100,
   });
-  assertEquals(calculateMedicareLedger(partialLedger).line12, 9000);
+  assertEquals(calculateMedicareLedger(partialLedger, 2025).line12, 9000);
   const zeroPenalty = structuredClone(priorBalanceLedger);
-  if (!zeroPenalty.prior_year?.had_account_at_end_2024) {
+  if (!zeroPenalty.prior_year?.had_account_at_prior_year_end) {
     throw new Error("fixture prior-year kind");
   }
-  zeroPenalty.prior_year.balance_on_2024_12_31 = 20000;
-  assertEquals(calculateMedicareLedger(zeroPenalty).line13b, 0);
-  assertEquals(calculateMedicareLedger(zeroPenalty).line13a, false);
+  zeroPenalty.prior_year.balance_at_prior_year_end = 20000;
+  assertEquals(calculateMedicareLedger(zeroPenalty, 2025).line13b, 0);
+  assertEquals(calculateMedicareLedger(zeroPenalty, 2025).line13a, false);
 });
-Deno.test("Medicare worksheet and source rejects absent review, duplicate distributions and missing holder bills", () => {
+test("Medicare worksheet and source rejects absent review, duplicate distributions and missing holder bills", () => {
   assertThrows(
-    () => calculateMedicareLedger({ ...noPriorLedger, prior_year: undefined }),
+    () => calculateMedicareLedger({ ...noPriorLedger, prior_year: undefined }, 2025),
     Error,
-    "2024 account review",
+    "prior-year account review",
   );
   const duplicate = structuredClone(noPriorLedger);
   if (duplicate.source.kind !== "normal") throw new Error("fixture source");
   duplicate.source.distributions.push(duplicate.source.distributions[0]);
-  assertThrows(() => calculateMedicareLedger(duplicate), Error, "duplicate");
+  assertThrows(() => calculateMedicareLedger(duplicate, 2025), Error, "duplicate");
   duplicate.source.distributions.pop();
   duplicate.source.distributions[0].qualified_expense_source_references = [];
   assertThrows(
-    () => calculateMedicareLedger(duplicate),
+    () => calculateMedicareLedger(duplicate, 2025),
     Error,
     "holder medical sources",
   );
@@ -91,7 +93,7 @@ for (
     ["nonspouse death transfer", deathLedger, 4000, 0],
   ] as const
 ) {
-  Deno.test(`Medicare MSA ${name} source→1040→native XSD and filled PDF`, async () => {
+  test(`Medicare MSA ${name} source→1040→native XSD and filled PDF`, async () => {
     const result = execute(
       buildExecutionPlan(registry),
       registry,
@@ -109,7 +111,7 @@ for (
     assertEquals(result.pending.f1040?.line23_other_taxes ?? 0, tax);
     const filer = extractFilerIdentity(result.pending.f1040);
     assertExists(filer);
-    const lines = calculateMedicareLedger(ledger);
+    const lines = calculateMedicareLedger(ledger, 2025);
     const xml = buildMefXml(buildPending(result.pending), filer);
     assertStringIncludes(
       xml,
@@ -137,14 +139,14 @@ for (
       lines.deathTransfer,
     );
     const xsd = new URL(
-      "../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+      "../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
       import.meta.url,
     ).pathname;
-    const xmlPath = await Deno.makeTempFile({ suffix: ".xml" });
-    const pdfPath = await Deno.makeTempFile({ suffix: ".pdf" });
+    const xmlPath = await sys.makeTempFile({ suffix: ".xml" });
+    const pdfPath = await sys.makeTempFile({ suffix: ".pdf" });
     try {
-      await Deno.writeTextFile(xmlPath, xml);
-      const validation = await new Deno.Command("xmllint", {
+      await fs.writeFile(xmlPath, xml);
+      const validation = await new sys.Command("xmllint", {
         args: ["--noout", "--schema", xsd, xmlPath],
         stderr: "piped",
       }).output();
@@ -153,8 +155,8 @@ for (
         0,
         new TextDecoder().decode(validation.stderr),
       );
-      await Deno.writeFile(pdfPath, await buildPdfBytes(result.pending, filer));
-      const output = await new Deno.Command("pdftotext", {
+      await fs.writeFile(pdfPath, await buildPdfBytes(result.pending, filer));
+      const output = await new sys.Command("pdftotext", {
         args: ["-layout", pdfPath, "-"],
         stdout: "piped",
         stderr: "piped",
@@ -185,8 +187,8 @@ for (
         ledger.owner === "spouse" ? "222334444" : "111223333",
       );
     } finally {
-      await Deno.remove(xmlPath);
-      await Deno.remove(pdfPath);
+      await sys.remove(xmlPath);
+      await sys.remove(pdfPath);
     }
     const projected = form8853Pdf.instances?.(
       result.pending.form8853!,
@@ -221,7 +223,7 @@ for (
   });
 }
 
-Deno.test("Medicare estate final-return source retains existing full-return blocker", async () => {
+test("Medicare estate final-return source retains existing full-return blocker", async () => {
   const ledger = structuredClone(deathLedger);
   if (ledger.source.kind !== "death_transfer") {
     throw new Error("fixture source");
@@ -282,7 +284,7 @@ Deno.test("Medicare estate final-return source retains existing full-return bloc
   );
 });
 
-Deno.test("Form8853 medicare rejects reused medical expense references through native and PDF export", async () => {
+test("Form8853 medicare rejects reused medical expense references through native and PDF export", async () => {
   const result = execute(
     buildExecutionPlan(registry),
     registry,
@@ -325,8 +327,27 @@ Deno.test("Form8853 medicare rejects reused medical expense references through n
   }
   invalidDeath.source.expenses.push({ ...invalidDeath.source.expenses[0] });
   assertThrows(
-    () => calculateMedicareLedger(invalidDeath),
+    () => calculateMedicareLedger(invalidDeath, 2025),
     Error,
     "qualified expense reference cannot be reused",
+  );
+});
+
+// IRC §138(c)(2) and the Form 8853 Section B worksheet are not indexed: a
+// 2026 ledger with 2026 distributions computes the same lines as TY2025.
+test("Medicare MSA ledger reads the return year's distribution dates", () => {
+  const in2026 = structuredClone(priorBalanceLedger);
+  if (in2026.source.kind !== "normal") throw new Error("fixture source kind");
+  for (const row of in2026.source.distributions) {
+    row.distribution_date = `2026${row.distribution_date.slice(4)}`;
+  }
+  assertEquals(
+    calculateMedicareLedger(in2026, 2026).worksheet,
+    calculateMedicareLedger(priorBalanceLedger, 2025).worksheet,
+  );
+  assertThrows(
+    () => calculateMedicareLedger(priorBalanceLedger, 2026),
+    Error,
+    "distribution date must be in filing year",
   );
 });

@@ -15,6 +15,7 @@ import {
 } from "../../../../../nodes/inputs/credits/child/f8812/index.ts";
 import { inputSchema as generalInputSchema } from "../../../../../nodes/inputs/general/filing/general/index.ts";
 import type { MefBuildContext, MefFormDescriptor } from "../../../form-descriptor.ts";
+import { mefTaxYear } from "../../../support/year-config.ts";
 
 function boolElement(tag: string, value: boolean | undefined): string {
   return element(tag, value === undefined ? undefined : String(value));
@@ -340,7 +341,7 @@ function validateFinalizedCreditClaims(
     ) {
       const form8812 = form8812InputSchema.safeParse(pending?.f8812);
       const lines = form8812.success
-        ? calculateSchedule8812Lines(2025, form8812.data)
+        ? calculateSchedule8812Lines(mefTaxYear(context), form8812.data)
         : undefined;
       const person = fields.other_dependents![0];
       const name = `${person.first_name} ${person.last_name}`.trim()
@@ -429,7 +430,10 @@ function validateFinalizedCreditClaims(
       const filedName = details
         ? `${details.first_name} ${details.last_name}`.trim().toUpperCase()
         : undefined;
-      const creditLines = calculateForm8863Lines(form8863.data);
+      const creditLines = calculateForm8863Lines(
+        form8863.data,
+        mefTaxYear(context),
+      );
       if (
         !details || filedName !== filedStudents[0] ||
         !student.student_ssn || !creditLines ||
@@ -466,13 +470,16 @@ function validateFinalizedCreditClaims(
         }
         if (samePerson) {
           const form8812 = form8812InputSchema.safeParse(pending?.f8812);
-          const creditLines = calculateForm8863Lines(form8863.data);
+          const creditLines = calculateForm8863Lines(
+        form8863.data,
+        mefTaxYear(context),
+      );
           if (!form8812.success || !creditLines) {
             throw new Error(
               "Form 8862 shared ODC and AOTC amounts need Schedule 8812 and Form 8863 source",
             );
           }
-          const odcLines = calculateSchedule8812Lines(2025, form8812.data);
+          const odcLines = calculateSchedule8812Lines(mefTaxYear(context), form8812.data);
           if (
             !odcLines || form8812.data.form8862_filed !== true ||
             form8863.data.form8862_filed !== true ||
@@ -495,6 +502,42 @@ function validateFinalizedCreditClaims(
   }
 }
 
+/** Each claimed credit's prior IRS notice copy must be retained with matching bytes. */
+function assertRetainedNoticeCopies(
+  fields: F8862Input,
+  context: MefBuildContext | undefined,
+): void {
+  const general = generalInputSchema.safeParse(context?.pending?.general);
+  const reviews = general.success ? general.data : undefined;
+  const copies = [
+    ...(fields.claim_eitc
+      ? [["EITC", reviews?.prior_eic_disallowance_review] as const]
+      : []),
+    ...(fields.claim_ctc
+      ? [["CTC/ODC", reviews?.prior_ctc_disallowance_review] as const]
+      : []),
+    ...(fields.claim_aotc
+      ? [["AOTC", reviews?.prior_aotc_disallowance_review] as const]
+      : []),
+  ];
+  for (const [credit, review] of copies) {
+    const reference = review && "notice_copy_reference" in review
+      ? review.notice_copy_reference
+      : undefined;
+    const digest = review && "notice_copy_sha256" in review
+      ? review.notice_copy_sha256
+      : undefined;
+    if (
+      !reference || !digest ||
+      context?.retainedSourceSha256ByReference?.[reference] !== digest
+    ) {
+      throw new Error(
+        `Form 8862 ${credit} export needs the retained prior IRS notice copy with matching SHA-256`,
+      );
+    }
+  }
+}
+
 export const form8862: MefFormDescriptor<"f8862", F8862Input> = {
   pendingKey: "f8862",
   FIELD_MAP: [],
@@ -508,19 +551,10 @@ export const form8862: MefFormDescriptor<"f8862", F8862Input> = {
       return "";
     }
     validateFinalizedCreditClaims(fields, context);
-    if (fields.claim_ctc || fields.claim_aotc) {
-      throw new Error(
-        "Form 8862 CTC/ODC and AOTC export needs executor-owned authentication of prior IRS notice issuance and contents",
-      );
-    }
-    if (fields.claim_eitc) {
-      throw new Error(
-        "Form 8862 EITC export needs executor-owned authentication of prior IRS notice issuance and contents",
-      );
-    }
+    assertRetainedNoticeCopies(fields, context);
 
     return elements("IRS8862", [
-      element("TaxYr", 2025),
+      element("TaxYr", mefTaxYear(context)),
       fields.claim_eitc ? element("EICClaimedInd", "X") : "",
       fields.claim_ctc ? element("CTCACTCODCClaimedInd", "X") : "",
       fields.claim_aotc ? element("AOTCClaimedInd", "X") : "",

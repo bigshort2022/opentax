@@ -1,11 +1,31 @@
 /**
  * MeF Business Rules: S3
  * Auto-generated from 1040_Business_Rules_2025v3.0.csv
- * 36 rules (31 implemented, 5 stubs)
+ * 36 rules (36 implemented)
  */
 
 import type { RuleDef } from "../../../../../../core/validation/types.ts";
-import { rule, alwaysPass, eqField, eqSum, hasValue, hasNonZero, gt, ifThen, isZero, noValue, not, any, all, formPresent, formCountAtMost, notGtNum, filingStatusIs, filingStatusNot, sumOfAll, } from "../../../../../../core/validation/mod.ts";
+import {
+  all,
+  amount,
+  amountEq,
+  any,
+  documentTotal,
+  eqField,
+  formPresent,
+  gt,
+  hasNonZero,
+  hasValue,
+  ifThen,
+  inOwnDocument,
+  isZero,
+  noValue,
+  notGtNum,
+  rule,
+  someRepeated,
+  sumOfAll,
+  total,
+} from "../../../../../../core/validation/mod.ts";
 
 export const S3_RULES: readonly RuleDef[] = [
   rule(
@@ -16,11 +36,12 @@ export const S3_RULES: readonly RuleDef[] = [
     "If Schedule 3 (Form 1040), 'TaxPaidByRICOrREITAmt' has a value greater than zero, then Form 2439 must be present in the return.",
   ),
   rule(
-    "S3-F1040-013-01",
+    // 2026v1.0 text: the 2025v5.4 Schedule 3 names line 6c NonrefundableAdoptionCreditAmt.
+    "S3-F1040-013-02",
     "reject",
     "missing_data",
-    ifThen(hasNonZero("OtherCreditsAmt"), any(hasNonZero("CurrentYearCreditAllowedAmt"), hasNonZero("MinAMTCrAmt"), hasNonZero("AdoptionCreditAmt"), hasNonZero("CreditForElderlyOrDisabledAmt"), hasNonZero("PersonalUsePartOfCreditAmt"), hasNonZero("CleanVehPrsnlUsePartCrAmt"), hasNonZero("MortgageInterestCreditAmt"), hasNonZero("DCHmByrCurrentYearCreditAmt"), hasNonZero("QlfyElecMotorVehCrAmt"), hasNonZero("TotalPersonalUsePartOfCrAmt"), hasNonZero("CurrentYearAllowableCreditAmt"), hasNonZero("TotRptgYrTxIncreaseDecreaseAmt"), hasNonZero("MaxPrevOwnedCleanVehCrAmt"), hasNonZero("TotOthNonrefundableCreditsAmt"))),
-    "If Schedule 3 (Form 1040), 'OtherCreditsAmt' has a non-zero value, then at least one of the following must have a non-zero value: 'CurrentYearCreditAllowedAmt' or 'MinAMTCrAmt' or 'AdoptionCreditAmt' or 'CreditForElderlyOrDisabledAmt' or 'PersonalUsePartOfCreditAmt' or 'CleanVehPrsnlUsePartCrAmt' or 'MortgageInterestCreditAmt' or 'DCHmByrCurrentYearCreditAmt' or 'QlfyElecMotorVehCrAmt' or 'TotalPersonalUsePartOfCrAmt' or 'CurrentYearAllowableCreditAmt' or 'TotRptgYrTxIncreaseDecreaseAmt' or 'MaxPrevOwnedCleanVehCrAmt' or 'TotOthNonrefundableCreditsAmt'.",
+    ifThen(hasNonZero("OtherCreditsAmt"), any(hasNonZero("CurrentYearCreditAllowedAmt"), hasNonZero("MinAMTCrAmt"), hasNonZero("NonrefundableAdoptionCreditAmt"), hasNonZero("CreditForElderlyOrDisabledAmt"), hasNonZero("PersonalUsePartOfCreditAmt"), hasNonZero("CleanVehPrsnlUsePartCrAmt"), hasNonZero("MortgageInterestCreditAmt"), hasNonZero("DCHmByrCurrentYearCreditAmt"), hasNonZero("QlfyElecMotorVehCrAmt"), hasNonZero("TotalPersonalUsePartOfCrAmt"), hasNonZero("CurrentYearAllowableCreditAmt"), hasNonZero("TotRptgYrTxIncreaseDecreaseAmt"), hasNonZero("MaxPrevOwnedCleanVehCrAmt"), hasNonZero("TotOthNonrefundableCreditsAmt"))),
+    "If Schedule 3 (Form 1040), 'OtherCreditsAmt' has a non-zero value, then at least one of the following must have a non-zero value: 'CurrentYearCreditAllowedAmt' or 'MinAMTCrAmt' or 'NonrefundableAdoptionCreditAmt' or 'CreditForElderlyOrDisabledAmt' or 'PersonalUsePartOfCreditAmt' or 'CleanVehPrsnlUsePartCrAmt' or 'MortgageInterestCreditAmt' or 'DCHmByrCurrentYearCreditAmt' or 'QlfyElecMotorVehCrAmt' or 'TotalPersonalUsePartOfCrAmt' or 'CurrentYearAllowableCreditAmt' or 'TotRptgYrTxIncreaseDecreaseAmt' or 'MaxPrevOwnedCleanVehCrAmt' or 'TotOthNonrefundableCreditsAmt'.",
   ),
   rule(
     "S3-F1040-016",
@@ -40,7 +61,14 @@ export const S3_RULES: readonly RuleDef[] = [
     "S3-F1040-021",
     "reject",
     "incorrect_data",
-    alwaysPass, // requires cross-form aggregation: sum of all Forms 8978 TotRptgYrTxIncreaseDecreaseAmt with conditional sign-flip logic
+    inOwnDocument(
+      (ctx) => {
+        const sum = total("8978/TotRptgYrTxIncreaseDecreaseAmt")(ctx);
+        const tax = ctx.num("TotalTaxBeforeCrAndOthTaxesAmt");
+        return !(sum < 0 && tax + sum < 0) ||
+          ctx.num("TotRptgYrTxIncreaseDecreaseAmt") === tax;
+      },
+    ),
     "Schedule 3 (Form 1040), 'TotRptgYrTxIncreaseDecreaseAmt' must be equal to 'TotalTaxBeforeCrAndOthTaxesAmt' in the return when (1) the sum of all Forms 8978, 'TotRptgYrTxIncreaseDecreaseAmt' is less than zero and (2) 'TotalTaxBeforeCrAndOthTaxesAmt' minus (-) [ the sum multiplied by negative 1 ] is less than zero.",
   ),
   rule(
@@ -61,7 +89,20 @@ export const S3_RULES: readonly RuleDef[] = [
     "S3-F1040-031",
     "reject",
     "incorrect_data",
-    alwaysPass, // requires cross-instance form lookup: two instances of Form 5695 with specific AdjustedCreditLimitCd value
+    inOwnDocument(
+      ifThen(
+        all(gt("EgyEffcntHmImprvCrAmt", 0), (ctx) => ctx.formCount("form5695") === 2),
+        amountEq(
+          amount("EgyEffcntHmImprvCrAmt"),
+          documentTotal(
+            "F5695",
+            (d) => d.field("AdjustedCreditLimitCd") === "MORE THAN ONE MAIN HOME"
+              ? d.num("EgyEffcntHmImprvCrGrp/EgyEffcntHmImprvCrAmt")
+              : 0,
+          ),
+        ),
+      ),
+    ),
     "If Schedule 3 (Form 1040), 'EgyEffcntHmImprvCrAmt' has a value greater than zero and there are two instances of Form 5695 present in the return, then Schedule 3 (Form 1040), 'EgyEffcntHmImprvCrAmt' must be equal to [ 'EgyEffcntHmImprvCrAmt' in 'EgyEffcntHmImprvCrGrp' ] from the instance of Form 5695 with 'AdjustedCreditLimitCd' having the value \"MORE THAN ONE MAIN HOME\".",
   ),
   rule(
@@ -131,7 +172,14 @@ export const S3_RULES: readonly RuleDef[] = [
     "S3-F1040-109-01",
     "reject",
     "incorrect_data",
-    alwaysPass, // requires cross-form aggregation: sum of all Forms 8978 TotRptgYrTxIncreaseDecreaseAmt with sign-flip conditional
+    inOwnDocument(
+      (ctx) => {
+        const sum = total("8978/TotRptgYrTxIncreaseDecreaseAmt")(ctx);
+        const tax = ctx.num("TotalTaxBeforeCrAndOthTaxesAmt");
+        return !(sum < 0 && tax + sum >= 0) ||
+          ctx.num("TotRptgYrTxIncreaseDecreaseAmt") === -sum;
+      },
+    ),
     "Schedule 3 (Form 1040), 'TotRptgYrTxIncreaseDecreaseAmt' must be equal to [ the sum of all Forms 8978, 'TotRptgYrTxIncreaseDecreaseAmt' ] multiplied by negative 1 when (1) the sum is less than zero and (2) 'TotalTaxBeforeCrAndOthTaxesAmt' in the return minus (-) [ the sum multiplied by negative 1 ] is greater than or equal to zero.",
   ),
   rule(
@@ -180,7 +228,7 @@ export const S3_RULES: readonly RuleDef[] = [
     "S3-F1040-144",
     "reject",
     "missing_document",
-    alwaysPass, // requires cross-instance check: at least two Form W-2s with the same EmployeeSSN present in the return
+    inOwnDocument(ifThen(hasNonZero("ExcessSocSecAndTier1RRTATaxAmt"), someRepeated("W2/EmployeeSSN"))),
     "If Schedule 3 (Form 1040), 'ExcessSocSecAndTier1RRTATaxAmt' has a non-zero value, then at least two Form W-2s with the same 'EmployeeSSN' must be present in the return.",
   ),
   rule(

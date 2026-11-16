@@ -81,6 +81,7 @@ const inputSchema = z.object({
   line8z_rtaa: z.number().optional(),
   f1099g_rtaa_sources: z.array(rtaaSourceSchema).optional(),
   line8r_taxable_scholarships: z.number().int().nonnegative().optional(),
+  line8t_nqdc_distribution: z.number().nonnegative().optional(),
   line8z_taxable_grants: z.number().optional(),
   f1099g_taxable_grant_sources: z.array(taxableGrantSourceSchema).optional(),
   line8z_substitute_payments: z.number().optional(),
@@ -145,6 +146,8 @@ const inputSchema = z.object({
   line13_depreciation: z.number().nonnegative().optional(),
   // Line 14 — Moving expenses (Form 3903; military only)
   line14_moving_expenses: z.number().nonnegative().optional(),
+  // Line 14 storage-fees-only box; no Form 3903 is attached.
+  line14_storage_fees_only: z.literal(true).optional(),
   // Line 15 — Deductible part of self-employment tax (Schedule SE)
   line15_se_deduction: z.number().nonnegative().optional(),
   // Line 16 — SEP, SIMPLE, and qualified plan contributions
@@ -218,6 +221,7 @@ function otherIncome(input: Schedule1Input): number {
     (input.line8p_excess_business_loss ?? 0) +
     (input.line8z_rtaa ?? 0) +
     (input.line8r_taxable_scholarships ?? 0) +
+    (input.line8t_nqdc_distribution ?? 0) +
     (input.line8z_taxable_grants ?? 0) +
     (input.line8z_substitute_payments ?? 0) +
     (input.line8z_attorney_proceeds ?? 0) +
@@ -354,6 +358,7 @@ function assembleSchedule1(input: Schedule1Input): Record<string, unknown> {
   if (input.line14_moving_expenses !== undefined) {
     result.line14_moving_expenses = input.line14_moving_expenses;
   }
+
   if (input.line15_se_deduction !== undefined) {
     result.line15_se_deduction = input.line15_se_deduction;
   }
@@ -421,6 +426,9 @@ function assembleSchedule1(input: Schedule1Input): Record<string, unknown> {
   }
   return {
     ...result,
+    ...(input.line14_storage_fees_only
+      ? { line14_storage_fees_only: true }
+      : {}),
     ...(input.f1099nec_nonbusiness_sources !== undefined
       ? { f1099nec_nonbusiness_sources: input.f1099nec_nonbusiness_sources }
       : {}),

@@ -1,4 +1,4 @@
-import { join } from "@std/path";
+import { join } from "node:path";
 import { z } from "zod";
 import { f1040_2025 } from "../../forms/f1040/2025/index.ts";
 import {
@@ -71,6 +71,7 @@ async function calculateRecord(
   const projected = reconcileForm8990Projection(
     pending.form8990,
     pending,
+    { taxYear: meta.year, formType: "f1040" },
   );
   const taxpayerSsn = z.object({ taxpayer_ssn: z.string().min(1) })
     .passthrough().parse(projected.sourceRecords.returnInputs.general)

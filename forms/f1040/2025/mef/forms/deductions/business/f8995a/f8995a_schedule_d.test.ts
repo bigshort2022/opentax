@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import { FilingStatus as HeaderFilingStatus } from "../../../../../../mef/header.ts";
 import { FilingStatus as NodeFilingStatus } from "../../../../../../nodes/types.ts";
@@ -68,7 +69,7 @@ const context = {
   },
 };
 
-Deno.test("Form 8995-A patron parent and distinct Schedule D both use the same nonzero reduction", () => {
+test("Form 8995-A patron parent and distinct Schedule D both use the same nonzero reduction", () => {
   const parent = form8995a.build(patron, context);
   const scheduleD = form8995aScheduleD.build(patron, context);
   assertStringIncludes(parent, "<PatronInd>X</PatronInd>");
@@ -100,7 +101,7 @@ Deno.test("Form 8995-A patron parent and distinct Schedule D both use the same n
   );
 });
 
-Deno.test("Schedule D trigger rejects a missing companion before Form 8995-A XML", () => {
+test("Schedule D trigger rejects a missing companion before Form 8995-A XML", () => {
   assertThrows(
     () =>
       form8995a.build(patron, {
@@ -116,7 +117,7 @@ Deno.test("Schedule D trigger rejects a missing companion before Form 8995-A XML
   );
 });
 
-Deno.test("Schedule D rejects a missing parent and altered line 14 source", () => {
+test("Schedule D rejects a missing parent and altered line 14 source", () => {
   assertThrows(
     () =>
       form8995aScheduleD.build(patron, {
@@ -152,7 +153,7 @@ Deno.test("Schedule D rejects a missing parent and altered line 14 source", () =
   );
 });
 
-Deno.test("Schedule D rejects Form 1040 line 13 mismatch and untriggered companion", () => {
+test("Schedule D rejects Form 1040 line 13 mismatch and untriggered companion", () => {
   assertThrows(
     () =>
       form8995aScheduleD.build(patron, {
@@ -183,7 +184,7 @@ Deno.test("Schedule D rejects Form 1040 line 13 mismatch and untriggered compani
   assertEquals(form8995aScheduleD.build([]), "");
 });
 
-Deno.test("Schedule D requires reviewed QBI and wage allocation worksheet reference", () => {
+test("Schedule D requires reviewed QBI and wage allocation worksheet reference", () => {
   assertThrows(() =>
     form8995aScheduleD.build({
       ...patron,
@@ -194,7 +195,7 @@ Deno.test("Schedule D requires reviewed QBI and wage allocation worksheet refere
     }, context), Error);
 });
 
-Deno.test("Form 8995-A cooperative box 6 written notice joins Schedule D, line 38, and Form 1040", () => {
+test("Form 8995-A cooperative box 6 written notice joins Schedule D, line 38, and Form 1040", () => {
   const withBox6 = {
     ...patron,
     patron_filing_details: {
@@ -222,7 +223,7 @@ Deno.test("Form 8995-A cooperative box 6 written notice joins Schedule D, line 3
     f1040: { line13_qbi_deduction: 17_500 },
   };
   const parsed = inputSchema.parse(withBox6);
-  const lines = calculateOneBusiness8995ALines(parsed);
+  const lines = calculateOneBusiness8995ALines(parsed, 2025);
   assertEquals(lines.line37, 15_500);
   assertEquals(lines.line38, 2_000);
   assertEquals(lines.line39, 17_500);
@@ -314,7 +315,7 @@ Deno.test("Form 8995-A cooperative box 6 written notice joins Schedule D, line 3
     },
   };
   assertThrows(
-    () => calculateOneBusiness8995ALines(inputSchema.parse(missingNotice)),
+    () => calculateOneBusiness8995ALines(inputSchema.parse(missingNotice), 2025),
     Error,
     "reviewed box 6 notice",
   );
@@ -330,7 +331,7 @@ Deno.test("Form 8995-A cooperative box 6 written notice joins Schedule D, line 3
   };
   assertThrows(
     () =>
-      calculateOneBusiness8995ALines(inputSchema.parse(changedNoticeAmount)),
+      calculateOneBusiness8995ALines(inputSchema.parse(changedNoticeAmount), 2025),
     Error,
     "reviewed box 6 notice",
   );
@@ -367,7 +368,7 @@ Deno.test("Form 8995-A cooperative box 6 written notice joins Schedule D, line 3
     f1040: { line13_qbi_deduction: 20_900 },
   };
   assertEquals(
-    calculateOneBusiness8995ALines(inputSchema.parse(cappedBox6)).line39,
+    calculateOneBusiness8995ALines(inputSchema.parse(cappedBox6), 2025).line39,
     20_900,
   );
   assertStringIncludes(
@@ -415,6 +416,7 @@ Deno.test("Form 8995-A cooperative box 6 written notice joins Schedule D, line 3
     () =>
       calculateOneBusiness8995ALines(
         inputSchema.parse(overQualifiedPaymentCap),
+        2025,
       ),
     Error,
     "9% of box 7",
@@ -448,7 +450,7 @@ Deno.test("Form 8995-A cooperative box 6 written notice joins Schedule D, line 3
     },
   };
   assertThrows(
-    () => calculateOneBusiness8995ALines(inputSchema.parse(excessBox6)),
+    () => calculateOneBusiness8995ALines(inputSchema.parse(excessBox6), 2025),
     Error,
     "9% of box 7",
   );

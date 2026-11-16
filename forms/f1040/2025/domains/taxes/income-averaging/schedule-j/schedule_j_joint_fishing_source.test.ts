@@ -1,4 +1,6 @@
-// deno-lint-ignore-file no-explicit-any
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { assert, assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { PDFDocument } from "pdf-lib";
 import { f1040_2025 } from "../../../../index.ts";
@@ -6,12 +8,18 @@ import { scheduleJJointFishingInputs } from "./schedule_j_joint_fishing.fixture.
 import { extractFilerIdentity } from "../../../../../mef/filer.ts";
 import { buildPdfBytes, type PdfPageOrigin } from "../../../../pdf/builder.ts";
 import { normalizeAllPending } from "../../../../return-processing/pending.ts";
-import { assertScheduleJSourceReturn } from "./schedule_j_source_return.ts";
+import {
+  assertScheduleJSourceReturn,
+  executeScheduleJSourceReturn,
+} from "./schedule_j_source_return.ts";
 
-const evidenceDir = Deno.env.get("SCHEDULE_J_JOINT_EVIDENCE_DIR") ??
+const replayScheduleJ = (inputs: Record<string, unknown>) =>
+  executeScheduleJSourceReturn(inputs, { taxYear: 2025, formType: "f1040" });
+
+const evidenceDir = process.env.SCHEDULE_J_JOINT_EVIDENCE_DIR ??
   ".state/research/schedulej-joint-fishing-oct6/packets";
-const xsd = Deno.env.get("SCHEDULE_J_JOINT_XSD_PATH") ??
-  ".state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd";
+const xsd = process.env.SCHEDULE_J_JOINT_XSD_PATH ??
+  "irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd";
 
 async function packet(id: string, input: Record<string, unknown>) {
   const result = f1040_2025.executeReturn(input);
@@ -28,18 +36,18 @@ async function packet(id: string, input: Record<string, unknown>) {
     origins,
   );
   const dir = `${evidenceDir}/${id}`;
-  await Deno.mkdir(dir, { recursive: true });
-  await Deno.writeTextFile(
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(
     `${dir}/source-pending.json`,
     JSON.stringify({ input, pending }, null, 2),
   );
-  await Deno.writeTextFile(`${dir}/return.xml`, prepared.bundle.xml);
-  await Deno.writeFile(`${dir}/return.pdf`, pdf);
-  await Deno.writeTextFile(
+  await fs.writeFile(`${dir}/return.xml`, prepared.bundle.xml);
+  await fs.writeFile(`${dir}/return.pdf`, pdf);
+  await fs.writeFile(
     `${dir}/origins.json`,
     JSON.stringify(origins, null, 2),
   );
-  const validation = await new Deno.Command("xmllint", {
+  const validation = await new sys.Command("xmllint", {
     args: ["--noout", "--schema", xsd, `${dir}/return.xml`],
     stderr: "piped",
   }).output();
@@ -48,7 +56,7 @@ async function packet(id: string, input: Record<string, unknown>) {
   return { result, pending, origins, xml: prepared.bundle.xml };
 }
 
-Deno.test("joint primary/spouse farm and fishing source elects owner-specific Schedule J and QBI", async () => {
+test("joint primary/spouse farm and fishing source elects owner-specific Schedule J and QBI", async () => {
   for (const fishingOwner of ["S", "T"] as const) {
     const input = scheduleJJointFishingInputs(fishingOwner);
     const noJInput = structuredClone(input) as any;
@@ -56,7 +64,7 @@ Deno.test("joint primary/spouse farm and fishing source elects owner-specific Sc
     const noJ = await packet(`joint-${fishingOwner}-without-j`, noJInput);
     const elected = await packet(`joint-${fishingOwner}`, input);
     const p = elected.pending;
-    assertScheduleJSourceReturn(elected.result.pending);
+    assertScheduleJSourceReturn(elected.result.pending, replayScheduleJ);
     assertEquals(p.f1040.filing_status, "mfj");
     assertEquals(p.schedule1.line3_schedule_c, 120_000);
     assertEquals(p.schedule1.line6_schedule_f, 200_000);
@@ -86,7 +94,7 @@ Deno.test("joint primary/spouse farm and fishing source elects owner-specific Sc
   }
 });
 
-Deno.test("joint Schedule J source and owner conflicts cannot be exported", async () => {
+test("joint Schedule J source and owner conflicts cannot be exported", async () => {
   const good: any = scheduleJJointFishingInputs();
   const invalid = [];
   const wrongLedger = structuredClone(good);
@@ -123,7 +131,7 @@ Deno.test("joint Schedule J source and owner conflicts cannot be exported", asyn
   ) {
     const pending: any = structuredClone(result.pending);
     change(pending);
-    assertThrows(() => assertScheduleJSourceReturn(pending));
+    assertThrows(() => assertScheduleJSourceReturn(pending, replayScheduleJ));
     await assertRejects(() => f1040_2025.prepareReturn(pending, filer));
     await assertRejects(() => buildPdfBytes(pending, filer, ".pdf-cache"));
   }

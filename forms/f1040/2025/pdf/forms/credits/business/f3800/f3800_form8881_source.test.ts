@@ -1,3 +1,4 @@
+import { test } from "bun:test";
 import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import { execute } from "../../../../../../../../core/runtime/executor.ts";
 import { buildExecutionPlan } from "../../../../../../../../core/runtime/planner.ts";
@@ -35,7 +36,7 @@ const source = {
     arrangement_first_included_on: "2025-01-01",
     eligible_automatic_contribution_arrangement_confirmed: true,
     qualified_employer_plan_confirmed: true,
-    maintained_in_2025_confirmed: true,
+    maintained_in_tax_year_confirmed: true,
   },
 };
 const f3800 = {
@@ -79,7 +80,7 @@ const pending = {
 };
 const ids = { f8881: ["IRS8881_1"], form6251: ["IRS6251_1"], f8835: [] };
 
-Deno.test("Form 8881 startup and enrollment credit reaches Form 3800, Schedule 3 and Form 1040", () => {
+test("Form 8881 startup and enrollment credit reaches Form 3800, Schedule 3 and Form 1040", () => {
   const result = execute(buildExecutionPlan(registry), registry, {
     general: {
       filing_status: FilingStatus.Single,
@@ -116,7 +117,7 @@ Deno.test("Form 8881 startup and enrollment credit reaches Form 3800, Schedule 3
   assertEquals(result.pending.f1040?.line20_nonrefundable_credits, 1_250);
 });
 
-Deno.test("Form 8881 Part I and II bind separate native and printable Form 3800 rows", () => {
+test("Form 8881 Part I and II bind separate native and printable Form 3800 rows", () => {
   const prepared = prepareForm3800DocumentParts(f3800, {
     pending,
     documentIdsByPendingKey: ids,
@@ -145,7 +146,7 @@ Deno.test("Form 8881 Part I and II bind separate native and printable Form 3800 
   ]);
 });
 
-Deno.test("Form 3800 PDF rejects a second Form 8881 part claiming another document ID", () => {
+test("Form 3800 PDF rejects a second Form 8881 part claiming another document ID", () => {
   const prepared = prepareForm3800DocumentParts(f3800, {
     pending,
     documentIdsByPendingKey: ids,
@@ -175,11 +176,11 @@ Deno.test("Form 3800 PDF rejects a second Form 8881 part claiming another docume
   );
 });
 
-Deno.test("Form 8881 military-spouse Part III binds Form 3800 line 1ee", () => {
+test("Form 8881 military-spouse Part III binds Form 3800 line 1ee", () => {
   const military = {
     ...source,
     military_spouses: {
-      preceding_2025_qualified_employee_count: 20,
+      preceding_year_qualified_employee_count: 20,
       eligible_defined_contribution_plan_confirmed: true,
       participation_within_two_months_confirmed: true,
       immediate_equal_contribution_and_vesting_confirmed: true,
@@ -191,7 +192,7 @@ Deno.test("Form 8881 military-spouse Part III binds Form 3800 line 1ee", () => {
         first_eligible_participation_year: 2025,
         non_hce_confirmed: true,
         active_duty_spouse_at_hire_confirmed: true,
-        participated_in_2025_confirmed: true,
+        participated_in_tax_year_confirmed: true,
         qualified_employer_contribution: 300,
         elective_deferrals_excluded_confirmed: true,
       }],
@@ -229,7 +230,7 @@ Deno.test("Form 8881 military-spouse Part III binds Form 3800 line 1ee", () => {
   ]);
 });
 
-Deno.test("Form 8881 child PDF rejects changed source, prepared part links, and final credit", () => {
+test("Form 8881 child PDF rejects changed source, prepared part links, and final credit", () => {
   const prepared = prepareForm3800DocumentParts(f3800, {
     pending,
     documentIdsByPendingKey: ids,
@@ -283,14 +284,14 @@ Deno.test("Form 8881 child PDF rejects changed source, prepared part links, and 
   );
 });
 
-Deno.test("Form 8881 contribution phaseout retains its zero-credit source projection", () => {
+test("Form 8881 contribution phaseout retains its zero-credit source projection", () => {
   const zeroSource = {
     schedule_c_business_reference: source.schedule_c_business_reference,
     plan_type: source.plan_type,
     contributions: {
       plan_effective_on: "2025-01-01",
       preceding_first_plan_year_qualified_employee_count: 100,
-      preceding_2025_employee_count: 100,
+      preceding_year_employee_count: 100,
       eligible_defined_contribution_plan_confirmed: true,
       no_substantially_same_employee_plan_in_prior_three_years_confirmed: true,
       contribution_deduction_reduced_by_credit_confirmed: true,
@@ -298,7 +299,7 @@ Deno.test("Form 8881 contribution phaseout retains its zero-credit source projec
         employee_reference: "PLAN-EMP-1",
         contribution_record_reference: "PLAN-PAY-1",
         contributed_on: "2025-09-15",
-        wages_2025: 50_000,
+        wages_for_year: 50_000,
         qualified_employer_contribution: 1_000,
         elective_deferrals_excluded_confirmed: true,
       }],
@@ -333,7 +334,7 @@ Deno.test("Form 8881 contribution phaseout retains its zero-credit source projec
   );
 });
 
-Deno.test("Form 8881 export rejects altered source, document link and prepared row", () => {
+test("Form 8881 export rejects altered source, document link and prepared row", () => {
   assertThrows(
     () =>
       prepareForm3800DocumentParts(f3800, {

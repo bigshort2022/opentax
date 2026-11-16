@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../scripts/support/sys.ts";
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { execute } from "../../../../../../core/runtime/executor.ts";
 import { buildExecutionPlan } from "../../../../../../core/runtime/planner.ts";
@@ -18,11 +21,11 @@ const base = pdfReviewFixtures.find((fixture) =>
   fixture.id === "single-ira-rollover"
 )!;
 const xsdPath = new URL(
-  "../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+  "../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
   import.meta.url,
 ).pathname;
 
-Deno.test("partial early IRA rollover reconciles Form 1040, Form 5329, native XML, and PDF", async () => {
+test("partial early IRA rollover reconciles Form 1040, Form 5329, native XML, and PDF", async () => {
   const original = f1099rInputSchema.parse({ f1099rs: base.inputs.f1099r })
     .f1099rs[0]!;
   const result = execute(
@@ -85,23 +88,23 @@ Deno.test("partial early IRA rollover reconciles Form 1040, Form 5329, native XM
     xml,
     "<EarlyDistributionsAmt>4000</EarlyDistributionsAmt>",
   );
-  const xmlPath = await Deno.makeTempFile({ suffix: ".xml" });
+  const xmlPath = await sys.makeTempFile({ suffix: ".xml" });
   try {
-    await Deno.writeTextFile(xmlPath, xml);
-    const validated = await new Deno.Command("xmllint", {
+    await fs.writeFile(xmlPath, xml);
+    const validated = await new sys.Command("xmllint", {
       args: ["--noout", "--schema", xsdPath, xmlPath],
       stdout: "piped",
       stderr: "piped",
     }).output();
     assertEquals(validated.code, 0, new TextDecoder().decode(validated.stderr));
   } finally {
-    await Deno.remove(xmlPath);
+    await sys.remove(xmlPath);
   }
 
-  const pdfPath = await Deno.makeTempFile({ suffix: ".pdf" });
+  const pdfPath = await sys.makeTempFile({ suffix: ".pdf" });
   try {
-    await Deno.writeFile(pdfPath, await buildPdfBytes(pending, base.filer));
-    const extracted = await new Deno.Command("pdftotext", {
+    await fs.writeFile(pdfPath, await buildPdfBytes(pending, base.filer));
+    const extracted = await new sys.Command("pdftotext", {
       args: ["-layout", pdfPath, "-"],
       stdout: "piped",
       stderr: "piped",
@@ -112,6 +115,6 @@ Deno.test("partial early IRA rollover reconciles Form 1040, Form 5329, native XM
     assertStringIncludes(text, "4000");
     assertStringIncludes(text, "400");
   } finally {
-    await Deno.remove(pdfPath);
+    await sys.remove(pdfPath);
   }
 });

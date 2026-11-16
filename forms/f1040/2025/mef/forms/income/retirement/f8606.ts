@@ -1,8 +1,14 @@
+import { mefTaxYear } from "../../../support/year-config.ts";
 import { formatForm8606BasisRatio } from "../../../../../nodes/intermediate/forms/income/retirement/form8606/roth-current-conversion.ts";
 import { reconcileForm8606RothInventories } from "../../../../domains/income/retirement/form8606/form8606_roth_inventory_reconciliation.ts";
 import { element, elements } from "../../../../../mef/xml.ts";
-import { FilingStatus } from "../../../../../mef/header.ts";
 import {
+  FilingStatus,
+  type FilerIdentity,
+  personNameLine1,
+} from "../../../../../mef/header.ts";
+import {
+  assertForm8606SourceYears,
   IraOwner,
   printSchema,
 } from "../../../../../nodes/intermediate/forms/income/retirement/form8606/index.ts";
@@ -16,6 +22,21 @@ import { reconcileForm8606Roth } from "../../../../domains/income/retirement/for
 type Input = z.infer<typeof printSchema> | readonly [];
 
 export const FIELD_MAP: ReadonlyArray<readonly [string, string]> = [];
+
+/** Line 1 of the IRA owner name in NameLine1Type format (Pub 4164 §12.5). */
+function iraOwnerNameLine(
+  filer: FilerIdentity | undefined,
+  ownerSsn: string,
+  displayName: string,
+): string {
+  const spouse = filer?.spouse?.ssn === ownerSsn ? filer.spouse : undefined;
+  const line = spouse
+    ? personNameLine1(spouse.firstName, spouse.middleInitial, spouse.lastName)
+    : filer?.primarySSN === ownerSsn
+    ? personNameLine1(filer.firstName, filer.middleInitial, filer.lastName)
+    : undefined;
+  return line ?? displayName;
+}
 
 function buildIRS8606(rawFields: Input, context?: MefBuildContext): string {
   if (Array.isArray(rawFields) && rawFields.length === 0) return "";
@@ -44,7 +65,14 @@ function buildIRS8606(rawFields: Input, context?: MefBuildContext): string {
       );
     }
     return elements("IRS8606", [
-      element("Form8606IRANamelineTxt", reviewedRoth.ownerName),
+      element(
+        "Form8606IRANamelineTxt",
+        iraOwnerNameLine(
+          context?.filer,
+          reviewedRoth.ownerSsn,
+          reviewedRoth.ownerName,
+        ),
+      ),
       element("NondedIRATxpyrWithIRASSN", reviewedRoth.ownerSsn),
       ...(fields.roth_owner_inventory_review?.current_conversion
         ? [
@@ -182,10 +210,18 @@ function buildIRS8606(rawFields: Input, context?: MefBuildContext): string {
     fields,
     context?.pending,
     context?.filer,
+    mefTaxYear(context),
   );
   if (reviewedDistribution) {
     return elements("IRS8606", [
-      element("Form8606IRANamelineTxt", reviewedDistribution.ownerName),
+      element(
+        "Form8606IRANamelineTxt",
+        iraOwnerNameLine(
+          context?.filer,
+          reviewedDistribution.ownerSsn,
+          reviewedDistribution.ownerName,
+        ),
+      ),
       element("NondedIRATxpyrWithIRASSN", reviewedDistribution.ownerSsn),
       element(
         "NondedIRACurrTYNondedContriAmt",
@@ -302,6 +338,12 @@ function buildIRS8606(rawFields: Input, context?: MefBuildContext): string {
   }
   if (line2 === 0) {
     const evidence = fields.zero_basis_source;
+    if (evidence) {
+      assertForm8606SourceYears(
+        { zero_basis_source: evidence },
+        mefTaxYear(context),
+      );
+    }
     const worksheet = iraWorksheetSchema.safeParse(
       context?.pending?.ira_deduction_worksheet,
     );
@@ -336,12 +378,15 @@ function buildIRS8606(rawFields: Input, context?: MefBuildContext): string {
       (f1040.line4b_ira_taxable ?? 0) !== 0
     ) {
       throw new Error(
-        "Form 8606 zero-opening-basis claim needs matching 2024 Form 8606, 2025 Form 5498, IRA worksheet, and finalized Form 1040 sources",
+        "Form 8606 zero-opening-basis claim needs matching prior-year Form 8606, Form 5498, IRA worksheet, and finalized Form 1040 sources",
       );
     }
   }
   return elements("IRS8606", [
-    element("Form8606IRANamelineTxt", ownerName),
+    element(
+      "Form8606IRANamelineTxt",
+      iraOwnerNameLine(filer, ownerSsn, ownerName),
+    ),
     element("NondedIRATxpyrWithIRASSN", ownerSsn),
     element("NondedIRACurrTYNondedContriAmt", line1),
     element("NondedIRABasisForPYAmt", line2),

@@ -1,3 +1,6 @@
+import { test } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as sys from "../../../../../../scripts/support/sys.ts";
 import {
   assertEquals,
   assertExists,
@@ -193,9 +196,9 @@ export function fixture(ledger: ArcherDistributionLedger) {
   };
 }
 
-Deno.test("Form8853 sourced mixed age65 and disability distributions retain on-event taxable penalty", () => {
+test("Form8853 sourced mixed age65 and disability distributions retain on-event taxable penalty", () => {
   for (const ledger of [ageLedger, disabilityLedger]) {
-    assertEquals(calculateArcherLedger(ledger), {
+    assertEquals(calculateArcherLedger(ledger, 2025), {
       rawGross: 6000,
       rawQualified: 1500,
       rawExceptedTaxable: 1500,
@@ -213,33 +216,33 @@ Deno.test("Form8853 sourced mixed age65 and disability distributions retain on-e
   const allExcepted = structuredClone(ageLedger);
   if (allExcepted.source.kind !== "normal") throw new Error("fixture kind");
   allExcepted.source.distributions = [row("2025-06-16", "after")];
-  assertEquals(calculateArcherLedger(allExcepted).line9b, 0);
+  assertEquals(calculateArcherLedger(allExcepted, 2025).line9b, 0);
   allExcepted.source.distributions[0].unreimbursed_qualified_expenses = 2000;
-  assertEquals(calculateArcherLedger(allExcepted).line9a, false);
+  assertEquals(calculateArcherLedger(allExcepted, 2025).line9a, false);
 });
 
-Deno.test("Form8853 source evidence rejects missing, invalid, duplicate, and death timing facts", () => {
+test("Form8853 source evidence rejects missing, invalid, duplicate, and death timing facts", () => {
   const duplicate = structuredClone(ageLedger);
   if (duplicate.source.kind !== "normal") throw new Error("fixture kind");
   duplicate.source.distributions.push(duplicate.source.distributions[0]);
-  assertThrows(() => calculateArcherLedger(duplicate), Error, "duplicate");
+  assertThrows(() => calculateArcherLedger(duplicate, 2025), Error, "duplicate");
   const missing = structuredClone(disabilityLedger);
   if (missing.source.kind !== "normal") throw new Error("fixture kind");
   missing.source.disability = undefined;
   missing.source.distributions[0].form1099sa_distribution_code = "3";
   assertThrows(
-    () => calculateArcherLedger(missing),
+    () => calculateArcherLedger(missing, 2025),
     Error,
     "sourced disability facts",
   );
   const invalid = structuredClone(deathLedger);
   if (invalid.source.kind !== "death_transfer") throw new Error("fixture kind");
   invalid.source.expenses[0].paid_date = "2026-04-16";
-  assertThrows(() => calculateArcherLedger(invalid), Error, "within one year");
+  assertThrows(() => calculateArcherLedger(invalid, 2025), Error, "within one year");
   invalid.source.expenses[0].paid_date = "2025-05-20";
   invalid.source.expenses[0].incurred_date = "2025-04-15";
   assertThrows(
-    () => calculateArcherLedger(invalid),
+    () => calculateArcherLedger(invalid, 2025),
     Error,
     "incurred before death",
   );
@@ -255,7 +258,7 @@ for (
     ["cents mixed age65", centsMixedLedger, 4499, 600],
   ] as const
 ) {
-  Deno.test(`Form8853 ${name}: public source through full1040, native XSD and PDF`, async () => {
+  test(`Form8853 ${name}: public source through full1040, native XSD and PDF`, async () => {
     const result = execute(
       buildExecutionPlan(registry),
       registry,
@@ -274,7 +277,7 @@ for (
     const filer = extractFilerIdentity(result.pending.f1040);
     assertExists(filer);
     const xml = buildMefXml(buildPending(result.pending), filer);
-    const lines = calculateArcherLedger(ledger);
+    const lines = calculateArcherLedger(ledger, 2025);
     assertEquals(
       xml.includes(
         "<ArcherMSADistriMeetTaxExcInd>X</ArcherMSADistriMeetTaxExcInd>",
@@ -302,14 +305,14 @@ for (
       );
     }
     const xsd = new URL(
-      "../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+      "../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
       import.meta.url,
     ).pathname;
-    const xmlPath = await Deno.makeTempFile({ suffix: ".xml" });
-    const pdfPath = await Deno.makeTempFile({ suffix: ".pdf" });
+    const xmlPath = await sys.makeTempFile({ suffix: ".xml" });
+    const pdfPath = await sys.makeTempFile({ suffix: ".pdf" });
     try {
-      await Deno.writeTextFile(xmlPath, xml);
-      const validation = await new Deno.Command("xmllint", {
+      await fs.writeFile(xmlPath, xml);
+      const validation = await new sys.Command("xmllint", {
         args: ["--noout", "--schema", xsd, xmlPath],
         stderr: "piped",
       }).output();
@@ -318,8 +321,8 @@ for (
         0,
         new TextDecoder().decode(validation.stderr),
       );
-      await Deno.writeFile(pdfPath, await buildPdfBytes(result.pending, filer));
-      const text = await new Deno.Command("pdftotext", {
+      await fs.writeFile(pdfPath, await buildPdfBytes(result.pending, filer));
+      const text = await new sys.Command("pdftotext", {
         args: ["-layout", pdfPath, "-"],
         stdout: "piped",
         stderr: "piped",
@@ -349,8 +352,8 @@ for (
         assertStringIncludes(printed, "Death of Archer MSA account holder");
       }
     } finally {
-      await Deno.remove(xmlPath);
-      await Deno.remove(pdfPath);
+      await sys.remove(xmlPath);
+      await sys.remove(pdfPath);
     }
     const projected = form8853Pdf.instances?.(
       result.pending.form8853!,
@@ -383,7 +386,7 @@ for (
   });
 }
 
-Deno.test("Form8853 estate FMV source calculates on final return; full packet retains deceased1040 blocker", async () => {
+test("Form8853 estate FMV source calculates on final return; full packet retains deceased1040 blocker", async () => {
   const result = execute(
     buildExecutionPlan(registry),
     registry,
@@ -430,7 +433,7 @@ Deno.test("Form8853 estate FMV source calculates on final return; full packet re
   );
 });
 
-Deno.test("Form8853 archer rejects reused medical expense references through native and PDF export", async () => {
+test("Form8853 archer rejects reused medical expense references through native and PDF export", async () => {
   const result = execute(
     buildExecutionPlan(registry),
     registry,
@@ -473,7 +476,7 @@ Deno.test("Form8853 archer rejects reused medical expense references through nat
   }
   invalidDeath.source.expenses.push({ ...invalidDeath.source.expenses[0] });
   assertThrows(
-    () => calculateArcherLedger(invalidDeath),
+    () => calculateArcherLedger(invalidDeath, 2025),
     Error,
     "qualified expense reference cannot be reused",
   );

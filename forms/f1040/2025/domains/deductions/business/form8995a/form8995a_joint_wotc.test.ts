@@ -1,3 +1,5 @@
+import { test } from "bun:test";
+import * as sys from "../../../../../../../scripts/support/sys.ts";
 import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import { pdfReviewFixtures } from "../../../../pdf/review-fixtures.ts";
 import { f1040_2025 } from "../../../../index.ts";
@@ -8,16 +10,17 @@ import {
 } from "../../../../../nodes/intermediate/forms/deductions/business/form8995a/index.ts";
 import { form8995a } from "../../../../mef/forms/deductions/business/f8995a/f8995a.ts";
 import { form8995aPdf } from "../../../../pdf/forms/deductions/business/f8995a.ts";
+import { roundWholeDollars } from "../../../../../whole-dollars.ts";
 const fixtures = pdfReviewFixtures.filter((f) =>
   f.id.startsWith("joint-primary-wotc-")
 );
-Deno.test("joint primary WOTC preserves spouse W2 and full wage reduction through phase-in/native/PDF/XSD", async () => {
+test("joint primary WOTC preserves spouse W2 and full wage reduction through phase-in/native/PDF/XSD", async () => {
   for (const fixture of fixtures) {
     const r = f1040_2025.executeReturn(fixture.inputs);
     assertEquals(r.diagnostics, []);
     const p = normalizeAllPending(r.pending),
       q = inputSchema.parse(p.form8995a),
-      lines = calculateOneBusiness8995ALines(q);
+      lines = calculateOneBusiness8995ALines(q, 2025);
     assertEquals(p.schedule_se.owner_instances instanceof Array, true);
     assertEquals((p.schedule_se.owner_instances as any[])[0].w2_ss_wages, 0);
     assertEquals(
@@ -30,10 +33,12 @@ Deno.test("joint primary WOTC preserves spouse W2 and full wage reduction throug
       (p.w2.w2s as any[])[0].box1_wages,
       (fixture.inputs.w2 as any[])[0].box1_wages,
     );
+    // Line 9 adds whole-dollar lines 1z and 8 before line 10 is subtracted.
     assertEquals(
       p.f1040.line11_agi,
-      Number(p.f1040.line1a_wages) + Number(p.schedule1.line3_schedule_c) -
-        Number(p.schedule1.line15_se_deduction),
+      roundWholeDollars(Number(p.f1040.line1a_wages)) +
+        roundWholeDollars(Number(p.schedule1.line3_schedule_c)) -
+        roundWholeDollars(Number(p.schedule1.line15_se_deduction)),
     );
     if (fixture.id.endsWith("threshold-edge")) {
       assertEquals(q.taxable_income, 394601);
@@ -69,10 +74,10 @@ Deno.test("joint primary WOTC preserves spouse W2 and full wage reduction throug
     const prepared = await f1040_2025.prepareReturn(r.pending, fixture.filer);
     assertStringIncludes(prepared.bundle.xml, "<IRS8995A ");
     const xsd = new URL(
-      "../../../../../../../.state/research/docs/IMF_Series_2025v5.4/1040x_Schema_2025v5.4/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
+      "../../../../../../../irs/mef/2025v5.4/IndividualIncomeTax/Ind1040/Return1040.xsd",
       import.meta.url,
     ).pathname;
-    const proc = new Deno.Command("xmllint", {
+    const proc = new sys.Command("xmllint", {
       args: ["--noout", "--schema", xsd, "-"],
       stdin: "piped",
       stdout: "piped",
@@ -86,7 +91,7 @@ Deno.test("joint primary WOTC preserves spouse W2 and full wage reduction throug
     assertEquals((await prepared.renderPdf()).length > 0, true);
   }
 });
-Deno.test("joint WOTC native and PDF reject owned wage/credit/phase-in/source conflicts", () => {
+test("joint WOTC native and PDF reject owned wage/credit/phase-in/source conflicts", () => {
   const fixture = fixtures[0], r = f1040_2025.executeReturn(fixture.inputs);
   assertEquals(r.diagnostics, []);
   const original = normalizeAllPending(r.pending);
@@ -118,7 +123,7 @@ Deno.test("joint WOTC native and PDF reject owned wage/credit/phase-in/source co
   }
 });
 
-Deno.test("joint WOTC parent rejects conflicting actual filed primary and spouse identities", () => {
+test("joint WOTC parent rejects conflicting actual filed primary and spouse identities", () => {
   const fixture = fixtures[0],
     r = f1040_2025.executeReturn(fixture.inputs),
     p = normalizeAllPending(r.pending);
@@ -134,7 +139,7 @@ Deno.test("joint WOTC parent rejects conflicting actual filed primary and spouse
   }
 });
 
-Deno.test("joint WOTC public source rejects missing owner review or W2 owned by neither spouse", () => {
+test("joint WOTC public source rejects missing owner review or W2 owned by neither spouse", () => {
   for (
     const mutate of [
       (inputs: any) =>

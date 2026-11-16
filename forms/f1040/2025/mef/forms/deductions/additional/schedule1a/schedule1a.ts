@@ -19,7 +19,10 @@ import {
   qualifiedEmployeeTipRows,
   seniorDeduction,
 } from "../../../../../../nodes/intermediate/forms/deductions/additional/schedule1a/index.ts";
-import { inputSchema as w2InputSchema } from "../../../../../../nodes/inputs/income/wages/w2/index.ts";
+import {
+  Box12Code,
+  inputSchema as w2InputSchema,
+} from "../../../../../../nodes/inputs/income/wages/w2/index.ts";
 import { inputSchema as form4137InputSchema } from "../../../../../../nodes/intermediate/forms/taxes/employment/form4137/index.ts";
 import { inputSchema as necInputSchema } from "../../../../../../nodes/inputs/income/business/f1099nec/index.ts";
 import { inputSchema as miscInputSchema } from "../../../../../../nodes/inputs/income/business/f1099m/index.ts";
@@ -31,6 +34,7 @@ import {
   physicalPresenceFilingSchema,
 } from "../../../../../../nodes/intermediate/forms/income/foreign/form2555/calculation.ts";
 import type { MefBuildContext, MefFormDescriptor } from "../../../../form-descriptor.ts";
+import { mefTaxYear } from "../../../../support/year-config.ts";
 
 const form1040ReconciliationSchema = z.object({
   filing_status: z.nativeEnum(FilingStatus).optional(),
@@ -59,8 +63,11 @@ function buildSchedule(raw: Input, context?: MefBuildContext): string {
     throw new Error("Schedule 1-A Part I reviews cannot conflict");
   }
   if (!input.senior_zero_exclusions_review && !positive2555) {
-    const hasDeductionSource = input.taxpayer_age_65_or_older === true ||
-      input.spouse_age_65_or_older === true ||
+    // A married-filing-separately filer has no senior deduction to source.
+    const seniorSource = input.filing_status !== FilingStatus.MFS &&
+      (input.taxpayer_age_65_or_older === true ||
+        input.spouse_age_65_or_older === true);
+    const hasDeductionSource = seniorSource ||
       (input.qualified_employee_tips?.length ?? 0) > 0 ||
       (input.qualified_form4137_tips?.length ?? 0) > 0 ||
       (input.form4070_reports?.length ?? 0) > 0 ||
@@ -109,7 +116,7 @@ function buildSchedule(raw: Input, context?: MefBuildContext): string {
       .passthrough().parse(context?.pending?.form2555);
     const lines = calculatePhysicalPresence2555(
       pending2555.filing_details,
-      2025,
+      mefTaxYear(context),
     );
     if (
       lines.qualifyingDays !== 365 || lines.line45 <= 0 ||
@@ -144,7 +151,7 @@ function buildSchedule(raw: Input, context?: MefBuildContext): string {
     (input.qualified_trade_business_tips?.length ?? 0) > 0
   ) {
     const lines = calculateQualifiedTipsSchedule1A(
-      { taxYear: 2025, formType: "f1040" },
+      { taxYear: mefTaxYear(context), formType: "f1040" },
       input,
     );
     const entries = input.qualified_employee_tips ?? [];
@@ -152,9 +159,16 @@ function buildSchedule(raw: Input, context?: MefBuildContext): string {
     const filedW2s = context?.pending?.w2
       ? w2InputSchema.parse(context.pending.w2).w2s
       : [];
+    const codeTP = (item: (typeof filedW2s)[number]) =>
+      (item.box12_entries ?? []).filter((entry) => entry.code === Box12Code.TP)
+        .reduce((sum, entry) => sum + entry.amount, 0);
+    const reportsCodeTP = (item: (typeof filedW2s)[number]) =>
+      codeTP(item) > 0 && item.box14b_tipped_code !== undefined &&
+      isQualifiedTipsOccupationCode(item.box14b_tipped_code);
     const sourceW2s = filedW2s.filter((item) =>
       item.box13_statutory_employee !== true &&
-      (item.qualified_tips_box14_review !== undefined ||
+      (reportsCodeTP(item) ||
+        item.qualified_tips_box14_review !== undefined ||
         (item.box14b_tipped_code !== undefined &&
           isQualifiedTipsOccupationCode(item.box14b_tipped_code) &&
           (item.box7_ss_tips ?? 0) > 0))
@@ -169,7 +183,10 @@ function buildSchedule(raw: Input, context?: MefBuildContext): string {
           normalize(source.employer_ein ?? "") ===
             normalize(entry.employer_ein) &&
           source.employer_name === entry.employer_name &&
-          (source.qualified_tips_box14_review === undefined
+          (reportsCodeTP(source)
+            ? entry.source_type === "w2_code_tp" &&
+              codeTP(source) === entry.amount
+            : source.qualified_tips_box14_review === undefined
             ? entry.source_type === "w2_box7" &&
               source.box7_ss_tips === entry.amount
             : entry.source_type === "w2_box14" &&
@@ -496,7 +513,7 @@ function buildSchedule(raw: Input, context?: MefBuildContext): string {
         );
       }
       const businessOutput = scheduleC.compute(
-        { taxYear: 2025, formType: "f1040" },
+        { taxYear: mefTaxYear(context), formType: "f1040" },
         context?.pending?.schedule_c as Parameters<typeof scheduleC.compute>[1],
       ).outputs.find((item) => item.nodeType === "schedule1a");
       const businessRows = businessOutput?.fields
@@ -504,7 +521,7 @@ function buildSchedule(raw: Input, context?: MefBuildContext): string {
       const farmOutput = context?.pending?.schedule_f === undefined
         ? undefined
         : scheduleF.compute(
-          { taxYear: 2025, formType: "f1040" },
+          { taxYear: mefTaxYear(context), formType: "f1040" },
           context.pending.schedule_f as Parameters<typeof scheduleF.compute>[1],
         ).outputs.find((item) => item.nodeType === "schedule1a");
       if (
@@ -544,14 +561,18 @@ function buildSchedule(raw: Input, context?: MefBuildContext): string {
         form7206.build(actualHealth!, {
           pending: actualPending,
           filer: context?.filer ?? extractFilerIdentity(actualPending.f1040),
+          taxYear: mefTaxYear(context),
         });
         healthDeduction = calculateSingleScheduleCForm7206(
           input.qualified_tips_health_plan_source,
         ).line14;
       } else if (input.qualified_tips_health_plans_source) {
         healthDeduction =
-          assertIndependentOwnerHealthSource(actualPending, context?.filer)
-            .deduction;
+          assertIndependentOwnerHealthSource(
+            actualPending,
+            mefTaxYear(context),
+            context?.filer,
+          ).deduction;
       }
       const line15 = scheduleOne.line15_se_deduction ?? 0;
       const owned = input.qualified_tips_owner_se_source === undefined
@@ -559,6 +580,7 @@ function buildSchedule(raw: Input, context?: MefBuildContext): string {
         : context?.pending
         ? assertOwnedScheduleSE(
           normalizeAllPending(context.pending as Record<string, unknown>),
+          mefTaxYear(context),
         )
         : undefined;
       if (
@@ -633,7 +655,7 @@ function buildSchedule(raw: Input, context?: MefBuildContext): string {
   }
   if ((input.qualified_w2_overtime?.length ?? 0) > 0) {
     const lines = calculateW2OvertimeSchedule1A(
-      { taxYear: 2025, formType: "f1040" },
+      { taxYear: mefTaxYear(context), formType: "f1040" },
       input,
     );
     const statementEntries = input.qualified_w2_overtime!.filter((entry) =>
@@ -642,10 +664,45 @@ function buildSchedule(raw: Input, context?: MefBuildContext): string {
       entry.double_time_excess_statement_reference !== undefined
     );
     const box14Entries = input.qualified_w2_overtime!.filter((entry) =>
+      entry.w2_box12_code_tt === undefined &&
       entry.employer_statement_reference === undefined &&
       entry.aggregate_overtime_statement_reference === undefined &&
       entry.double_time_excess_statement_reference === undefined
     );
+    const codeTTEntries = input.qualified_w2_overtime!.filter((entry) =>
+      entry.w2_box12_code_tt === true
+    );
+    if (codeTTEntries.length > 0) {
+      const sourceW2s = context?.pending?.w2
+        ? w2InputSchema.parse(context.pending.w2).w2s
+        : [];
+      const normalize = (value: string) => value.replaceAll("-", "");
+      const codeTT = (w2: (typeof sourceW2s)[number]) =>
+        (w2.box12_entries ?? []).filter((entry) => entry.code === Box12Code.TT)
+          .reduce((sum, entry) => sum + entry.amount, 0);
+      const sourceCodeTTW2s = sourceW2s.filter((w2) =>
+        w2.flsa_overtime_review !== undefined && codeTT(w2) > 0 &&
+        w2.box13_statutory_employee !== true
+      );
+      if (
+        sourceCodeTTW2s.length !== codeTTEntries.length ||
+        !codeTTEntries.every((entry) =>
+          sourceCodeTTW2s.filter((w2) =>
+            normalize(w2.employee_ssn ?? "") ===
+              normalize(entry.employee_ssn) &&
+            normalize(w2.employer_ein ?? "") ===
+              normalize(entry.employer_ein) &&
+            w2.box1_wages === entry.box1_wages &&
+            codeTT(w2) === entry.amount &&
+            w2.flsa_overtime_review?.source_reference === entry.source_reference
+          ).length === 1
+        )
+      ) {
+        throw new Error(
+          "Schedule 1-A code TT overtime does not match the filed W-2 box 12 and review",
+        );
+      }
+    }
     if (box14Entries.length > 0) {
       const sourceW2s = context?.pending?.w2
         ? w2InputSchema.parse(context.pending.w2).w2s
@@ -822,7 +879,7 @@ function buildSchedule(raw: Input, context?: MefBuildContext): string {
   }
   if ((input.vehicle_loans?.length ?? 0) > 0) {
     const lines = calculateVehicleInterestSchedule1A(
-      { taxYear: 2025, formType: "f1040" },
+      { taxYear: mefTaxYear(context), formType: "f1040" },
       input,
     );
     const returnSsns = [form1040.taxpayer_ssn];
@@ -872,12 +929,19 @@ function buildSchedule(raw: Input, context?: MefBuildContext): string {
       element("QualifiedCarLoanInterestDedAmt", lines.line30_vehicle_interest),
     );
   }
-  if (seniorDeduction({ taxYear: 2025, formType: "f1040" }, input) > 0) {
-    const lines = calculateSeniorOnlySchedule1A(
-      { taxYear: 2025, formType: "f1040" },
+  const seniorContext = {
+    taxYear: mefTaxYear(context),
+    formType: "f1040",
+  };
+  if (seniorDeduction(seniorContext, input) > 0) {
+    const lines = calculateSeniorOnlySchedule1A(seniorContext, input);
+    assertSchedule1ASeniorGeneralSource(
+      context?.pending?.general,
       input,
+      lines.line36a_taxpayer,
+      lines.line36b_spouse,
+      seniorContext.taxYear,
     );
-    assertSchedule1ASeniorGeneralSource(context?.pending?.general, input, lines.line36a_taxpayer, lines.line36b_spouse);
     const matchesPerson = (
       claimed: number,
       sourceSsn: string | undefined,

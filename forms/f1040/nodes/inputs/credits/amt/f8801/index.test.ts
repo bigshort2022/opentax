@@ -1,7 +1,10 @@
+import { test } from "bun:test";
 import { assertEquals, assertThrows } from "@std/assert";
 import { f8801 } from "./index.ts";
 import { fieldsOf } from "../../../../../../../core/test-utils/output.ts";
 import { schedule3 } from "../../../../intermediate/aggregation/general/return-assembly/schedule3/index.ts";
+import { form6251 } from "../../../../intermediate/forms/taxes/amt/form6251/index.ts";
+import { f1040 } from "../../../../outputs/general/return-assembly/f1040/index.ts";
 
 function reviewedSources(input: Record<string, unknown>) {
   const amt = Number(input.prior_year_amt_paid ?? 0);
@@ -54,12 +57,12 @@ function compute(input: Record<string, unknown>) {
 // 1. Input Schema Validation
 // =============================================================================
 
-Deno.test("f8801.inputSchema: empty input passes", () => {
+test("f8801.inputSchema: empty input passes", () => {
   const parsed = f8801.inputSchema.safeParse({});
   assertEquals(parsed.success, true);
 });
 
-Deno.test("f8801.inputSchema: valid full input passes", () => {
+test("f8801.inputSchema: valid full input passes", () => {
   const parsed = f8801.inputSchema.safeParse({
     prior_year_amt_paid: 5000,
     prior_year_carryforward: 2000,
@@ -73,7 +76,7 @@ Deno.test("f8801.inputSchema: valid full input passes", () => {
   assertEquals(parsed.success, true);
 });
 
-Deno.test("Form 8801 staged credit needs exact reviewed prior Form 6251 and 8801 lines", () => {
+test("Form 8801 staged credit needs exact reviewed prior Form 6251 and 8801 lines", () => {
   const claim = {
     prior_year_amt_paid: 5_000,
     prior_year_carryforward: 2_000,
@@ -151,22 +154,22 @@ Deno.test("Form 8801 staged credit needs exact reviewed prior Form 6251 and 8801
   }
 });
 
-Deno.test("f8801.inputSchema: negative prior_year_amt_paid fails", () => {
+test("f8801.inputSchema: negative prior_year_amt_paid fails", () => {
   const parsed = f8801.inputSchema.safeParse({ prior_year_amt_paid: -1 });
   assertEquals(parsed.success, false);
 });
 
-Deno.test("f8801.inputSchema: negative prior_year_carryforward fails", () => {
+test("f8801.inputSchema: negative prior_year_carryforward fails", () => {
   const parsed = f8801.inputSchema.safeParse({ prior_year_carryforward: -100 });
   assertEquals(parsed.success, false);
 });
 
-Deno.test("f8801.inputSchema: negative current_year_regular_tax fails", () => {
+test("f8801.inputSchema: negative current_year_regular_tax fails", () => {
   const parsed = f8801.inputSchema.safeParse({ current_year_regular_tax: -1 });
   assertEquals(parsed.success, false);
 });
 
-Deno.test("f8801.inputSchema: negative current_year_tmt fails", () => {
+test("f8801.inputSchema: negative current_year_tmt fails", () => {
   const parsed = f8801.inputSchema.safeParse({ current_year_tmt: -50 });
   assertEquals(parsed.success, false);
 });
@@ -175,12 +178,12 @@ Deno.test("f8801.inputSchema: negative current_year_tmt fails", () => {
 // 2. Zero / No Output Cases
 // =============================================================================
 
-Deno.test("f8801.compute: empty input — no outputs", () => {
+test("f8801.compute: empty input — no outputs", () => {
   const result = compute({});
   assertEquals(result.outputs.length, 0);
 });
 
-Deno.test("f8801.compute: available_credit is zero — no output", () => {
+test("f8801.compute: available_credit is zero — no output", () => {
   // Both prior_year fields omitted → available_credit = 0
   const result = compute({
     current_year_regular_tax: 20000,
@@ -189,7 +192,7 @@ Deno.test("f8801.compute: available_credit is zero — no output", () => {
   assertEquals(result.outputs.length, 0);
 });
 
-Deno.test("f8801.compute: regular_tax equals tmt — excess is zero, no output", () => {
+test("f8801.compute: regular_tax equals tmt — excess is zero, no output", () => {
   // Excess = 0 → credit_allowed = 0
   const result = compute({
     prior_year_amt_paid: 5000,
@@ -199,7 +202,7 @@ Deno.test("f8801.compute: regular_tax equals tmt — excess is zero, no output",
   assertEquals(result.outputs.length, 0);
 });
 
-Deno.test("f8801.compute: regular_tax less than tmt — excess is zero, no output", () => {
+test("f8801.compute: regular_tax less than tmt — excess is zero, no output", () => {
   // regular_tax < tmt → excess = max(0, ...) = 0
   const result = compute({
     prior_year_amt_paid: 3000,
@@ -209,7 +212,7 @@ Deno.test("f8801.compute: regular_tax less than tmt — excess is zero, no outpu
   assertEquals(result.outputs.length, 0);
 });
 
-Deno.test("f8801.compute: zero prior_year_amt_paid and zero carryforward — no output", () => {
+test("f8801.compute: zero prior_year_amt_paid and zero carryforward — no output", () => {
   const result = compute({
     prior_year_amt_paid: 0,
     prior_year_carryforward: 0,
@@ -223,7 +226,7 @@ Deno.test("f8801.compute: zero prior_year_amt_paid and zero carryforward — no 
 // 3. Credit Calculation — Full Credit Used
 // =============================================================================
 
-Deno.test("f8801.compute: excess > available_credit — full credit allowed", () => {
+test("f8801.compute: excess > available_credit — full credit allowed", () => {
   // available = 3000; excess = 20000 - 10000 = 10000; credit = min(3000, 10000) = 3000
   const result = compute({
     prior_year_amt_paid: 3000,
@@ -235,7 +238,7 @@ Deno.test("f8801.compute: excess > available_credit — full credit allowed", ()
   assertEquals(fields.line6b_prior_year_min_tax_credit, 3000);
 });
 
-Deno.test("f8801.compute: carryforward only — full credit allowed when excess sufficient", () => {
+test("f8801.compute: carryforward only — full credit allowed when excess sufficient", () => {
   // available = 0 + 2500 = 2500; excess = 15000 - 8000 = 7000; credit = 2500
   const result = compute({
     prior_year_carryforward: 2500,
@@ -246,7 +249,7 @@ Deno.test("f8801.compute: carryforward only — full credit allowed when excess 
   assertEquals(fields.line6b_prior_year_min_tax_credit, 2500);
 });
 
-Deno.test("f8801.compute: both prior_year_amt_paid and carryforward — sums correctly", () => {
+test("f8801.compute: both prior_year_amt_paid and carryforward — sums correctly", () => {
   // available = 2000 + 3000 = 5000; excess = 20000 - 13000 = 7000; credit = 5000
   const result = compute({
     prior_year_amt_paid: 2000,
@@ -262,7 +265,7 @@ Deno.test("f8801.compute: both prior_year_amt_paid and carryforward — sums cor
 // 4. Credit Calculation — Partial Credit (Excess Limits Credit)
 // =============================================================================
 
-Deno.test("f8801.compute: excess < available_credit — partial credit, limited by excess", () => {
+test("f8801.compute: excess < available_credit — partial credit, limited by excess", () => {
   // available = 8000; excess = 20000 - 18000 = 2000; credit = min(8000, 2000) = 2000
   const result = compute({
     prior_year_amt_paid: 8000,
@@ -273,7 +276,7 @@ Deno.test("f8801.compute: excess < available_credit — partial credit, limited 
   assertEquals(fields.line6b_prior_year_min_tax_credit, 2000);
 });
 
-Deno.test("f8801.compute: tmt is zero — excess equals regular_tax", () => {
+test("f8801.compute: tmt is zero — excess equals regular_tax", () => {
   // tmt = 0 (no AMT this year); available = 4000; excess = 10000; credit = 4000
   const result = compute({
     prior_year_amt_paid: 4000,
@@ -288,7 +291,7 @@ Deno.test("f8801.compute: tmt is zero — excess equals regular_tax", () => {
 // 5. Output Routing
 // =============================================================================
 
-Deno.test("f8801.compute: credit routes to schedule3 node", () => {
+test("f8801.compute: credit routes to schedule3 node", () => {
   const result = compute({
     prior_year_amt_paid: 1000,
     current_year_regular_tax: 10000,
@@ -298,7 +301,7 @@ Deno.test("f8801.compute: credit routes to schedule3 node", () => {
   assertEquals(result.outputs[0].nodeType, "schedule3");
 });
 
-Deno.test("f8801.compute: credit field is line6b_prior_year_min_tax_credit", () => {
+test("f8801.compute: credit field is line6b_prior_year_min_tax_credit", () => {
   const result = compute({
     prior_year_amt_paid: 1500,
     current_year_regular_tax: 10000,
@@ -312,23 +315,23 @@ Deno.test("f8801.compute: credit field is line6b_prior_year_min_tax_credit", () 
 // 6. Throw Rules
 // =============================================================================
 
-Deno.test("f8801.compute: throws on negative prior_year_amt_paid", () => {
+test("f8801.compute: throws on negative prior_year_amt_paid", () => {
   assertThrows(() => compute({ prior_year_amt_paid: -1 }), Error);
 });
 
-Deno.test("f8801.compute: throws on negative prior_year_carryforward", () => {
+test("f8801.compute: throws on negative prior_year_carryforward", () => {
   assertThrows(() => compute({ prior_year_carryforward: -500 }), Error);
 });
 
-Deno.test("f8801.compute: throws on negative current_year_regular_tax", () => {
+test("f8801.compute: throws on negative current_year_regular_tax", () => {
   assertThrows(() => compute({ current_year_regular_tax: -100 }), Error);
 });
 
-Deno.test("f8801.compute: throws on negative current_year_tmt", () => {
+test("f8801.compute: throws on negative current_year_tmt", () => {
   assertThrows(() => compute({ current_year_tmt: -1 }), Error);
 });
 
-Deno.test("f8801.compute: zero values do not throw", () => {
+test("f8801.compute: zero values do not throw", () => {
   const result = compute({
     prior_year_amt_paid: 0,
     prior_year_carryforward: 0,
@@ -342,7 +345,7 @@ Deno.test("f8801.compute: zero values do not throw", () => {
 // 7. Smoke Test
 // =============================================================================
 
-Deno.test("f8801.compute: smoke test — realistic scenario", () => {
+test("f8801.compute: smoke test — realistic scenario", () => {
   // Taxpayer paid $6,000 AMT last year and has $1,000 carryforward.
   // This year: regular tax $25,000, TMT $18,000 → excess $7,000
   // credit = min(7000, 7000) = 7000
@@ -357,7 +360,7 @@ Deno.test("f8801.compute: smoke test — realistic scenario", () => {
   assertEquals(fields.line6b_prior_year_min_tax_credit, 7000);
 });
 
-Deno.test("f8801.compute: smoke test — partial credit scenario", () => {
+test("f8801.compute: smoke test — partial credit scenario", () => {
   // available = 10000; excess = 22000 - 20000 = 2000; credit = 2000 (partial)
   const result = compute({
     prior_year_amt_paid: 10000,
@@ -366,4 +369,32 @@ Deno.test("f8801.compute: smoke test — partial credit scenario", () => {
   });
   const fields = fieldsOf(result.outputs, schedule3)!;
   assertEquals(fields.line6b_prior_year_min_tax_credit, 2000);
+});
+
+test("f8801.compute: a 2024 line 26 carryforward alone needs no prior evidence", () => {
+  // 2025 Form 8801 line 19 is the 2024 Form 8801 line 26 amount; Form 1040
+  // finishes Part II from its own tax and Form 6251 line 9.
+  const input = { prior_year_carryforward: 86_216 };
+  assertEquals(f8801.inputSchema.safeParse(input).success, true);
+  const result = f8801.compute({ taxYear: 2025, formType: "f1040" }, input);
+  assertEquals(fieldsOf(result.outputs, f1040), {
+    form8801_line21_credit_available: 86_216,
+  });
+  assertEquals(fieldsOf(result.outputs, form6251), {
+    must_file_for_credit: true,
+  });
+  assertEquals(
+    fieldsOf(result.outputs, schedule3)?.line6b_prior_year_min_tax_credit,
+    0,
+  );
+});
+
+test("f8801.inputSchema: entered 2024 Form 8801 evidence must match the carryforward", () => {
+  assertEquals(
+    f8801.inputSchema.safeParse({
+      prior_year_carryforward: 86_216,
+      prior_year_evidence: reviewedSources({ prior_year_carryforward: 86_215 }),
+    }).success,
+    false,
+  );
 });

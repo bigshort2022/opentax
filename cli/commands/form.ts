@@ -1,4 +1,4 @@
-import { join } from "@std/path";
+import { join } from "node:path";
 import { z } from "zod";
 import { catalog } from "../../catalog.ts";
 import type { FormDefinition } from "../../core/types/form-definition.ts";
@@ -11,6 +11,10 @@ import {
   loadMeta,
   updateInput,
 } from "../store/store.ts";
+import {
+  detachInlineBytes,
+  resolveSourceBytes,
+} from "./return-source-files.ts";
 
 function getCatalogEntry(formType: string, year: number) {
   const key = `${formType}:${year}`;
@@ -58,6 +62,13 @@ export function rejectUnknownFields(
   }
 }
 
+/** Inline source bytes are stored as digests of files in retained/. */
+function storedFields(
+  fields: Record<string, unknown>,
+): Record<string, unknown> {
+  return detachInlineBytes(fields).value;
+}
+
 // ─── form add ─────────────────────────────────────────────────────────────────
 
 export type FormAddArgs = {
@@ -70,7 +81,23 @@ export type FormAddArgs = {
 export type FormAddResult = {
   readonly id: string;
   readonly nodeType: string;
+  readonly hint?: string;
 };
+
+/** A box 7 code 3 disability distribution can qualify a recipient under 65
+ * for the credit for the elderly or the disabled (2025 Schedule R, Part I
+ * boxes 2, 4, 5, 6 and 9). */
+function addHint(
+  nodeType: string,
+  fields: Readonly<Record<string, unknown>>,
+  inputs: Readonly<Record<string, readonly unknown[]>>,
+): string | undefined {
+  if (nodeType !== "f1099r" || inputs["schedule_r"]?.length) return undefined;
+  if (
+    fields["box7_distribution_code"] !== "3" && fields["box7_code2"] !== "3"
+  ) return undefined;
+  return "Box 7 code 3 is a disability distribution: if the recipient is under 65 and retired on permanent and total disability, add schedule_r for the credit for the elderly or the disabled ('opentax node template schedule_r --full').";
+}
 
 export async function formAddCommand(
   args: FormAddArgs,
@@ -97,7 +124,7 @@ export async function formAddCommand(
 
   const schema = getUserInputSchema(def, args.nodeType);
   rejectUnknownFields(schema, data);
-  const parsed = schema.safeParse(data);
+  const parsed = schema.safeParse(await resolveSourceBytes(returnPath, data));
   if (!parsed.success) {
     throw new Error(`Validation error: ${parsed.error.message}`);
   }
@@ -105,16 +132,21 @@ export async function formAddCommand(
   const publicEntry = def.inputNodes.find((entry) =>
     (entry.inputKey ?? entry.node.nodeType) === args.nodeType
   );
+  const existing = await loadInputs(returnPath);
   if (
-    publicEntry && !publicEntry.isArray &&
-    (await loadInputs(returnPath))[args.nodeType]?.length
+    publicEntry && !publicEntry.isArray && existing[args.nodeType]?.length
   ) {
     throw new Error(`Singleton input ${args.nodeType} already exists`);
   }
 
-  const { id } = await appendInput(returnPath, args.nodeType, parsed.data);
+  const { id } = await appendInput(
+    returnPath,
+    args.nodeType,
+    storedFields(parsed.data),
+  );
 
-  return { id, nodeType: args.nodeType };
+  const hint = addHint(args.nodeType, data, existing);
+  return { id, nodeType: args.nodeType, ...(hint ? { hint } : {}) };
 }
 
 // ─── form list ────────────────────────────────────────────────────────────────
@@ -199,12 +231,12 @@ export async function formUpdateCommand(
 
   const schema = getUserInputSchema(def, existing.nodeType);
   rejectUnknownFields(schema, data);
-  const parsed = schema.safeParse(data);
+  const parsed = schema.safeParse(await resolveSourceBytes(returnPath, data));
   if (!parsed.success) {
     throw new Error(`Validation error: ${parsed.error.message}`);
   }
 
-  return updateInput(returnPath, args.entryId, parsed.data);
+  return updateInput(returnPath, args.entryId, storedFields(parsed.data));
 }
 
 // ─── form delete ──────────────────────────────────────────────────────────────

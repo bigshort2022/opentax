@@ -19,6 +19,10 @@ import {
   assertForm8835SmallFacilitySource,
   smallFacilitySourceSchema,
 } from "./increase-source.ts";
+import {
+  calculatePurchasedForm8835,
+  purchaseSourceSchema,
+} from "./purchase-source.ts";
 import { z } from "zod";
 import { assertForm8835BondSource, bondSourceSchema } from "./bond-source.ts";
 import type { NodeContext } from "../../../../../../../core/types/node-context.ts";
@@ -26,6 +30,7 @@ import { OutputNodes } from "../../../../../../../core/types/output-nodes.ts";
 import type { NodeResult } from "../../../../../../../core/types/tax-node.ts";
 import { output, TaxNode } from "../../../../../../../core/types/tax-node.ts";
 import { f3800 } from "../f3800/index.ts";
+import { configForYear } from "../../../../config/index.ts";
 
 // Form 8835 line 1 base rates and line 9 fivefold increase are separate.
 export enum EnergyType {
@@ -221,6 +226,7 @@ export const itemSchema = z.object({
   is_fiscal_year: z.boolean(),
   phaseout_adjustment: z.number().nonnegative().optional(),
   transfer_source: transferSourceSchema.optional(),
+  purchase_source: purchaseSourceSchema.optional(),
   transfer_election_amount: z.number().nonnegative().optional(),
   transfer_election_statement_file_name: z.string().min(1).optional(),
   registration_number: z.string().regex(
@@ -286,7 +292,7 @@ function parsedDate(value: string): Date {
   return date;
 }
 
-function baseRate(item: F8835Item): number {
+function baseRate(item: F8835Item, taxYear: number): number {
   const service = parsedDate(item.facility_placed_in_service_date);
   const oldFacility = service < parsedDate("2022-01-01");
   if (
@@ -307,7 +313,9 @@ function baseRate(item: F8835Item): number {
     ((item.energy_type === EnergyType.Hydro ||
       item.energy_type === EnergyType.Marine) &&
       service >= parsedDate("2023-01-01"));
-  return oldFacility ? (high ? 0.03 : 0.015) : (high ? 0.006 : 0.003);
+  const rates = configForYear(taxYear).renewableProductionRates;
+  const period = oldFacility ? rates.placedBefore2022 : rates.placedAfter2021;
+  return high ? period.full : period.half;
 }
 
 function increaseFactor(item: F8835Item): number {
@@ -387,16 +395,16 @@ function windPhaseout(item: F8835Item, line6: number): number {
   return Math.round(line6 * rate);
 }
 
-function form3800Line(item: F8835Item): "1f" | "4e" {
+function form3800Line(item: F8835Item, taxYear: number): "1f" | "4e" {
   const service = parsedDate(item.facility_placed_in_service_date);
   const start = parsedDate(item.production_period_start_date);
   const end = parsedDate(item.production_period_end_date);
   if (
     start > end || start < service ||
-    start.getUTCFullYear() !== 2025 || end.getUTCFullYear() !== 2025
+    start.getUTCFullYear() !== taxYear || end.getUTCFullYear() !== taxYear
   ) {
     throw new Error(
-      "Form 8835 production period must be a valid 2025 period after service",
+      `Form 8835 production period must be a valid ${taxYear} period after service`,
     );
   }
   const creditEnd = new Date(service);
@@ -416,7 +424,13 @@ function form3800Line(item: F8835Item): "1f" | "4e" {
   return end < fourthAnniversary ? "4e" : "1f";
 }
 
-export function calculateForm8835(item: F8835Item): F8835Lines {
+export function calculateForm8835(
+  item: F8835Item,
+  taxYear: number,
+): F8835Lines {
+  if (item.purchase_source) {
+    return calculatePurchasedForm8835(itemSchema.parse(item));
+  }
   assertForm8835PwaSource(item);
   assertForm8835SmallFacilitySource(item);
   assertForm8835EarlyConstructionSource(item);
@@ -733,15 +747,15 @@ export function calculateForm8835(item: F8835Item): F8835Lines {
   if (item.kwh_sold > item.kwh_produced) {
     throw new Error("Form 8835 kWh sold cannot exceed kWh produced");
   }
-  const line = form3800Line(item);
-  const line1 = Math.round(item.kwh_sold * baseRate(item));
+  const line = form3800Line(item, taxYear);
+  const line1 = Math.round(item.kwh_sold * baseRate(item, taxYear));
   const line3 = item.is_fiscal_year ? item.phaseout_adjustment : 0;
   if (line3 === undefined) {
     throw new Error("Form 8835 fiscal-year phaseout adjustment is required");
   }
   if (!item.is_fiscal_year && (item.phaseout_adjustment ?? 0) > 0) {
     throw new Error(
-      "Form 8835 calendar-year 2025 cannot carry a phaseout adjustment",
+      "Form 8835 calendar-year return cannot carry a phaseout adjustment",
     );
   }
   if (line3 > line1) {
@@ -807,10 +821,24 @@ class F8835Node extends TaxNode<typeof inputSchema> {
   readonly inputSchema = inputSchema;
   readonly outputNodes = new OutputNodes([f3800]);
 
-  compute(_ctx: NodeContext, rawInput: F8835Input): NodeResult {
+  compute(ctx: NodeContext, rawInput: F8835Input): NodeResult {
     const input = inputSchema.parse(rawInput);
     const entries = input.f8835s.map((item) => {
-      const lines = calculateForm8835(item);
+      const lines = calculateForm8835(item, ctx.taxYear);
+      const purchase = item.purchase_source;
+      if (purchase) {
+        return {
+          form3800_line: lines.form3800Line,
+          credit_amount: 0,
+          transfer_out_amount: 0,
+          transfer_in_amount: purchase.purchased_credit_amount,
+          transferor_tin: purchase.transferor_tin,
+          registration_number: purchase.registration_number,
+          subject_to_passive_activity_limit:
+            item.subject_to_passive_activity_limit,
+          transfer_election_statement_file_name: purchase.statement_file_name,
+        };
+      }
       return {
         form3800_line: lines.form3800Line,
         credit_amount: lines.line15,

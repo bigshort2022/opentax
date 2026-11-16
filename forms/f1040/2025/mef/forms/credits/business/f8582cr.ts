@@ -1,5 +1,6 @@
+import { mefTaxYear } from "../../../support/year-config.ts";
 import { element, elements } from "../../../../../mef/xml.ts";
-import { reconcileFiledForm8582CROrdinary } from "../../../../domains/credits/business/form8582c/form8582cr_filed_ordinary.ts";
+import { reconcileFiledForm8582CROrdinary } from "../../../../domains/credits/business/form8582cr/form8582cr_filed_ordinary.ts";
 import {
   calculateForm8582CR,
   inputSchema,
@@ -278,7 +279,11 @@ export const form8582cr: MefFormDescriptor<"form8582cr", unknown> = {
           "Form 8582-CR ordinary line 6 needs the finalized return",
         );
       }
-      reconcileFiledForm8582CROrdinary(raw, context.pending);
+      reconcileFiledForm8582CROrdinary(
+        raw,
+        context.pending,
+        mefTaxYear(context),
+      );
     }
     if (context) {
       reconcilePassiveDisabledAccessSources(lines.sourceAllocations, context);

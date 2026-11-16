@@ -12,6 +12,7 @@ import { reconcileForm4952ScheduleJChildDividend } from "../../../deductions/inv
 export function assertForm6251QualifiedDividendSource(
   fields: Readonly<Record<string, unknown>>,
   pending: Readonly<Record<string, unknown>> | undefined,
+  taxYear: number,
 ): void {
   const qualified = fields.qualified_dividends;
   const iso = typeof fields.iso_adjustment === "number" &&
@@ -44,7 +45,7 @@ export function assertForm6251QualifiedDividendSource(
         "Form 6251 needs retained Form 8814 owner and child sources",
       );
     }
-    assertForm8814CalculatedLines(child, owner);
+    assertForm8814CalculatedLines(child, owner, taxYear);
     if (childCapital > 0) {
       const refs = new Set<string>();
       for (const line of child) {
@@ -111,7 +112,7 @@ export function assertForm6251QualifiedDividendSource(
     ? sales.reduce((sum, row) => sum + row.proceeds - row.cost_basis, 0)
     : 0;
   if (ordinarySales) {
-    assertCapitalSaleSourceRows(pending!);
+    assertCapitalSaleSourceRows(pending!, taxYear);
     const schedule = pending?.schedule_d as Record<string, unknown> | undefined;
     const transactions = schedule?.transaction === undefined
       ? []
