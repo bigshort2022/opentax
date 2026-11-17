@@ -22,6 +22,7 @@ for (
   const scenario of [
     "mismatch",
     "command-error",
+    "invalid-input",
     "executor-error",
     "missing-case",
     "unsupported",
@@ -29,14 +30,19 @@ for (
   ] as const
 ) {
   test(`benchmark process fails closed: ${scenario}`, async () => {
-    const form = `__integrity_${crypto.randomUUID()}`;
+    const form = scenario === "missing-case"
+      ? `__integrity_${crypto.randomUUID()}`
+      : "f1040";
+    const name = `__integrity_${crypto.randomUUID()}`;
     const caseRoot = join(root, "cases", form);
-    const caseDir = join(caseRoot, "2025", "synthetic");
+    const caseDir = join(caseRoot, "2025", name);
     const runtime = await sys.makeTempDir();
     try {
       await fs.mkdir(caseDir, { recursive: true });
-      const forms = scenario === "command-error"
+      const forms = scenario === "invalid-input"
         ? [{ node_type: "__nonexistent_node", data: {} }]
+        : scenario === "command-error"
+        ? [validForms[0], validForms[0], validForms[1]]
         : scenario === "executor-error"
         ? [validForms[1]]
         : validForms;
@@ -77,6 +83,7 @@ for (
           join(root, "run_benchmark.ts"),
           "--form",
           form,
+          ...(scenario === "missing-case" ? [] : ["--case", name]),
           "--json",
         ],
         cwd: runtime,
@@ -95,6 +102,17 @@ for (
         );
         return;
       }
+      if (scenario === "invalid-input") {
+        assertStringIncludes(
+          new TextDecoder().decode(stderr),
+          "__nonexistent_node is not a valid input",
+        );
+        assertEquals(
+          new TextDecoder().decode(stdout).includes('{"total":'),
+          false,
+        );
+        return;
+      }
       const jsonLine = new TextDecoder().decode(stdout).split("\n").find(
         (line) => line.startsWith('{"total":'),
       );
@@ -102,7 +120,7 @@ for (
       const report = JSON.parse(jsonLine);
       {
         assertEquals(report.fail, 1);
-        assertEquals(report.failing, ["synthetic"]);
+        assertEquals(report.failing, [name]);
         if (scenario === "mismatch") {
           assertEquals(
             report.failures[0].lineFailures.filter((
@@ -135,8 +153,10 @@ for (
         }
       }
     } finally {
-      await sys.remove(caseRoot, { recursive: true });
+      await sys.remove(scenario === "missing-case" ? caseRoot : caseDir, {
+        recursive: true,
+      });
       await sys.remove(runtime, { recursive: true });
     }
-  });
+  }, 60_000);
 }

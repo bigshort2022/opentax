@@ -206,13 +206,13 @@ const COMMANDS: readonly CommandDef[] = [
     cmd: "return",
     sub: "create",
     description: "Create a new tax return",
-    usage: "opentax return create --year <year> [--form f1040|f4868]",
+    usage: "opentax return create --year <year> [--form f1040|f4868|ca540]",
     options: [
       { flag: "--year", description: "Tax year (e.g. 2025)", required: true },
       {
         flag: "--form",
         description:
-          "Form type (default: f1040; f4868 with --year 2026 for an extension)",
+          "Form type (default: f1040; f4868 TY2026 extension; ca540 TY2025 workpaper)",
       },
     ],
     handler: async (args) => {
@@ -348,7 +348,7 @@ const COMMANDS: readonly CommandDef[] = [
     cmd: "return",
     sub: "export",
     description:
-      "Export a return as MeF XML, an MeF submission ZIP, filled IRS PDF, or Form 4972 paper packet",
+      "Export MeF XML/submission ZIP, federal PDF, CA workpaper, or Form 4972 paper packet",
     usage:
       "opentax return export --returnId <id> --type mef|mef-submission|pdf|form4972-paper [--force] [--draft] [--output <path>] [--efin <efin> --software-id <id> [--sequence <7 chars>] [--residency-review <json-file>]]",
     options: [
@@ -361,7 +361,8 @@ const COMMANDS: readonly CommandDef[] = [
       },
       {
         flag: "--force",
-        description: "Bypass reject-severity validation gate",
+        description:
+          "Bypass federal reject-severity business rules (not CA workpaper restrictions)",
         required: false,
       },
       {
@@ -582,7 +583,8 @@ const COMMANDS: readonly CommandDef[] = [
   {
     cmd: "return",
     sub: "validate",
-    description: "Validate a return against MeF business rules",
+    description:
+      "Report federal rule validation or California workpaper readiness diagnostics",
     usage: "opentax return validate --returnId <id> [--format text|json]",
     options: [
       { flag: "--returnId", description: "Return identifier", required: true },
@@ -779,7 +781,7 @@ const TOP_LEVEL_DEFS: readonly TopLevelDef[] = [
   { usage: "opentax version", description: "Show the current version" },
   {
     usage: "opentax update",
-    description: "Download and install the latest release",
+    description: "Show manual versioned-release installation guidance",
   },
 ];
 

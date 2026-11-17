@@ -1,0 +1,8 @@
+{
+  "official": [
+    "FTB 2025 California Tax Table, line 31, taxable income $68,450–$68,550, Single or Married/RDP Filing Separately column; https://www.ftb.ca.gov/forms/2025/2025-540-taxtable.pdf",
+    "FTB 2025 Form 540 Booklet, lines 18, 19, 31–33, 64, 97 and 100; exemption-credit limitation worksheet separately floors personal/blind/senior and dependent groups; https://www.ftb.ca.gov/forms/2025/2025-540-booklet.html"
+  ],
+  "policy": "OpenTax approved CA540 coverage/readiness plan, bounded workpaper policy (not FTB filing authorization); docs/superpowers/plans/2026-10-17-ca540-coverage-readiness.md",
+  "provenance": "Synthetic workpaper inputs retained from the existing CLI test. Independently source-derived worksheet arithmetic: 75000-1000+200-5706=68494 taxable income; FTB tax table line31=2864; personal credit153; total tax2864-153=2711; payments4000 produce overpayment1289 and taxdue0. Implementation-agent evidence, not an official worked example or human numerical signoff."
+}

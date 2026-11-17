@@ -29,7 +29,8 @@ const IRS_CACHE_XSD =
 
 /** Node, export and return-processing tests: hermetic and fast enough for every pull request. */
 function isFormsGateTest(path: string): boolean {
-  return /^forms\/[^/]+\/(nodes|mef|validation)\//.test(path) ||
+  return /^forms\/ca540\/\d{4}\//.test(path) ||
+    /^forms\/[^/]+\/(nodes|mef|validation)\//.test(path) ||
     /^forms\/[^/]+\/\d{4}\/(mef|return-processing)\//.test(path);
 }
 // PDF and XSD round trips can take minutes; a test is only stopped when hung.
@@ -132,7 +133,8 @@ try {
   const candidates = mode === "harness"
     ? all.filter((path) =>
       path.startsWith("scripts/testing/") ||
-      path === "benchmark/harness.test.ts"
+      path === "benchmark/harness.test.ts" ||
+      path === "benchmark/ca540.test.ts"
     )
     : mode === "forms"
     ? all.filter(isFormsGateTest)
@@ -141,7 +143,8 @@ try {
       path.startsWith("core/") || path.startsWith("cli/") ||
       path.startsWith("scripts/support/") ||
       path.startsWith("scripts/testing/") ||
-      path === "benchmark/harness.test.ts"
+      path === "benchmark/harness.test.ts" ||
+      path === "benchmark/ca540.test.ts"
     )
     : all;
   const gate = changedBase === null

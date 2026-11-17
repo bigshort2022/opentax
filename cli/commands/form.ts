@@ -1,7 +1,10 @@
 import { join } from "node:path";
 import { z } from "zod";
-import { catalog } from "../../catalog.ts";
-import type { FormDefinition } from "../../core/types/form-definition.ts";
+import { productCatalog } from "../../catalog.ts";
+import {
+  isStateFormDefinition,
+  type ProductDefinition,
+} from "../../core/types/form-definition.ts";
 import {
   appendInput,
   deleteInput,
@@ -16,22 +19,26 @@ import {
   resolveSourceBytes,
 } from "./return-source-files.ts";
 
-function getCatalogEntry(formType: string, year: number) {
+function getCatalogEntry(formType: string, year: number): ProductDefinition {
   const key = `${formType}:${year}`;
-  const def = catalog[key];
+  const def = productCatalog[key];
   if (!def) throw new Error(`Unsupported form: ${key}`);
   return def;
 }
 
-export function getUserInputSchema(def: FormDefinition, nodeType: string) {
-  const entry = def.inputNodes.find((candidate) =>
-    (candidate.inputKey ?? candidate.node.nodeType) === nodeType
-  );
-  if (entry) return entry.isArray ? entry.itemSchema : entry.inputSchema;
-
-  // The start node is the graph's composite input and is routed directly.
-  if (nodeType === "start") return def.registry.start.inputSchema;
-
+export function getUserInputSchema(
+  def: ProductDefinition,
+  nodeType: string,
+) {
+  if (isStateFormDefinition(def)) {
+    if (nodeType === def.inputKey) return def.inputSchema;
+  } else {
+    const entry = def.inputNodes.find((candidate) =>
+      (candidate.inputKey ?? candidate.node.nodeType) === nodeType
+    );
+    if (entry) return entry.isArray ? entry.itemSchema : entry.inputSchema;
+    if (nodeType === "start") return def.registry.start.inputSchema;
+  }
   throw new Error(
     `Node type ${nodeType} is not a valid input for ${def.formType}/${def.taxYear}`,
   );
@@ -114,10 +121,12 @@ export async function formAddCommand(
   const def = getCatalogEntry(meta.formType ?? "f1040", meta.year);
 
   if (
-    args.nodeType !== "start" &&
-    !def.inputNodes.some((entry) =>
-      (entry.inputKey ?? entry.node.nodeType) === args.nodeType
-    )
+    isStateFormDefinition(def)
+      ? args.nodeType !== def.inputKey
+      : args.nodeType !== "start" &&
+        !def.inputNodes.some((entry) =>
+          (entry.inputKey ?? entry.node.nodeType) === args.nodeType
+        )
   ) {
     throw new Error(`Unknown node type: ${args.nodeType}`);
   }
@@ -129,14 +138,21 @@ export async function formAddCommand(
     throw new Error(`Validation error: ${parsed.error.message}`);
   }
 
-  const publicEntry = def.inputNodes.find((entry) =>
-    (entry.inputKey ?? entry.node.nodeType) === args.nodeType
-  );
   const existing = await loadInputs(returnPath);
-  if (
-    publicEntry && !publicEntry.isArray && existing[args.nodeType]?.length
-  ) {
-    throw new Error(`Singleton input ${args.nodeType} already exists`);
+  if (isStateFormDefinition(def)) {
+    if (existing[args.nodeType]?.length) {
+      throw new Error(`Singleton input ${args.nodeType} already exists`);
+    }
+  } else {
+    const publicEntry = def.inputNodes.find((entry) =>
+      (entry.inputKey ?? entry.node.nodeType) === args.nodeType
+    );
+    if (
+      publicEntry && !publicEntry.isArray &&
+      existing[args.nodeType]?.length
+    ) {
+      throw new Error(`Singleton input ${args.nodeType} already exists`);
+    }
   }
 
   const { id } = await appendInput(
@@ -221,10 +237,12 @@ export async function formUpdateCommand(
   const existing = await getInput(returnPath, args.entryId);
 
   if (
-    existing.nodeType !== "start" &&
-    !def.inputNodes.some((entry) =>
-      (entry.inputKey ?? entry.node.nodeType) === existing.nodeType
-    )
+    isStateFormDefinition(def)
+      ? existing.nodeType !== def.inputKey
+      : existing.nodeType !== "start" &&
+        !def.inputNodes.some((entry) =>
+          (entry.inputKey ?? entry.node.nodeType) === existing.nodeType
+        )
   ) {
     throw new Error(`Unknown node type: ${existing.nodeType}`);
   }

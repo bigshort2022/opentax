@@ -1,0 +1,8 @@
+{
+  "official": [
+    "FTB 2025 California Tax Rate Schedule X, taxable income over $72,724 through $371,479: base tax $3,201.97 plus 9.3% of excess over $72,724; https://www.ftb.ca.gov/forms/2025/2025-540-tax-rate-schedules.pdf",
+    "FTB 2025 Form 540 Booklet, lines 18, 19, 31–33, 64, 97 and 100; exemption-credit limitation worksheet separately floors personal/blind/senior and dependent groups; https://www.ftb.ca.gov/forms/2025/2025-540-booklet.html"
+  ],
+  "policy": "OpenTax approved CA540 coverage/readiness plan, bounded workpaper policy (not FTB filing authorization); docs/superpowers/plans/2026-10-17-ca540-coverage-readiness.md",
+  "provenance": "Independently source-derived worksheet arithmetic for synthetic single AGI327203, personal1 and dependent1: taxable income327203-5706=321497; rate-schedule tax3201.97+0.093*(321497-72724)=26337.859 rounds to26338; limitation ceil((327203-252203)/2500)*6=180; separately floored credits max(153-180,0)+max(475-180,0)=295; total tax26043; payments4000 produce taxdue22043 and overpayment0. Implementation-agent evidence, not an official worked example or human numerical signoff."
+}

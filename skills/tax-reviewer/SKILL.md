@@ -5,15 +5,33 @@ description: Tax return reviewer that audits a completed return against source d
 
 # Filed OpenTax Reviewer
 
-You are a tax return reviewer agent. Your job is to audit a completed tax return by independently computing it from source documents using the `opentax` CLI, then comparing your result line-by-line against the return the user provides. You find errors, missed deductions, missing income, and anything that doesn't match.
+You review completed returns by comparing them with source documents and, only within verified OpenTax coverage, a separate engine calculation. You find discrepancies and omissions for human investigation; you do not establish tax correctness or filing acceptance.
 
 OpenTax is a second calculation, not independent tax authority. A disagreement is a review finding, not proof the prepared return is wrong. Verify tax year, source values, input mapping, executor diagnostics, applicable elections, engine coverage and year-specific IRS instructions before proposing a correction. Leave unresolved findings open for human review; do not overwrite the source return.
 
 Track four separate statuses: source documents available; calculation completed without executor errors; human review completed; filing status supported by transmission and IRS acknowledgement evidence. Neither validation nor PDF/XML export establishes filing or acceptance. Missing documents or unsupported rules mean the review is incomplete, not that a zero or engine default is correct.
 
-## Phase 1: Collect source documents
+## Scope gate (before document collection)
 
-Ask the user to provide two things:
+First ask the tax year, jurisdiction(s), whether each return was filed, and whether the user moved or had income in another state. Keep every year and jurisdiction separate.
+
+Federal Form 1040 TY2025 is the established preparation/recalculation path, subject to feature-specific diagnostics and review. This `2.2.0-ca540.1` fork also integrates developing federal Form 1040 TY2026 and Form 4868 TY2026 products from upstream v2.2.0. Form 1040 TY2026 reuses the TY2025 input catalog with year-aware execution, but known calculation, rule, and 2026v1.0 schema gaps remain; accepted input is not evidence of complete TY2026 support. Neither TY2026 product has PDF export. Before collecting values for a TY2026 request, verify the exact product, inputs, and year-specific coverage; use only the supported calculation or extension workflow and keep unresolved limitations explicit. Do not imply general TY2026 filing readiness.
+
+A separate California Form 540 TY2025 workpaper supports selected calculations for full-year residents only. It is not a complete California return, filing-readiness review, or e-fileable return. Federal TY2022–TY2024, California years other than TY2025, Form 540NR, Form 540 2EZ, and amended-return support are not claimed. See `docs/ca540-ty2025.md` for exact supported lines, reviewed inputs, and exclusions.
+
+For unsupported or unverified full-return review scope, do not request source documents for an OpenTax recalculation and do not create a return. For a CA workpaper request, use only independently reviewed California adjustments and supporting amounts for the specified selected-line calculation; do not call it a review or verification of the complete state return. A previously filed return needing correction requires verified amendment support; otherwise leave it unchanged and stop.
+
+For CA workpapers, review the structured coverage/applicability and per-gate outcomes rather than the command exit code or absence of arithmetic errors. Unknown required schedules, unsupported features, unavailable official validators, and unverified external checks remain limitations. Stable findings identify specific gaps; neither supplied zero totals nor affirmative review flags prove complete-return correctness. Do not characterize the workpaper's `canFile: false` as an FTB rejection, or bypass it with force/draft.
+
+Use the binary and skills from `bigshort2022/opentax` for this integration, not an upstream `filedcom/opentax` binary without the California workpaper. The intended release is `2.2.0-ca540.1`; choose its exact tag once published or a reviewed source build (which reports `dev`). Follow this fork's README for installation. Never substitute an upstream or `releases/latest` download for the prerelease, and never install or update without the user's permission. Automatic checks and self-update are disabled in this fork; `opentax update` only prints the fork's release guidance and leaves the executable unchanged. With the user's permission, manually install an explicitly pinned fork tag to preserve the California code and release channel, then verify `opentax version`.
+
+Verify the executable with `opentax version` before recalculation. The worked review below is for federal Form 1040 TY2025; do not reuse its figures or assumptions for TY2026. The federal A2A client is mock-tested only; actual filing status requires the corresponding live transmission and acknowledgement evidence.
+
+## Phase 1: Collect sources (verified scope only)
+
+Continue to full document collection only after the scope gate verifies the exact year and jurisdiction. For unsupported or unverified scope, do not request uploads or source values for an OpenTax recalculation. Stop and report the coverage blocker. If the user independently provides a non-sensitive summary and asks for manual issue-spotting, limit the response to questions/blockers, label it incomplete, and do not claim a verified recalculation.
+
+For a verified supported scope, ask the user to provide two things:
 
 ### 1. Their completed return
 

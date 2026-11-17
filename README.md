@@ -4,13 +4,15 @@
   <img src="icon.svg" width="128" height="128" alt="Filed Open Tax Engine">
 </p>
 
-**[opentax.filed.com](https://opentax.filed.com)** - Fully open-source federal tax calculation engine. Single binary. Runs on macOS, Linux, and Windows.
+**Fork integration: `2.2.0-ca540.1`**, based on [Filed OpenTax v2.2.0](https://github.com/filedcom/opentax/releases/tag/v2.2.0), with the fork's limited California Form 540 TY2025 workpaper preserved. Single binary for macOS, Linux, and Windows. This is a prerelease integration, not a claim of filing certification.
 
-> **Note:** This engine calculates taxes accurately for use by AI agents and developers. For filing your taxes, visit [irs.gov](https://irs.gov).
+Federal products include Form 1040 TY2025, developing Form 1040 TY2026 support, and Form 4868 TY2026. TY2026 has explicit calculation/schema gaps and no PDF export. See [supported forms](#supported-forms) and [MeF readiness](./docs/mef/README.md).
 
-Built and maintained by AI agents using official IRS publications as the sole source of truth.
+> **California scope:** selected TY2025 Form 540 calculations for full-year residents only. The worksheet is incomplete, unofficial, not filing-ready, and not e-fileable. See [California Form 540 scope and limitations](docs/ca540-ty2025.md).
 
-> Covers Form 1040 for TY2025, with TY2026 Form 1040 and Form 4868 started. Additional forms and state returns coming.
+California validation reports calculation coverage, stable findings, and separate local-readiness gates. A passing arithmetic/input check is not a complete-return or filing pass: required documents remain unverified and official FTB schema/rule validation is unavailable. `canFile` stays false, and neither force nor draft enables California MeF export.
+
+The engine provides calculations for AI agents and developers; it does not establish tax correctness or filing readiness. Use official IRS/FTB forms and instructions and approved filing channels. Federal MeF A2A transmission code exists but has only been tested against a local mock IRS server; no IRS approval or live acceptance is claimed.
 
 ---
 
@@ -32,11 +34,11 @@ Inspired by Andrej Karpathy's [autoresearch](https://github.com/karpathy/autores
 
 ## Use with AI agents
 
-Copy-paste this into Claude Desktop app:
+Use the skills from this fork so the California scope and safety gates are retained. Copy-paste this into Claude Desktop app:
 
 ```
 Load the skill here using curl or equivalent:
-https://raw.githubusercontent.com/filedcom/opentax/main/skills/opentax/SKILL.md
+https://raw.githubusercontent.com/bigshort2022/opentax/main/skills/opentax/SKILL.md
 
 Then run the onboarding flow.
 ```
@@ -48,7 +50,7 @@ If you use [Claude Code](https://claude.ai/code), install OpenTax as a plugin so
 1. Add the marketplace:
 
 ```
-/plugin marketplace add filedcom/opentax
+/plugin marketplace add bigshort2022/opentax
 ```
 
 2. Install the plugin:
@@ -67,26 +69,60 @@ If you use [Claude Code](https://claude.ai/code), install OpenTax as a plugin so
 
 ---
 
-## Install CLI
+## Install this fork
 
-One command. No runtime, no installer, no dependencies.
+Use this repository's source or an explicitly selected release from
+[bigshort2022/opentax releases](https://github.com/bigshort2022/opentax/releases).
+The upstream `filedcom/opentax` installer and binaries do not include this fork's
+California workpaper. Do not use the upstream one-line installer for this integration.
+
+### Build from source
+
+Requires [Bun](https://bun.sh) 1.4.2. Check out the reviewed integration commit or
+release tag before building:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/filedcom/opentax/main/install.sh | sh
+git clone https://github.com/bigshort2022/opentax.git
+cd opentax
+# Select the reviewed integration commit, or v2.2.0-ca540.1 once published.
+bun install --frozen-lockfile
+bun run compile
+./opentax version
 ```
 
-- Detects your OS and architecture automatically
-- Downloads the right binary and puts it in your PATH
+Run `./opentax` (Windows: `./opentax.exe` when built with that output name), or
+place that executable on your PATH. Source builds report `dev`; release CI
+injects the selected tag's version without changing the source default.
 
-Or download manually:
+### Release binaries
 
-| Platform            | Download                                                                                                          |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Mac (Apple Silicon) | [`opentax-macos-arm64`](https://github.com/filedcom/opentax/releases/latest/download/opentax-macos-arm64)         |
-| Mac (Intel)         | [`opentax-macos-x64`](https://github.com/filedcom/opentax/releases/latest/download/opentax-macos-x64)             |
-| Windows             | [`opentax-windows-x64.exe`](https://github.com/filedcom/opentax/releases/latest/download/opentax-windows-x64.exe) |
-| Linux (x64)         | [`opentax-linux-x64`](https://github.com/filedcom/opentax/releases/latest/download/opentax-linux-x64)             |
-| Linux (ARM)         | [`opentax-linux-arm64`](https://github.com/filedcom/opentax/releases/latest/download/opentax-linux-arm64)         |
+When `v2.2.0-ca540.1` is published, select that exact prerelease on the fork's
+release page. Download its platform asset and `SHA256SUMS`, verify the checksum,
+and run `opentax version` to confirm `2.2.0-ca540.1` before using it.
+The fork's `install.sh` is pinned to that tag by default, rather than GitHub's
+latest-release channel; it cannot download a release that has not been published.
+After publication, an explicit-version install is:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/bigshort2022/opentax/main/install.sh | OPENTAX_VERSION=v2.2.0-ca540.1 sh
+```
+
+Review the script before running it; it may need elevated permission to place
+the binary on your PATH. It is separate from the upstream installer.
+
+| Platform | Asset |
+| --- | --- |
+| Mac (Apple Silicon) | `opentax-macos-arm64` |
+| Mac (Intel) | `opentax-macos-x64` |
+| Windows (x64) | `opentax-windows-x64.exe` |
+| Linux (x64) | `opentax-linux-x64` |
+| Linux (ARM64) | `opentax-linux-arm64` |
+
+The release workflow compiles and smoke-tests all five assets, retains smoke
+transcripts, and publishes checksums. Maintainers should first run its dry-run
+build and the verification/CA gates, then publish the reviewed commit under the
+explicit fork tag. Tags with a hyphen are marked as prereleases. A build or
+smoke pass does not establish tax correctness or filing certification.
 
 ---
 
@@ -96,8 +132,8 @@ Or download manually:
 $ opentax return create --year 2025
 { "returnId": "a1b2c3" }
 
-$ opentax form add --returnId a1b2c3 --node_type general '{"filing_status": "single"}'
-{ "id": "general_01", "nodeType": "general" }
+$ opentax form add --returnId a1b2c3 --node_type start '{"general": {"filing_status": "single"}}'
+{ "id": "start_01", "nodeType": "start" }
 
 $ opentax form add --returnId a1b2c3 --node_type w2 '{"box1_wages": 55000, "box2_fed_withheld": 5200}'
 { "id": "w2_01", "nodeType": "w2" }
@@ -188,6 +224,9 @@ Run `opentax <command> --help` for every flag.
 
 ## Export, validation and filing
 
+The federal notes below do not enable California export or filing. CA supports
+only its unofficial calculation worksheet; its MeF export remains refused.
+
 - `return get` works on partial returns; check its `warnings` before relying on
   amounts. Export also needs the filer's identity (SSN and name).
 - `return validate` and export run the IRS MeF business rules offline. A clean
@@ -202,37 +241,43 @@ Run `opentax <command> --help` for every flag.
 - Shell redirection can leave an empty file on failure; check the exit status.
 - The CLI does not validate against the IRS XSDs; the harness does when the
   schemas are installed in [`irs/`](./irs/README.md).
-- Returns stay local. Uploading source documents to a hosted assistant
-  discloses them to that provider.
+- Return storage and calculations are local; explicitly sending through MeF
+  transmits the submission to the selected IRS endpoint. Uploading source
+  documents to a hosted assistant discloses them to that provider.
 
 MeF A2A transmission (`opentax mef`) and the current MeF readiness are in
-[docs/mef](./docs/mef/README.md).
+[docs/mef](./docs/mef/README.md). Transmission has only been tested against a
+local mock IRS server, not live IRS ATS or production. California workpapers
+cannot be submitted through this path.
 
 ---
 
 ## Staying up to date
 
-OpenTax tells you when a new version is available:
+Automatic update checks and self-update are intentionally disabled for this
+fork (`SELF_UPDATE_ENABLED = false`). The background check does not read or
+write its update cache or contact the network. `opentax update` prints the
+fork's versioned-release guidance and leaves the executable unchanged.
 
-```
-$ opentax return get --returnId abc-123
-{ ... }
-
-Update available: 0.1.0 → 0.2.0. Run `opentax update` to upgrade.
-```
-
-`opentax update` replaces the binary with the latest release; `opentax version`
-shows the current one.
+To update, explicitly choose a reviewed version from
+[the fork's releases](https://github.com/bigshort2022/opentax/releases), verify
+its checksum, and install that exact version manually, or rebuild from its
+reviewed commit. The fork installer accepts the exact tag through
+`OPENTAX_VERSION` and defaults to `v2.2.0-ca540.1`. This pinned selection preserves
+the California fork and release channel; do not substitute an upstream binary
+or a `releases/latest` download. Run `opentax version` after installation to
+confirm the executable you selected.
 
 ---
 
 ## Supported forms
 
-| Form      | Year | Inputs                                                                           |
-| --------- | ---- | -------------------------------------------------------------------------------- |
-| Form 1040 | 2025 | 195 input nodes: W-2s, 1099s, schedules, credits, capital transactions and more  |
-| Form 1040 | 2026 | `general`, `w2`, `f8888`; other inputs are refused until their TY2026 rules land |
-| Form 4868 | 2026 | Extension request                                                                |
+| Form | Year | Scope and limitations |
+| --- | --- | --- |
+| Federal Form 1040 | 2025 | Registered source-document, schedule, and credit inputs; inspect diagnostics and each feature's coverage. Calculation/export is not IRS acceptance. |
+| Federal Form 1040 | 2026 | Reuses the TY2025 input-node catalog with year-aware execution. Known TY2026 calculation/rule/schema blockers remain; input acceptance does not prove TY2026 completeness. MeF uses 2026v1.0; PDF export is unavailable. |
+| Federal Form 4868 | 2026 | Separate extension-request product and MeF XML on 2026v1.0; no PDF export or claim of live IRS acceptance. |
+| California Form 540 | 2025 | Selected-line full-year-resident calculation workpaper only. Not a complete return; `canFile: false`; unofficial worksheet PDF only; no MeF export or transmission. |
 
 [`catalog.ts`](./catalog.ts) lists the form definitions; `opentax node list` and
 `opentax node inspect` show every node and its schema.
@@ -243,8 +288,10 @@ shows the current one.
 
 The engine is a directed graph of **nodes**. Each node is a pure function:
 validated input in, typed output out. Schemas are Zod, with types inferred;
-routing between nodes is type-checked. 137 TY2025 benchmark cases check it
-against values from cited IRS publications.
+routing between nodes is type-checked. Federal TY2025 benchmark cases and
+separate California line/workpaper cases
+check selected values against cited publications and explicit scope assertions.
+These regression checks do not prove full-return correctness or agency acceptance.
 
 AI agents maintain the codebase: they read IRS instructions, write nodes, source
 test cases from IRS exercises, fix regressions, and prove each change with the
@@ -254,7 +301,7 @@ harness before it ships.
 
 ## Development
 
-Requires [Bun](https://bun.sh) 1.4. Run `bun install` once after cloning.
+Requires [Bun](https://bun.sh) 1.4.2. Run `bun install --frozen-lockfile` after cloning.
 
 `cli/main.ts` is the product; the harness is dev-only and documented in
 [scripts/testing/README.md](./scripts/testing/README.md). Agent instructions are
@@ -269,9 +316,12 @@ bun run check:oracle      # expected values changed only with a cited ledger ent
 bun run check:sandbox     # the binary reaches the network only through restricted fetch
 bun run test:unit         # module graph, type check and typed tests
 bun run test:forms        # node, MeF, validation and return-processing tests
-bun run check:mef         # sample returns build MeF XML and pass the IRS rules
+bun run check:mef         # sample returns gain no new baselined MeF blockers
+bun run check:ty2026      # TY2026 sample-return blocker ratchet
 bun run check:cli         # sample returns work end to end through the CLI
-bun run bench --form f1040 --year 2025   # engine output against IRS ground truth
+bun run test:ca540        # explicit CA arithmetic, readiness, CLI and evidence tests
+bun run bench --form ca540 --year 2025 --json # exact CA line/workpaper assertions
+bun run bench --form f1040 --year 2025   # local federal source-derived regression check
 
 # Reports and helpers
 bun run check:irs         # which IRS files in irs/ are present, against irs/manifest.json

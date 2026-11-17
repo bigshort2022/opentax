@@ -11,7 +11,7 @@ on:
         type: boolean
         default: true
       version:
-        description: "Tag to create on the dispatched commit, e.g. v2.1.0 (needs dry_run off)"
+        description: "Tag to create on the dispatched commit, e.g. v2.2.0-ca540.1 (needs dry_run off)"
         type: string
         default: ""
 
@@ -45,7 +45,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -57,7 +57,7 @@ jobs:
       - name: Set version
         shell: bash
         run: |
-          if [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+          if [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
             VERSION="${RELEASE_TAG#v}"
           elif [[ -n "$RELEASE_TAG" ]]; then
             echo "Invalid version: $RELEASE_TAG"; exit 1
@@ -83,13 +83,13 @@ jobs:
           smoke-${{ matrix.asset }}.json
 
       - name: Upload smoke transcript
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: smoke-transcript-${{ matrix.asset }}
           path: smoke-${{ matrix.asset }}.json
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.asset }}
           path: ${{ matrix.asset }}
@@ -134,4 +134,4 @@ jobs:
           target_commitish: ${{ github.sha }}
           files: artifacts/*
           generate_release_notes: true
-          prerelease: ${{ contains(env.RELEASE_TAG, '-checkpoint.') }}
+          prerelease: ${{ contains(env.RELEASE_TAG, '-') }}

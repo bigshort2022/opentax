@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import process from "node:process";
 import { Readable } from "node:stream";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
-import { VERSION, GITHUB_REPO } from "../version.ts";
+import { VERSION, GITHUB_REPO, SELF_UPDATE_ENABLED } from "../version.ts";
 
 const RELEASES_API = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 1 day
@@ -72,6 +72,7 @@ async function writeCache(cache: UpdateCache): Promise<void> {
  * is available. Network fetch runs at most once per day (cached).
  */
 export async function checkForUpdate(): Promise<void> {
+  if (!SELF_UPDATE_ENABLED) return;
   const cache = await readCache();
   if (cache && (Date.now() - cache.checkedAt) < CHECK_INTERVAL_MS) {
     if (compareSemver(VERSION, cache.latestVersion) > 0) {
@@ -118,6 +119,11 @@ function assetName(): string {
 
 /** `tax update` -- download latest release and replace the running binary */
 export async function updateCommand(): Promise<void> {
+  if (!SELF_UPDATE_ENABLED) {
+    console.log(`Automatic updates are disabled for this California workpaper fork (${VERSION}).`);
+    console.log(`Choose and verify a versioned release at https://github.com/${GITHUB_REPO}/releases`);
+    return;
+  }
   console.log(`Current version: ${VERSION}`);
   console.log("Checking for updates...");
 

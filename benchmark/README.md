@@ -1,6 +1,6 @@
 # benchmark
 
-Accuracy benchmark for the `tax` engine — 133 checked-in TY2025 scenarios.
+Accuracy benchmark for the `tax` engine — federal TY2025 regression fixtures plus California line/workpaper cases.
 Expected values are regression fixtures, not proof of IRS certification or
 universal tax correctness; independently verify their provenance before treating
 them as authority.
@@ -10,7 +10,8 @@ For folder layout and file formats, see
 
 ## Cases
 
-133 scenarios covering the common return types:
+Federal TY2025 scenarios cover the common return types below; inspect the
+canonical case inventory and current benchmark report for the exact count:
 
 | Range | Filing status | Key features tested                                                                                                                                      |
 | ----- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -71,6 +72,20 @@ bun run bench --form f1040 --year 2025 --json
 bun run check:cases
 ```
 
+## California case contract
+
+`bun run bench --form ca540 --year 2025 --json` runs canonical cases under `cases/ca540/2025/`. `line31` cases compare one tax value; `workpaper` cases exercise create/add/get/validate, the permitted worksheet, and force/draft MeF refusal. `complete_return` cases are explicitly unsupported in this milestone. Exact whole-dollar CA comparisons do not inherit the federal $5 legacy tolerance.
+
+Each case has strict `input.json`, `correct.json`, and `sources.json` records. Inputs declare product, year, and kind. Workpaper expectations include selected numeric lines, stable diagnostic dispositions, every local gate, readiness, required/produced document sets, and external-check limitations. A deliberately blocked workpaper can pass its scenario assertions while its `canFile` remains false. Missing expected lines never default to zero.
+
+`scenarios.json` must match the nonempty executable case inventory and list the requirement IDs each case exercises. Official FTB TY2025 citations establish numeric provenance; explicit OpenTax project policy establishes the workpaper restriction, not an FTB rejection or authorization. Source-derived worksheet arithmetic must not be described as a published FTB worked example or as user numerical approval.
+
+For CA, `ledger.json` records typed assertion paths, before/after values, authority kind/citation, contributor review identity/date, and provenance. Numeric amounts, typed gate/readiness/document assertions, input/source changes, and manifest deletions are checked. This is evidence change control, not automatic human signoff. Missing sources, unknown typed paths, stale evidence, malformed cases, and an empty inventory fail validation.
+
+The old standalone CA vector runner is removed. `check:cases`, `check:oracle`, and the canonical benchmark runner use product-aware CA contracts while retaining federal defaults and evidence conventions. `bun run test:ca540` explicitly executes CA product and evidence tests; the ordinary unit selection alone does not prove CA coverage.
+
+No benchmark here establishes official FTB schema/business-rule validation, PATS qualification, provider import compatibility, or agency acceptance.
+
 ## Adding a new case
 
 Use `/tax-cases` (Claude Code skill) to generate IRS-sourced cases
@@ -98,7 +113,7 @@ table was stale and is not retained as a second, competing source of tax rules.
 This documentation change does not modify engine tax parameters or gold
 fixtures.
 
-## Current discovery contract
+## Federal discovery contract
 
 Discovery recursively validates every leaf before starting the CLI: the shared
 input and expected-value schemas, the product read from `<form>/<year>/<case>`,

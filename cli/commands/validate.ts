@@ -7,7 +7,11 @@
 
 import { join } from "node:path";
 import type { ExecutorDiagnosticEntry } from "../../core/runtime/executor.ts";
-import { catalog } from "../../catalog.ts";
+import { productCatalog } from "../../catalog.ts";
+import {
+  isStateFormDefinition,
+  type ProductDefinition,
+} from "../../core/types/form-definition.ts";
 import { buildEngineInputs, loadReturn } from "../store/store.ts";
 import { singletonPublicInputKeys } from "../store/public-input-keys.ts";
 import { extractFilerIdentity } from "../../forms/f1040/mef/filer.ts";
@@ -22,6 +26,7 @@ import type {
   DiagnosticsReport,
   ErrorCategory,
 } from "../../core/validation/types.ts";
+import type { StateDiagnosticsReport } from "../../core/validation/state-report.ts";
 import { FIELD_REGISTRY } from "../../forms/f1040/validation/field-registry.ts";
 import { rulesForReturnVersion } from "../../forms/f1040/validation/rules/ty2026.ts";
 import { normalizeAllPending } from "../../forms/f1040/2025/return-processing/pending.ts";
@@ -34,9 +39,9 @@ import {
 } from "./return-source-files.ts";
 import { returnHints } from "./return-hints.ts";
 
-function getCatalogEntry(formType: string, year: number) {
+function getCatalogEntry(formType: string, year: number): ProductDefinition {
   const key = `${formType}:${year}`;
-  const def = catalog[key];
+  const def = productCatalog[key];
   if (!def) throw new Error(`Unsupported form: ${key}`);
   return def;
 }
@@ -48,7 +53,7 @@ export type ValidateReturnArgs = {
 };
 
 export type ValidateReturnResult = {
-  readonly report: DiagnosticsReport;
+  readonly report: DiagnosticsReport | StateDiagnosticsReport;
   readonly formatted: string;
 };
 
@@ -62,6 +67,17 @@ export async function validateReturnCommand(
   const returnPath = join(args.baseDir, args.returnId);
   const { meta, inputs } = await loadReturn(returnPath);
   const def = getCatalogEntry(meta.formType ?? "f1040", meta.year);
+  if (isStateFormDefinition(def)) {
+    const entriesForInput = inputs[def.inputKey] ?? [];
+    const { report } = def.assess(entriesForInput.map((entry) => entry.fields));
+    const format = args.format ?? "json";
+    return {
+      report,
+      formatted: format === "text"
+        ? formatDiagnosticsText(report, args.returnId, meta.year)
+        : formatDiagnosticsJson(report),
+    };
+  }
   const engineInputs = await resolveSourceBytes(
     returnPath,
     buildEngineInputs(inputs, singletonPublicInputKeys(def)),

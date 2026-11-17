@@ -1,7 +1,12 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
-import { catalog } from "../../catalog.ts";
+import { productCatalog } from "../../catalog.ts";
+import {
+  isStateFormDefinition,
+  type ProductDefinition,
+  type FormDefinition,
+} from "../../core/types/form-definition.ts";
 import { buildEngineInputs, loadReturn } from "../store/store.ts";
 import { singletonPublicInputKeys } from "../store/public-input-keys.ts";
 import { extractFilerIdentity } from "../../forms/f1040/mef/filer.ts";
@@ -17,6 +22,7 @@ import type {
   DiagnosticsReport,
 } from "../../core/validation/types.ts";
 import type { ExecutorDiagnosticEntry } from "../../core/runtime/executor.ts";
+import type { StateAssessment } from "../../core/validation/state-report.ts";
 import {
   loadReturnSourceFiles,
   resolveSourceBytes,
@@ -45,9 +51,9 @@ import {
 
 export { businessRuleReport, emittedValidationScope, isTransmissionOnlyRule };
 
-function getCatalogEntry(formType: string, year: number) {
+function getCatalogEntry(formType: string, year: number): ProductDefinition {
   const key = `${formType}:${year}`;
-  const def = catalog[key];
+  const def = productCatalog[key];
   if (!def) throw new Error(`Unsupported form: ${key}`);
   return def;
 }
@@ -95,9 +101,10 @@ export class ExportExecutionError extends Error {
 
 type PipelineResult = {
   readonly pending: Readonly<Record<string, Record<string, unknown>>>;
-  readonly def: ReturnType<typeof getCatalogEntry>;
+  readonly def: ProductDefinition;
   readonly filer: ReturnType<typeof extractFilerIdentity>;
   readonly executorDiagnostics: readonly ExecutorDiagnosticEntry[];
+  readonly stateAssessment?: StateAssessment;
 };
 
 export function validateBusinessRules(
@@ -111,7 +118,7 @@ export function validateBusinessRules(
 
 /** The emitted return's own rule set: a Form 4868 is not judged by Form 1040 rules. */
 function validateSubmissionRules(
-  def: PipelineResult["def"],
+  def: FormDefinition,
   pending: Readonly<Record<string, Record<string, unknown>>>,
   filer: PipelineResult["filer"],
   force: boolean | undefined,
@@ -159,6 +166,17 @@ export async function runReturnPipeline(
   const returnPath = join(args.baseDir, args.returnId);
   const { meta, inputs } = await loadReturn(returnPath);
   const def = getCatalogEntry(meta.formType ?? "f1040", meta.year);
+  if (isStateFormDefinition(def)) {
+    const entries = inputs[def.inputKey] ?? [];
+    const assessment = def.assess(entries.map((entry) => entry.fields));
+    return {
+      pending: {},
+      def,
+      filer: undefined,
+      executorDiagnostics: [],
+      stateAssessment: assessment,
+    };
+  }
   const engineInputs = await resolveSourceBytes(
     returnPath,
     buildEngineInputs(inputs, singletonPublicInputKeys(def)),
@@ -219,7 +237,7 @@ async function addDraftWatermark(pdfBytes: Uint8Array): Promise<Uint8Array> {
 export async function prepareWithSourceFiles(
   args: ExportReturnArgs,
   pending: PipelineResult["pending"],
-  def: PipelineResult["def"],
+  def: FormDefinition,
   filer: PipelineResult["filer"],
 ) {
   const files = await loadReturnSourceFiles(
@@ -244,6 +262,9 @@ export async function exportMefCommand(
   const { pending, def, filer, executorDiagnostics } = await runReturnPipeline(
     args,
   );
+  if (isStateFormDefinition(def)) {
+    throw new Error("MeF export is not available for California Form 540");
+  }
   const prepared = await prepareWithSourceFiles(args, pending, def, filer);
   const xml = prepared.bundle.xml;
   validateSubmissionRules(def, pending, filer, args.force, xml);
@@ -260,9 +281,21 @@ export type ExportPdfArgs = ExportReturnArgs & {
 export async function exportPdfCommand(
   args: ExportPdfArgs,
 ): Promise<string> {
-  const { pending, def, filer } = await runReturnPipeline(
+  const { pending, def, filer, stateAssessment } = await runReturnPipeline(
     args,
   );
+  if (isStateFormDefinition(def)) {
+    if (!stateAssessment?.calculation) {
+      throw new Error(
+        "California workpaper calculation is unavailable; run validate for input diagnostics.",
+      );
+    }
+    const pdfBytes = await def.buildWorksheetPdf(stateAssessment);
+    const outPath = args.outputPath ??
+      join(args.baseDir, args.returnId, "export.pdf");
+    await writeFile(outPath, pdfBytes);
+    return outPath;
+  }
   // An unidentified draft is a PDF preview; it has no fileable MeF return.
   const prepared = args.draft && !filer
     ? undefined
@@ -299,6 +332,9 @@ export async function exportForm4972PaperCommand(
     );
   }
   const { pending, def, filer } = await runReturnPipeline(args);
+  if (isStateFormDefinition(def)) {
+    throw new Error("Form 4972 paper-only export requires a TY2025 Form 1040");
+  }
   if (def.formType !== "f1040" || def.taxYear !== 2025) {
     throw new Error("Form 4972 paper-only export requires a TY2025 Form 1040");
   }
@@ -419,7 +455,7 @@ export async function prepareMefSubmissionArchive(
     );
   }
   const { pending, def, filer: returnFiler } = await runReturnPipeline(args);
-  if (def.formType !== "f1040" || def.taxYear !== 2025) {
+  if (isStateFormDefinition(def) || def.formType !== "f1040" || def.taxYear !== 2025) {
     throw new Error("MeF submission export requires a TY2025 Form 1040");
   }
   if (!returnFiler) {

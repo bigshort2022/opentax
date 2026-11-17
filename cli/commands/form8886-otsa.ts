@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { z } from "zod";
 import { sha256Hex } from "../../forms/f1040/2025/return-processing/prepared-source.ts";
 import { dirname, join } from "node:path";
+import { isStateFormDefinition } from "../../core/types/form-definition.ts";
 import {
   emittedValidationScope,
   type ExportReturnArgs,
@@ -31,6 +32,9 @@ async function prepareExport(
   );
   const pipeline = await runReturnPipeline(args);
   const { pending, def } = pipeline;
+  if (isStateFormDefinition(def)) {
+    throw new Error("OTSA exact-copy export requires a Form 1040 return");
+  }
   const filer = pipeline.filer && preparationTimestamp
     ? { ...pipeline.filer, timestamp: preparationTimestamp }
     : pipeline.filer;

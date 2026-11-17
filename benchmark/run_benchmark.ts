@@ -7,7 +7,7 @@ import * as sys from "../scripts/support/sys.ts";
  * Run: bun benchmark/run_benchmark.ts
  */
 
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath as fromFileUrl } from "node:url";
 import {
   benchmarkExpectedSchema,
@@ -18,6 +18,7 @@ import {
   discoverBenchmarkCases,
   readCaseBaseline,
 } from "./harness.ts";
+import { runCaBenchmark } from "./ca540.ts";
 
 const SCRIPT_DIR = dirname(fromFileUrl(import.meta.url));
 const TAX_DIR = join(SCRIPT_DIR, "..");
@@ -33,6 +34,34 @@ function getFlag(flag: string, defaultVal: string): string {
 const formFlag = getFlag("--form", "f1040");
 const yearFlag = getFlag("--year", "2025");
 const jsonFlag = args.includes("--json");
+const caseFlag = getFlag("--case", "");
+if (
+  args.includes("--case") &&
+  (!caseFlag || caseFlag.startsWith("--") || basename(caseFlag) !== caseFlag ||
+    caseFlag === "." || caseFlag === "..")
+) {
+  throw new Error("--case requires one case directory name");
+}
+if (import.meta.main && formFlag === "ca540") {
+  if (yearFlag !== "2025") {
+    throw new Error(`Unsupported California benchmark year: ${yearFlag}`);
+  }
+  const report = await runCaBenchmark(
+    join(SCRIPT_DIR, "cases", "ca540", yearFlag),
+    caseFlag || undefined,
+  );
+  console.log(
+    jsonFlag ? JSON.stringify(report) : [
+      ...report.results.map((result) =>
+        `${result.ok ? "PASS" : "FAIL"} ${result.name}${
+          result.errors.length ? ": " + result.errors.join("; ") : ""
+        }`
+      ),
+      `${report.pass} passed, ${report.fail} failed; CA workpaper evidence only, exact dollars; no filing authorization`,
+    ].join("\n"),
+  );
+  process.exit(report.total > 0 && report.fail === 0 ? 0 : 1);
+}
 
 const CASES_DIR = join(SCRIPT_DIR, "cases", formFlag, yearFlag);
 
@@ -332,7 +361,15 @@ async function runCase(name: string): Promise<CaseResult> {
   const correct = JSON.parse(await fs.readFile(correctFile, "utf8"));
   benchmarkExpectedSchema.parse(correct);
   const rid = createdReturnSchema.parse(JSON.parse(
-    await tax("return", "create", "--year", String(caseData.year), "--json"),
+    await tax(
+      "return",
+      "create",
+      "--form",
+      formFlag,
+      "--year",
+      String(caseData.year),
+      "--json",
+    ),
   )).returnId;
   for (const f of caseData.forms) {
     await tax(
@@ -491,11 +528,15 @@ async function runAll(caseNames: string[]): Promise<CaseResult[]> {
 }
 
 if (import.meta.main) {
-  const paths = await discoverBenchmarkCases(CASES_DIR, undefined, {
-    casesRoot: join(SCRIPT_DIR, "cases"),
-    baseline: await readCaseBaseline(join(SCRIPT_DIR, "..")),
-    today: new Date().toISOString().slice(0, 10),
-  });
+  const paths = await discoverBenchmarkCases(
+    caseFlag ? join(CASES_DIR, caseFlag) : CASES_DIR,
+    undefined,
+    {
+      casesRoot: join(SCRIPT_DIR, "cases"),
+      baseline: await readCaseBaseline(join(SCRIPT_DIR, "..")),
+      today: new Date().toISOString().slice(0, 10),
+    },
+  );
   const names = paths.map((path) => path.slice(CASES_DIR.length + 1));
 
   const results = await runAll(names);

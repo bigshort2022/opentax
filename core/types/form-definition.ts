@@ -4,6 +4,7 @@ import type { FilerIdentity } from "../../forms/f1040/mef/header.ts";
 import type { ExecuteResult } from "../runtime/executor.ts";
 import type { MefBundle } from "../../forms/f1040/2025/mef/builder.ts";
 import type { MefPdfAttachment } from "../../forms/f1040/2025/mef/form-descriptor.ts";
+import type { StateAssessment } from "../validation/state-report.ts";
 import type { DiagnosticsReport } from "../validation/types.ts";
 
 export interface PreparedFormReturn {
@@ -60,4 +61,23 @@ export interface FormDefinition {
     pending: Readonly<Record<string, unknown>>,
     xml: string,
   ) => DiagnosticsReport;
+}
+export interface StateFormDefinition {
+  readonly kind: "state-paper";
+  readonly formType: string;
+  readonly taxYear: number;
+  readonly inputKey: string;
+  readonly inputSchema: ZodTypeAny;
+  readonly assess: (entries: readonly unknown[]) => StateAssessment;
+  readonly buildWorksheetPdf: (
+    assessment: StateAssessment,
+  ) => Promise<Uint8Array>;
+}
+
+export type ProductDefinition = FormDefinition | StateFormDefinition;
+
+export function isStateFormDefinition(
+  definition: ProductDefinition,
+): definition is StateFormDefinition {
+  return "kind" in definition && definition.kind === "state-paper";
 }

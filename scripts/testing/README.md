@@ -11,7 +11,7 @@ in [AGENTS.md](../../AGENTS.md); the rule each check owns is in the table in
 | `bun run check:structure`                   | nodes are placed, registered and reachable                       | a `TaxNode` outside `forms/<form>/nodes/<role>/[<kind>/]<section>/<group>/<name>/`; a registry key that is not the node type; a node class in no registry; a registered node that nothing routes to and the CLI cannot take; shared code that pins a tax year beyond `year-pinned-baseline.json` |
 | `bun run check:cases`                       | benchmark cases fit their node schemas and cite a source         | an input `form add` would reject, with the field named; a `source` that cites the engine                                                                                                                                    |
 | `bun run check:oracle [--base origin/main]` | expected values changed only with a citation                     | a changed scored value, a removed case, or a new case without a source, that has no matching entry in `benchmark/cases/<form>/<year>/ledger.json`                                                                           |
-| `bun run bench --form f1040 --year 2025`    | the engine matches IRS ground truth                              | a supported line outside the $5 legacy tolerance, an unmapped oracle, a diagnostic, a skipped case                                                                                                                          |
+| `bun run bench --form f1040 --year 2025`    | selected engine outputs match cited IRS fixtures                              | a supported line outside the $5 legacy tolerance, an unmapped oracle, a diagnostic, a skipped case                                                                                                                          |
 | `bun run check:sandbox`                     | the binary can reach the network only through restricted fetch   | a module `cli/main.ts` loads, dependencies included, that imports `child_process`, `net`, `http`, `worker_threads`, `vm`, `bun:ffi` or similar, or calls `Bun.spawn`, `eval` or a non-literal `import()`                    |
 | `bun run test:unit`                         | the module graph resolves, type-checks, and the typed tests pass | an unresolved import, a `tsc` error (strict, no unused locals or parameters), a missing or duplicate test module, a failing test, a runtime change during the run                                                           |
 | `bun run test:forms`                        | the node, MeF, validation and return-processing tests pass       | a failing test not in `scripts/testing/forms-failure-baseline.json`, an expired entry, an entry whose test now passes                                                                                                       |
@@ -22,11 +22,17 @@ in [AGENTS.md](../../AGENTS.md); the rule each check owns is in the table in
 | `bun run bench:cached [bench flags]`        | same as `bench`, replayed when nothing it reads changed           | as `bench`                                                                                                                                                                                                                  |
 | `bun run check:mef [--update]`              | every signed PDF review fixture computes, builds MeF XML and passes the IRS business rules export applies | a calculation, XML or reject-level rule finding not in `scripts/testing/mef-baseline.json`, or a baselined finding that no longer occurs; `--update` rewrites the baseline |
 | `bun run check:ty2026 [--update]`           | the same sample returns run as TY2026 (`check:mef --year 2026`) with every date and year field moved one year later (`sample-year.ts`), signed and received in 2027 | a finding not in `scripts/testing/mef-baseline-2026.json`, a baselined finding that no longer occurs, or a baselined return without its reason; the clean count can only rise |
+| `bun run test:ca540` | selected CA arithmetic, coverage, readiness, CLI/worksheet and evidence contracts execute | a selected behavioral contract fails; this does not run official FTB schemas or PATS |
+| `bun run bench --form ca540 --year 2025 --json` | canonical CA line/workpaper assertions match exactly, including intentional non-readiness | a numeric/typed expectation differs, inventory is empty/malformed, required evidence is absent, or a workflow fails |
 
-Every check prints each problem with its fix, takes `--json`, and exits 1 on any
-problem. `.github/workflows/test.yml` runs the first three, `check:sandbox`,
-`test:unit`, `test:forms`, `check:mef`, `check:ty2026` and `check:cli` on every pull request. `bench` runs locally until the baselined
-cases below are fixed, then joins them.
+The gates report problems with fixes and fail on unmet contracts; `check:ats`
+is a readiness report rather than a pass/fail filing gate, as noted above.
+`.github/workflows/test.yml` runs `check:structure`, `check:cases`, `check:oracle`,
+`check:sandbox`, `test:unit`, `test:forms`, `check:mef`, `check:ty2026`, `check:cli`,
+`check:irs`, and a compiled-binary smoke. Its separate Bun CA job installs the
+PDF text utilities and runs `test:ca540` and the canonical CA benchmark.
+The federal benchmark remains local while baselined cases remain unresolved;
+a CA pass is not a clean federal benchmark or filing certification.
 
 ## Changed-only runs
 
@@ -63,6 +69,8 @@ fails until it is removed, so a baseline only shrinks.
 | `scripts/testing/mef-baseline-2026.json`      | sample return id       | the same samples' TY2026 blockers, each with its reason: a dated 2025 fact, a 2026v1.0 schema gap, a named TY2025-only route or open TY2026 work |
 | `benchmark/cases/<form>/<year>/ledger.json`   | case, line             | every expected-value change, with its publication   |
 
+California ledgers use typed assertion paths and official/project-policy authority for numeric and nonnumeric outcomes, inputs/sources, and manifest changes. Their contributor provenance does not imply user or tax-professional numerical approval. Federal numeric ledger semantics are unchanged.
+
 The ledger is history, not debt: it is append-only and never expires. An entry
 that cites the engine, its output or a reference calculator does not count.
 
@@ -92,6 +100,17 @@ request and stay in `bun run test`.
 Reports explicitly list excluded modules; a selected run does not prove complete
 filing coverage.
 
+`bun run test:ca540` directly runs an explicit Bun test selection with file
+isolation: `forms/ca540/2025`, `cli/commands/ca540.test.ts`,
+`benchmark/ca540.test.ts`, `core/validation/readiness.test.ts`,
+`core/validation/report.test.ts`, and `scripts/testing/oracle.test.ts`.
+It covers the workpaper and shared readiness/evidence contracts, including CA
+modules not exercised by the ordinary unit selection. Graph discovery alone is
+not execution evidence. This direct Bun command reports to stdout/stderr; it
+does not create the harness runner's retained report directory. Canonical CA
+cases distinguish line-31 checks from workpapers and reject complete-return
+cases until that product scope exists.
+
 `bun run test` runs the complete discovered suite in isolated parallel workers,
 requires xmllint, Poppler and the retained TY2025 Return1040 schema, and rejects
 unavailable ignored requirements. Exact module/test exclusions in
@@ -102,7 +121,7 @@ environment inputs for the relevant optional filing gates. Missing inputs and
 ignored cases remain visible in the requirements and JUnit reports. A full suite
 is not IRS acceptance or independent tax ground truth.
 
-Every invocation retains a unique private directory under
+Every harness runner invocation retains a unique private directory under
 `.state/research/testing/`, including exact selected/excluded modules, module
 graph, runtime hashes, stdout/stderr, child exit status and terminal report.
 Runtime changes, graph errors, missing/duplicate test modules, zero executed

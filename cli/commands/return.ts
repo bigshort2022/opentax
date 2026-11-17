@@ -1,14 +1,18 @@
 import { join } from "node:path";
-import { catalog } from "../../catalog.ts";
+import { productCatalog } from "../../catalog.ts";
+import {
+  isStateFormDefinition,
+  type ProductDefinition,
+} from "../../core/types/form-definition.ts";
 import { buildEngineInputs, createReturn, loadReturn } from "../store/store.ts";
 import { singletonPublicInputKeys } from "../store/public-input-keys.ts";
 import { resolveSourceBytes } from "./return-source-files.ts";
 import { returnHints } from "./return-hints.ts";
 import { normalizeAllPending } from "../../forms/f1040/2025/return-processing/pending.ts";
 
-function getCatalogEntry(formType: string, year: number) {
+function getCatalogEntry(formType: string, year: number): ProductDefinition {
   const key = `${formType}:${year}`;
-  const def = catalog[key];
+  const def = productCatalog[key];
   if (!def) throw new Error(`Unsupported form: ${key}`);
   return def;
 }
@@ -35,20 +39,12 @@ export type GetReturnArgs = {
   readonly baseDir: string;
 };
 
-export type ReturnSummary = {
-  readonly line1z_total_wages: number;
-  readonly line9_total_income: number;
-  readonly line11_agi: number;
-  readonly line15_taxable_income: number;
-  readonly line24_total_tax: number;
-  readonly line33_total_payments: number;
-  readonly line35a_refund?: number;
-  readonly line37_amount_owed?: number;
-};
+export type ReturnSummary = Readonly<Record<string, number>>;
 
 export type GetReturnResult = {
   readonly returnId: string;
   readonly year: number;
+  readonly formType: string;
   readonly summary: ReturnSummary;
   readonly forms: readonly string[];
   readonly lines: Record<string, unknown>;
@@ -189,6 +185,43 @@ export async function getReturnCommand(
   const { meta, inputs } = await loadReturn(returnPath);
 
   const def = getCatalogEntry(meta.formType ?? "f1040", meta.year);
+  if (isStateFormDefinition(def)) {
+    const entries = inputs[def.inputKey] ?? [];
+    const { calculation, report } = def.assess(
+      entries.map((entry) => entry.fields),
+    );
+    if (!calculation) {
+      throw new Error(
+        `California workpaper calculation is unavailable; run validate for input diagnostics (${
+          report.entries[0].ruleNumber
+        }).`,
+      );
+    }
+    return {
+      returnId: meta.returnId,
+      year: meta.year,
+      formType: meta.formType ?? def.formType,
+      summary: {
+        federal_agi: calculation.lines.line13_federal_agi,
+        california_agi: calculation.lines.line17_ca_agi,
+        taxable_income: calculation.lines.line19_taxable_income,
+        ordinary_tax: calculation.lines.line31_tax,
+        total_tax: calculation.lines.line64_total_tax,
+        payments_after_use_tax_and_penalty:
+          calculation.lines.line95_payments_after_use_tax_and_penalty,
+        refund: calculation.lines.line97_overpaid_tax,
+        amount_due: calculation.lines.line100_tax_due,
+      },
+      forms: ["f540"],
+      lines: { ...calculation.lines },
+      warnings: calculation.findings.map((finding) => finding.message),
+      carryforwards: {},
+      // The workpaper runs no engine nodes; a missing calculation throws above.
+      complete: true,
+      failedNodes: [],
+    };
+  }
+
   const engineInputs = await resolveSourceBytes(
     returnPath,
     buildEngineInputs(inputs, singletonPublicInputKeys(def)),
@@ -215,6 +248,7 @@ export async function getReturnCommand(
   return {
     returnId: meta.returnId,
     year: meta.year,
+    formType: meta.formType ?? "f1040",
     summary: extractSummary(f1040),
     forms: collectForms(pending),
     // A Form 4868 is its own submission; its filed lines are form4868.
